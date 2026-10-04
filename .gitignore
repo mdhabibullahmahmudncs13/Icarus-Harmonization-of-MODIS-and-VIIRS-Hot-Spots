@@ -1,6 +1,9 @@
 # Caches
 cache/
 *.parquet
+# The offline demo detections fixture is committed on purpose: it is what
+# `make demo` serves when there is no cache and no FIRMS_MAP_KEY.
+!demo_fixtures/*.parquet
 
 # Secrets
 .env

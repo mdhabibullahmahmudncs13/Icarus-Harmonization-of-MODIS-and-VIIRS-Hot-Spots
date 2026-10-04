@@ -19,14 +19,19 @@ CACHE_DIR = REPO_ROOT / "cache"
 FIXTURE_DIR = REPO_ROOT / "demo_fixtures"
 
 
-def _is_offline() -> bool:
+def is_offline() -> bool:
     """Return True when OFFLINE=1 is set."""
     return os.environ.get("OFFLINE", "").strip().lower() in {"1", "true", "yes"}
 
 
+#: Backwards-compatible private alias; ``src.acquire.firms`` and older
+#: callers use the underscore name.
+_is_offline = is_offline
+
+
 def _try_live(url: str, fetcher: Callable[[str], Any]) -> Any | None:
     """Attempt a live fetch. Return None on any failure."""
-    if _is_offline():
+    if is_offline():
         return None
     try:
         return fetcher(url)

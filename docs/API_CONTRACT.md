@@ -11,6 +11,14 @@ Every endpoint below is a `GET` and returns JSON. Every response — without
 exception — starts with the same `meta` block, so no figure can ever be shown
 without its provenance.
 
+**Implementation.** `src/api` (FastAPI, `python -m uvicorn src.api.main:app`,
+or `make demo`) serves all seven endpoints. It reads local parquet only —
+`cache/raw/*.parquet` when present, else the committed
+`demo_fixtures/detections.parquet` — and never calls NASA; `OFFLINE=1` forces
+the fixture. `tests/test_api.py` calls every route through the ASGI test
+client and validates each response against `contract.schema.json`, and it
+validates the mock files against the same definitions.
+
 ## The `meta` block (present on every response)
 
 | Field | Type | Meaning |

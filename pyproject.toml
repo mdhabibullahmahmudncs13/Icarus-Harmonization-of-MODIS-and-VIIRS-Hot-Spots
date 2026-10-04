@@ -10,7 +10,10 @@ dependencies = [
     "requests",
     "fastapi",
     "uvicorn",
+    # httpx2 is what Starlette's TestClient uses; the contract tests need it.
+    "httpx2",
     "pytest",
+    "jsonschema",
     "ruff",
 ]
 
