@@ -3,6 +3,7 @@
 **Project:** Icarus: Harmonization of MODIS and VIIRS Hot Spots (NASA Space Apps 2026, Challenge 9, Bangladesh)
 **Scope:** `web/` frontend: visual identity, layout, 3D globe, interactions, motion, accessibility, offline UX, demo choreography
 **Direction (v2):** light theme in shades of green and black, bento-grid layout over a full-viewport Three.js globe, minimal glassmorphism
+**Direction (v3, shipped):** **dark** theme — near-black green ground, one neon green accent, pale mint for raw — with a procedural dot-matrix Earth as the hero (section 0.1). v2's light palette is superseded and kept below only as history.
 **Companions:** PRD, TRD (requirements and architecture), `CLAUDE.md` (non-negotiables)
 
 ---
@@ -25,6 +26,25 @@ Gaps worth fixing before the UI depends on them:
 1. **Sensor list.** README and `CLAUDE.md` list MODIS plus VIIRS NOAA-20 and NOAA-21 only, and describe the problem as "post-2012". NOAA-20 and NOAA-21 launched well after 2012 (from my knowledge, verify), so the 2003 to 2026 demo and a 2012 transition likely also need Suomi-NPP, which NASA stops serving on 1 Nov 2026. The UI's era bands (section 7.2) are driven by `/api/meta` data windows, so they follow whatever the data actually contains.
 2. **Package paths.** `pyproject.toml` uses `where = ["src"]`, while the Makefile runs `uvicorn src.api.main:app`. Pick one import style before the API is written.
 3. **Dependencies.** No test client for FastAPI (`httpx`) and no numeric/stat library is declared. Add them with the compute code.
+
+---
+
+- **v2 (light) is superseded.** The shipped tokens are the dark set in `web/src/styles/tokens.css`; the v2 block quoted in section 4.2 is history. Dark was P2 in v2 and is now the default because the globe hero is the product surface and a dot-matrix Earth only reads on a dark ground.
+
+## 0.1 Direction v3 — what shipped (4 Oct 2026)
+
+**World.** Near-black green ground (`#010c09`), one neon green accent (`#2ee87d`), pale mint for raw (`#eafff3`). Black can no longer mean "raw" on a black page, so the metaphor inverts: **raw is pale and dense, harmonized is green and corrected.** Everything else from v2 stands — one idea per tile, green-and-black only, no new hues, self-hosted type, glass that serves legibility.
+
+**Hero (section 1).** A code-authored Three.js Earth (`web/src/globe/`, spec in `globeSpec.ts`): a near-black sphere body, a 1° dot-matrix land shell from the Natural Earth 110 m mask (`npm run land:gen`), a faint graticule, one tilted orbit ring, a dim starfield, and the study region's own cells as glowing dots with light streaks on the busiest ones. No downloaded meshes and no image textures — the whole model is procedural, so it stays offline and inspectable. The camera is owned by the page (`GlobeView`): centred on the region by default, held still; drag to spin; "Whole Earth" releases the spin; clicking a cell in the panel flies to it.
+
+**Honesty rules for the hero.**
+1. Every dot is a grid cell at its own coordinates with its own count; nothing is placed decoratively.
+2. At full density 10 047 cells merge into one white patch with no readable structure, so the globe draws the **500 busiest** (ranked once by the higher of the two counts, so the set does not change when the mode is toggled). The legend says so, and the panel plus the cells JSON carry every cell.
+3. WebGL failure degrades to a labelled note; the rest of the page is unaffected.
+
+**Panel (section 1, right).** The reference's "what's hot" column, made data-driven: the seven busiest cells in the active mode, each selectable, with the region total and the mock window stated.
+
+**Timeline (section 2).** The v2 chart, restyled: raw is the pale line, harmonized the green one, era bands and the sensor-transition marker unchanged.
 
 ---
 
@@ -86,7 +106,7 @@ Navigation: top-bar links scroll or focus the matching tile in Globe view; on mo
 
 Light and airy, like frosted glass over a pale mint landscape, with black used as ink. Precise and quiet. Nothing decorative that is not data. No stock photos, no people.
 
-### 4.2 Color tokens (light theme, default)
+### 4.2 Color tokens (light theme, v2 — superseded by section 0.1)
 
 Only shades of green and black plus neutral greys. No orange, red, blue or purple anywhere. Separate values by **lightness**, not hue.
 
@@ -140,9 +160,9 @@ Only shades of green and black plus neutral greys. No orange, red, blue or purpl
 
 Re-verify contrast with a checker once values are final. Use `--harmonized-text` for any green text; `--harmonized` is for fills, lines and chips with white text.
 
-### 4.3 Optional dark theme (P2)
+### 4.3 Dark theme — shipped as the default (see section 0.1)
 
-Same token names, remapped: `--bg-0 #060A08`, glass fill `rgba(20, 32, 26, .55)`, `--text-1 #E7F0EA`, **raw becomes near-white `#F2F5F3`** (black would vanish), harmonized becomes a light green `#3DDC84`, and the ramp is reversed so higher values are brighter. A sun/moon switch in the top bar toggles it. Default stays light.
+The v3 remap is exactly this, and it is now the only theme: `--bg-0 #010c09`, glass fill `rgba(6, 30, 22, .55)`, `--text-1 #e7f8ee`, **raw is pale mint `#eafff3`** (black would vanish), harmonized is neon green `#2ee87d`. There is no light/dark switch; `prefers-reduced-transparency` swaps glass for an opaque fill instead.
 
 ### 4.4 Data color scale
 

@@ -1,53 +1,59 @@
 /*
- * Design tokens — docs/DESIGN.md (v2): light world, green and black.
- * Only shades of green and black plus neutral greys; values separate by
- * lightness, never hue. No red, blue, orange or purple anywhere.
+ * Design tokens — the dark world.
+ *
+ * Near-black green ground, one neon green accent, neutral greens in between.
+ * No red, blue, orange or purple anywhere; values separate by lightness, not
+ * hue. Raw is the pale, dense, unprocessed reading; harmonized is the green,
+ * corrected one — the same metaphor as before, inverted for a dark ground
+ * (black cannot mean "raw" on a black page).
  */
 :root {
-  /* Canvas and mesh gradient (visible behind the glass) */
-  --bg-0: #f4f8f4;
-  --mesh-mint: #d9f0e0;
-  --mesh-sage: #bfe0c9;
-  --mesh-lime: #e6f4d7;
+  /* Canvas: near-black, with green light pooled behind the globe */
+  --bg-0: #010c09;
+  --bg-1: #04170f;
+  --bg-2: #072417;
+  --mesh-teal: #06251c;
+  --mesh-moss: #0a2a18;
 
   /* Glass */
-  --glass-fill: rgba(255, 255, 255, 0.6);
-  --glass-fill-strong: rgba(255, 255, 255, 0.82);
-  --glass-border: rgba(255, 255, 255, 0.7);
-  --glass-shadow: 0 10px 40px rgba(15, 60, 35, 0.1);
-  --glass-blur: 24px;
+  --glass-fill: rgba(6, 30, 22, 0.55);
+  --glass-fill-strong: rgba(4, 22, 16, 0.88);
+  --glass-border: rgba(46, 232, 125, 0.18);
+  --glass-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+  --glass-blur: 18px;
 
   /* Text and lines */
-  --text-1: #0a0f0c; /* primary, near-black */
-  --text-2: #4e5b53; /* secondary */
-  --text-3: #7b887f; /* non-essential labels only */
-  --line: rgba(10, 15, 12, 0.1);
-  --ghost: #9ba8a0; /* inactive or comparison line */
+  --text-1: #e7f8ee; /* primary, near-white with a green cast */
+  --text-2: #93bfa8; /* secondary */
+  --text-3: #6a917f; /* non-essential labels only */
+  --line: rgba(46, 232, 125, 0.16);
+  --ghost: #50786a; /* inactive or comparison line */
 
   /* Mode accents (toggle, lines, chrome) */
-  --raw: #0b0f0d; /* black */
-  --harmonized: #138a4b; /* green: fills, lines, chips */
-  --harmonized-text: #0f6b3a; /* darker green: any green TEXT */
+  --raw: #eafff3; /* raw: pale, every detection counted */
+  --raw-ink: #04170f; /* text on a pale fill */
+  --harmonized: #2ee87d; /* neon green: fills, lines, chips */
+  --harmonized-text: #6ef2a6; /* brighter green: any green TEXT */
 
-  /* Data ramp (map, globe cells, calendar), light to dark */
-  --ramp-0: #f0f8f1;
-  --ramp-1: #cfe9d5;
-  --ramp-2: #98d3a9;
-  --ramp-3: #52b26f;
-  --ramp-4: #1f8a50;
-  --ramp-5: #0f5a33;
-  --ramp-6: #040a07;
+  /* Data ramp (globe cells, map, calendar), dark to neon */
+  --ramp-0: #06231a;
+  --ramp-1: #0a3624;
+  --ramp-2: #10532f;
+  --ramp-3: #1a7a45;
+  --ramp-4: #24a75e;
+  --ramp-5: #2ee87d;
+  --ramp-6: #a6ffcd;
 
-  /* Source badges (no new hues). Mock = black outline until real data. */
-  --src-live: #138a4b;
-  --src-cache: #4e5b53;
-  --src-fixture: #0b0f0d;
-  --src-mock: #0b0f0d;
+  /* Source badges (no new hues). Mock = pale outline until real data. */
+  --src-live: #2ee87d;
+  --src-cache: #93bfa8;
+  --src-fixture: #eafff3;
+  --src-mock: #eafff3;
 
   /* Eras (timeline bands), from /api/meta sensor windows */
-  --era-modis: rgba(10, 15, 12, 0.04);
-  --era-overlap: rgba(19, 138, 75, 0.1);
-  --era-viirs: rgba(10, 15, 12, 0.07);
+  --era-modis: rgba(234, 255, 243, 0.045);
+  --era-overlap: rgba(46, 232, 125, 0.11);
+  --era-viirs: rgba(46, 232, 125, 0.05);
 
   /* Type — all self-hosted via fontsource, no CDN */
   --font-display: "Fraunces Variable", Georgia, "Times New Roman", serif;
@@ -74,23 +80,36 @@
   --space-5: 1.5rem;
   --space-6: 2.5rem;
 
-  --content-max: 1440px;
+  --content-max: 1560px;
 }
 
-/* Visible keyboard focus, in dark green (DESIGN.md §13). */
+/* Visible keyboard focus, in neon green. */
 :focus-visible {
-  outline: 2px solid var(--harmonized-text);
+  outline: 2px solid var(--harmonized);
   outline-offset: 2px;
 }
 
 /* Browser surfaces carry the design too. */
 ::selection {
   background: var(--harmonized);
-  color: #ffffff;
+  color: var(--raw-ink);
 }
 
 body {
-  caret-color: var(--harmonized-text);
+  caret-color: var(--harmonized);
+}
+
+/* Text readout for screen readers, hidden visually. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -107,8 +126,8 @@ body {
 /* Glass quality tier: opaque tiles for reduced-transparency users. */
 @media (prefers-reduced-transparency: reduce) {
   :root {
-    --glass-fill: rgba(255, 255, 255, 0.92);
-    --glass-fill-strong: rgba(255, 255, 255, 0.96);
+    --glass-fill: rgba(4, 22, 16, 0.96);
+    --glass-fill-strong: rgba(4, 22, 16, 0.98);
     --glass-blur: 0px;
   }
 }

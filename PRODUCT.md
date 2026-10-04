@@ -47,14 +47,16 @@ not asserted — and mock data is never presented as evidence.
 
 - Shipped today: mock data source, contract-validated payloads, daily series
   2003–2026, raw/harmonized toggle, provenance drawer, source badge, persistent
-  mock banner. Calendar, map, validation card, methods panel and story mode
-  (F3+) are not built yet.
+  mock banner, and a procedural Three.js globe hero (section 1) over the
+  busiest-cells panel, with the timeline as section 2. Calendar, map,
+  validation card, methods panel and story mode are not built yet.
 - Offline-first; zero third-party requests; self-hosted fonts and assets;
   deterministic science only in src/compute; the frontend displays numbers and
   never computes statistics.
 - Defaults: 5.5 km grid (configurable), confidence ≥ 50, VIIRS l/n/h mapped
   to 25/60/90.
-- Open decision: dark theme deferred (P2 in docs/DESIGN.md).
+- Dark theme shipped as the only theme (DESIGN.md v3, section 0.1): a
+  dot-matrix Earth only reads on a dark ground.
 
 ## Brand Commitments
 

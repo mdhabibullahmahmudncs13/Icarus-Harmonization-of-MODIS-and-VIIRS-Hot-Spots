@@ -74,6 +74,25 @@ A transparent record of how AI tools contributed to this repository.
   the AI made no product decisions beyond what the docs and user answers
   specify. Captures in `.impeccable/review/` are gitignored dev artifacts.
 
+- 4 Oct 2026 (Freebuff, globe hero session): used the **img2threejs** skill
+  (project-scoped at `.agents/skills/img2threejs/`) to rebuild the direction
+  reference (`~/Downloads/reference.png`, a dark neon-green Earth) as a
+  **code-only procedural Three.js globe**: `web/src/globe/geo.ts` (pure
+  sphere/geography maths), `globeSpec.ts` (the reconstruction parameter sheet),
+  `createEarthGlobe.ts` (the scene factory) and `GlobeHero.tsx` (canvas, render
+  loop, pointer drag, resize observer, WebGL fallback). The land shell is
+  generated offline from Natural Earth 1:110m land by
+  `web/scripts/gen-landmask.ts` (`npm run land:gen`) — the input TopoJSON is
+  committed at `web/scripts/data/land-110m.json`, so the step needs no network
+  and the globe ships no downloaded mesh or image texture. Also restyled the
+  whole page to the reference's dark world (tokens + app.css), added the
+  data-driven `HottestCells` panel, moved the timeline into section 2, and added
+  `web/tests/unit/globe.test.ts` plus three Playwright cases (globe mounts and
+  lists real payload values, selecting a cell moves the camera — asserted by a
+  canvas pixel diff — and the toggle reaches the hero copy). Session prompts
+  below. The AI chose the palette values, the camera framing, and which cells
+  the globe draws; every number shown still comes from the payload verbatim.
+
 ## What the AI did not do
 
 <!-- Be explicit. The AI should not generate final scientific decisions, dataset licenses, or anything that requires domain expertise you do not have. -->
@@ -92,6 +111,16 @@ A transparent record of how AI tools contributed to this repository.
   frontend milestones F1 and F2 from docs/ImplementationPlan.md, then STOP and
   report. Do not start F3 or later. Do not touch src/compute, src/acquire or
   src/api. Do not call any NASA API." — followed; scope held to Phase 1 + F1/F2.
+- Globe hero brief (4 Oct 2026): "use the skill img2threejs,
+  '/home/xenon/Downloads/reference.png', my website should look like this and the
+  hero section will have the earth sphere, which will have glowing rots which will
+  represent live fire spots. the graph will be in 2nd section". Interview answers:
+  fire spots = the real mock cells from `public/mock/cells.json` (not an invented
+  global field); theme = whole app dark; right column = yes, a data-driven list of
+  the busiest cells. Outcome: the globe draws only the 500 busiest of the 10 047
+  mock cells, labelled in the hero legend, because at full density the dot field
+  saturates into a single white patch; the panel and the cells JSON carry all of
+  them. `docs/DESIGN.md` section 0.1 records the direction.
 - Redesign brief (4 Oct 2026): "use impeccable skill, redesign the frontend",
   pointing at `docs/DESIGN.md` and `docs/frontend.md`. Interview answers:
   scope = redesign the existing surface only (no globe/calendar yet); type =

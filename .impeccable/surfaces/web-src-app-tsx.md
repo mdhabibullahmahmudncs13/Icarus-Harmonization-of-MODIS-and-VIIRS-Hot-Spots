@@ -53,3 +53,12 @@ roll was run because the direction is pinned; seed key: none (pinned-by-brief;
 mode rules taken from mode-operate.md).
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+
+## Addendum (4 Oct 2026): the globe pass
+
+The direction above is superseded. A later session added the globe hero the
+brief excluded, working from a supplied reference image rather than a pinned
+type brief, and inverted the world to dark (docs/DESIGN.md section 0.1). Scope
+of that pass: section 1 = procedural Three.js Earth + data-driven busiest-cells
+panel, section 2 = the same timeline chart. The globe's own reconstruction
+contract is `web/src/globe/globeSpec.ts`; the surface is `web/src/components/GlobeHero.tsx`.
