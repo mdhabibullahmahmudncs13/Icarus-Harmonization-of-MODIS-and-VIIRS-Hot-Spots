@@ -1,0 +1,1 @@
+"""Data acquisition modules for NASA FIRMS and related sources."""

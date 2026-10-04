@@ -1,0 +1,18 @@
+# Caches
+cache/
+*.parquet
+
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Node (for the frontend, when added)
+web/node_modules/

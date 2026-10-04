@@ -1,0 +1,29 @@
+[project]
+name = "icarus"
+version = "0.0.1"
+description = "Harmonization of MODIS and VIIRS hot spots (NASA Space Apps 2026)"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb",
+    "pandas",
+    "pyarrow",
+    "requests",
+    "fastapi",
+    "uvicorn",
+    "pytest",
+    "ruff",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
