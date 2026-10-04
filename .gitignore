@@ -24,3 +24,8 @@ web/test-results/
 web/playwright-report/
 web/blob-report/
 web/.playwright/
+
+# Impeccable run artifacts (the surface brief is committed)
+**/.impeccable/review/
+**/.impeccable/build/
+**/.impeccable/mocks/
