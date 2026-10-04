@@ -1,0 +1,29 @@
+{
+  "meta": {
+    "source": "mock",
+    "generated_at": "2026-10-04T00:00:00Z",
+    "region": {
+      "bbox": [
+        88,
+        20,
+        93,
+        27
+      ]
+    },
+    "cell_km": 5.5,
+    "min_confidence": 50,
+    "date_range": [
+      "2003-01-01",
+      "2026-09-30"
+    ]
+  },
+  "date": "2024-03-15",
+  "value": 55,
+  "percentile": 36.9,
+  "baseline_window": 7,
+  "doy_range": [
+    68,
+    82
+  ],
+  "years_used": 24
+}

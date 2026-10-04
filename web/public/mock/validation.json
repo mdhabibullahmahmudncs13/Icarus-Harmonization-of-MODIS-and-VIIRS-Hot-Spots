@@ -1,0 +1,56 @@
+{
+  "meta": {
+    "source": "mock",
+    "generated_at": "2026-10-04T00:00:00Z",
+    "region": {
+      "bbox": [
+        88,
+        20,
+        93,
+        27
+      ]
+    },
+    "cell_km": 5.5,
+    "min_confidence": 50,
+    "date_range": [
+      "2003-01-01",
+      "2026-09-30"
+    ]
+  },
+  "overlap": {
+    "start": "2012-01-01",
+    "end": "2026-09-30"
+  },
+  "raw": {
+    "pearson": 0.9936,
+    "spearman": 0.9696,
+    "ratio": 2.118
+  },
+  "harmonized": {
+    "pearson": 0.997,
+    "spearman": 0.9846,
+    "ratio": 1.1421
+  },
+  "cell_sweep": [
+    {
+      "cell_km": 5.5,
+      "raw_pearson": 0.9936,
+      "harmonized_pearson": 0.997
+    },
+    {
+      "cell_km": 11,
+      "raw_pearson": 0.9936,
+      "harmonized_pearson": 0.9969
+    },
+    {
+      "cell_km": 16.5,
+      "raw_pearson": 0.9936,
+      "harmonized_pearson": 0.9968
+    },
+    {
+      "cell_km": 22,
+      "raw_pearson": 0.9936,
+      "harmonized_pearson": 0.9968
+    }
+  ]
+}
