@@ -1,0 +1,49 @@
+/*
+ * Design tokens — Implementation plan, section 5.1.
+ * Color encodes meaning consistently: raw is signal red, harmonized is teal,
+ * everywhere, in every view.
+ */
+:root {
+  /* Meaning colors */
+  --raw: #c8372d;
+  --harmonized: #0e7c86;
+
+  /* Neutrals */
+  --ink: #14202a;
+  --muted: #5b6b76;
+  --grid: #cbd3d8;
+  --canvas: #eef1f3;
+  --surface: #ffffff;
+
+  /* Type */
+  --font-ui: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --font-title: "Newsreader", Georgia, "Times New Roman", serif;
+
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2.5rem;
+
+  /* Layout */
+  --content-max: 72rem;
+  --radius: 6px;
+}
+
+/* Visible keyboard focus, everywhere. */
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
