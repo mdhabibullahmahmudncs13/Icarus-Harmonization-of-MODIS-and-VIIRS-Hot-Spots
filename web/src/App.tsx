@@ -20,6 +20,7 @@ import { SeriesChart } from "./components/SeriesChart";
 import { GlobeHero, type GlobeView } from "./components/GlobeHero";
 import { HottestCells } from "./components/HottestCells";
 import { CalendarHeatmap } from "./components/CalendarHeatmap";
+import { RegionMap } from "./components/RegionMap";
 import { ValidationCard } from "./components/ValidationCard";
 import { AnomalyBox } from "./components/AnomalyBox";
 import { MethodsPanel } from "./components/MethodsPanel";
@@ -166,6 +167,9 @@ export default function App(): ReactElement {
   const drawnCells = Math.min(GLOBE_SPEC.hotspots.maxDots, spots.length);
   const selectSpot = (spot: GlobeSpot): void =>
     setView({ kind: "cell", id: spot.id, lat: spot.lat, lon: spot.lon });
+  // Same selection, reached from the flat map instead of the cell table.
+  const selectCell = (id: string, lat: number, lon: number): void =>
+    setView({ kind: "cell", id, lat, lon });
 
   return (
     <div className="app">
@@ -182,6 +186,7 @@ export default function App(): ReactElement {
           </div>
           <nav className="top-nav" aria-label="Sections">
             <a href="#overview">Overview</a>
+            <a href="#map">Map</a>
             <a href="#timeline">Timeline</a>
             <a href="#calendar">Calendar</a>
             <a href="#evidence">Evidence</a>
@@ -246,6 +251,41 @@ export default function App(): ReactElement {
                 onViewSource={() => setDrawer({ title: "Grid cells", payload: cells })}
               />
             </section>
+
+            {cells !== null && (
+              <section className="glass-tile map-tile" id="map" aria-labelledby="map-title">
+                <div className="figure-head">
+                  <div>
+                    <h2 id="map-title">The region, cell by cell</h2>
+                    <p className="figure-sub">
+                      {state.mode === "raw"
+                        ? "Raw mode: every detection counted in the cell. The finer VIIRS sensor darkens cells it sees more than once."
+                        : "Harmonized mode: one shading step per cell-day, so a finer sensor cannot darken a cell on its own."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="ghost-btn"
+                    onClick={() => setDrawer({ title: "Grid cells", payload: cells })}
+                  >
+                    View cells JSON
+                  </button>
+                </div>
+
+                <RegionMap
+                  cells={cells}
+                  mode={state.mode}
+                  selectedId={selectedId}
+                  onSelect={selectCell}
+                />
+
+                <p className="figure-note">
+                  No basemap and no tiles: the map draws the payload's own cell polygons, so the
+                  page still makes no third-party request. Geometry comes from the API's bounds;
+                  nothing is computed here.
+                </p>
+              </section>
+            )}
 
             <section className="glass-tile chart-tile" id="timeline" aria-labelledby="chart-title">
               <figure className="figure">

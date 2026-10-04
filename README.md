@@ -17,7 +17,9 @@ Tagline: **Same fires. One honest record.**
   calendar, validation card, anomaly box, methods panel, provenance drawer,
   source badge and mock banner. The data layer can run on the API instead
   (`VITE_DATA=api`, same-origin via a dev/preview proxy), and the anomaly box
-  re-asks for the day you select. The map (F4) is not built yet.
+  re-asks for the day you select. The map draws the payload's own cell
+  polygons, shaded by the active mode; it carries no basemap, because a tile
+  source would be a third-party request.
 - **Acquisition (`src/acquire/`):** implemented for FIRMS (`firms.py`) with
   chunking, rate limiting, resume and parquet output. **No real NASA data has
   been downloaded yet** — run `make cache` with a `FIRMS_MAP_KEY` to do that.

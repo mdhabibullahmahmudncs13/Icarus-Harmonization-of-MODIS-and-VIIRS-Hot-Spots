@@ -52,8 +52,9 @@ not asserted — and mock data is never presented as evidence.
   the overlap validation card, the anomaly box (percentile plus the day-of-year
   baseline lookup) and a methods panel that cites every dataset with its id,
   FIRMS product name and URL. The same app can run on the backend instead of
-  the mock files (`VITE_DATA=api`, same-origin through a dev proxy). A map is
-  not built yet.
+  the mock files (`VITE_DATA=api`, same-origin through a dev proxy). The map
+  is the region's own cell polygons, shaded by the active mode; it has no
+  basemap, because a tile source would be a third-party request.
 - Offline-first; zero third-party requests; self-hosted fonts and assets;
   deterministic science only in src/compute; the frontend displays numbers and
   never computes statistics.

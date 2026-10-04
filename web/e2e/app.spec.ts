@@ -274,3 +274,31 @@ test("the anomaly box answers for the selected day against the baseline", async 
     page.locator(".baseline-band").getByText(String(first.p50), { exact: true }),
   ).toBeVisible();
 });
+
+test("the region map draws the payload's cells and follows the toggle", async ({ page }) => {
+  const cells = (await (await page.request.get("/mock/cells.json")).json()) as {
+    meta: { cell_km: number };
+    rows: { cell_id: string; raw: number; harmonized: number }[];
+  };
+  const rawMax = Math.max(...cells.rows.map((row) => row.raw));
+  const harmonizedMax = Math.max(...cells.rows.map((row) => row.harmonized));
+  expect(rawMax).not.toBe(harmonizedMax);
+
+  await page.goto("/");
+  await expect(page.getByTestId("region-map")).toBeVisible();
+  // One square per payload cell, not a sampled subset.
+  await expect(page.getByTestId("map-cell")).toHaveCount(cells.rows.length);
+
+  // The legend names the raw unit and the raw maximum.
+  await expect(page.locator("#map .cal-key")).toContainText(`${rawMax} detections`);
+
+  // Clicking a square makes the same selection the table makes: in raw mode
+  // the busiest cell is the table's first row.
+  const busiest = cells.rows.reduce((a, b) => (b.raw > a.raw ? b : a));
+  await page.locator(`[data-testid="map-cell"][data-cell-id="${busiest.cell_id}"]`).click();
+  await expect(page.getByTestId("hot-row").first()).toHaveAttribute("aria-pressed", "true");
+
+  // The same cells, read as cell-days, without a refetch.
+  await page.getByRole("radio", { name: "Harmonized" }).click();
+  await expect(page.locator("#map .cal-key")).toContainText(`${harmonizedMax} cell-days`);
+});

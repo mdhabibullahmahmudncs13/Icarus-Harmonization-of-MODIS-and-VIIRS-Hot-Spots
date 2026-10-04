@@ -174,6 +174,20 @@ A transparent record of how AI tools contributed to this repository.
   still fires only on `source: "mock"`, which means the synthetic
   *fixture* tier shows a source badge but no banner (see "did not do").
 
+- 5 Oct 2026 (Freebuff, F4 map session): built the region cell map —
+  `web/src/charts/cells.ts` (the pure projection and ramp model) and
+  `web/src/components/RegionMap.tsx` (the drawn map), wired into `App.tsx`
+  as a section between the hero and the timeline, plus `cells.test.ts` (8)
+  and an e2e case. The AI chose an **SVG map over MapLibre**, which
+  `docs/frontend.md` names: MapLibre needs a basemap, a tile source is a
+  third-party request, and the project forbids those, so the map draws the
+  payload's own cell polygons on a plain ground and the offline tile story
+  (PMTiles) is left to Phase 6. The AI also decided the projection (longitude
+  scaled by cos(mid latitude) so the region is not stretched) and that the
+  map is `role="img"` with the busiest-cells table as the keyboard control,
+  rather than making 144 squares focusable. Geometry and values are the
+  API's; shading is presentation.
+
 ## What the AI did not do
 
 <!-- Be explicit. The AI should not generate final scientific decisions, dataset licenses, or anything that requires domain expertise you do not have. -->
@@ -192,7 +206,10 @@ A transparent record of how AI tools contributed to this repository.
   mock and, in `src/acquire/firms.py`, flagged in `docs/DATA.md` as unverified
   until checked against the FIRMS data-availability API; they are not facts.
   No harmonization statistics were computed for real data, and no real FIRMS
-  data has been downloaded (`cache/` is empty). The frontend was never reviewed
+  data has been downloaded (`cache/` is empty). The map is not a MapLibre map
+  and has no basemap; `docs/frontend.md` specifies MapLibre plus tiles, and
+  that is deferred to Phase 6 rather than shipped as a third-party request.
+  The frontend was never reviewed
   visually in this environment: every frontend claim above is the result of
   programmatic checks (type-check, lint, unit tests, `vite build`, and headless
   Playwright), not a human or model look at a rendered screenshot.
@@ -236,6 +253,13 @@ A transparent record of how AI tools contributed to this repository.
   the frontend to the API". Outcome: `ApiDataSource`, the `/api` proxy, the
   interactive anomaly fetch, 9 unit tests and 4 api-mode e2e tests, all green
   with `tsc`, eslint, prettier, vitest (87), `vite build` and Playwright (21).
+- F4 map brief (5 Oct 2026): "proceed to next", after the Phase 5 session and
+  a commit checkpoint. Outcome: the region cell map above, `tsc`, eslint,
+  prettier, vitest (95) and Playwright (22) all green. One existing e2e case
+  was failing for a real reason: the new section reused the timeline's "View
+  source JSON" label, so the suite's selector became ambiguous. The button was
+  renamed to match the app's payload-naming convention ("View cells JSON",
+  as the cells table already uses) rather than loosening the test's locator.
 - Redesign brief (4 Oct 2026): "use impeccable skill, redesign the frontend",
   pointing at `docs/DESIGN.md` and `docs/frontend.md`. Interview answers:
   scope = redesign the existing surface only (no globe/calendar yet); type =

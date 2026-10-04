@@ -968,6 +968,60 @@ aside[id] {
   stroke-width: 1.5;
 }
 
+/* --- Region map (F4) ---------------------------------------- */
+
+/* No basemap: a tile source would be a third-party request, so the map draws
+   the region's own cell polygons on a plain ground. */
+.map-tile {
+  margin-bottom: 1rem;
+}
+
+.map-stage {
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.map-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.map-ground {
+  fill: rgba(147, 191, 168, 0.05);
+}
+
+.map-cell {
+  cursor: pointer;
+}
+
+.map-level-0 {
+  fill: var(--ramp-0);
+}
+.map-level-1 {
+  fill: var(--ramp-1);
+}
+.map-level-2 {
+  fill: var(--ramp-2);
+}
+.map-level-3 {
+  fill: var(--ramp-3);
+}
+.map-level-4 {
+  fill: var(--ramp-4);
+}
+.map-level-5 {
+  fill: var(--ramp-5);
+}
+.map-level-6 {
+  fill: var(--ramp-6);
+}
+
+.map-cell.is-selected {
+  stroke: var(--harmonized);
+  stroke-width: 1.5;
+}
+
 .cal-year,
 .cal-month {
   fill: var(--text-3);
