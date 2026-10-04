@@ -27,3 +27,5 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Vendored third-party agent skills in .agents/ are not project source.
+extend-exclude = [".agents"]
