@@ -1,0 +1,1051 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Icarus API responses",
+  "description": "JSON Schema (draft-07) for every Icarus API response. Generated from web/src/contract/schemas.ts by `npm run contract:export`. One definition per endpoint under `definitions`; validate a response body against definitions.<endpoint>.",
+  "definitions": {
+    "meta": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "meta": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": [
+                "mock",
+                "live",
+                "cache",
+                "fixture"
+              ]
+            },
+            "generated_at": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T"
+            },
+            "region": {
+              "type": "object",
+              "properties": {
+                "bbox": {
+                  "type": "array",
+                  "items": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "additionalItems": false,
+                  "minItems": 4,
+                  "maxItems": 4
+                }
+              },
+              "required": [
+                "bbox"
+              ],
+              "additionalProperties": false
+            },
+            "cell_km": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "min_confidence": {
+              "type": "number"
+            },
+            "date_range": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                }
+              ],
+              "additionalItems": false,
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "source",
+            "generated_at",
+            "region",
+            "cell_km",
+            "min_confidence",
+            "date_range"
+          ],
+          "additionalProperties": false
+        },
+        "sensors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "product": {
+                "type": "string",
+                "minLength": 1
+              },
+              "family": {
+                "type": "string",
+                "enum": [
+                  "MODIS",
+                  "VIIRS"
+                ]
+              },
+              "start": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "end": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "product",
+              "family",
+              "start",
+              "end"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "meta",
+        "sensors"
+      ],
+      "additionalProperties": false
+    },
+    "series": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "meta": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": [
+                "mock",
+                "live",
+                "cache",
+                "fixture"
+              ]
+            },
+            "generated_at": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T"
+            },
+            "region": {
+              "type": "object",
+              "properties": {
+                "bbox": {
+                  "type": "array",
+                  "items": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "additionalItems": false,
+                  "minItems": 4,
+                  "maxItems": 4
+                }
+              },
+              "required": [
+                "bbox"
+              ],
+              "additionalProperties": false
+            },
+            "cell_km": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "min_confidence": {
+              "type": "number"
+            },
+            "date_range": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                }
+              ],
+              "additionalItems": false,
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "source",
+            "generated_at",
+            "region",
+            "cell_km",
+            "min_confidence",
+            "date_range"
+          ],
+          "additionalProperties": false
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "raw_modis": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "raw_viirs": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "raw_total": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "harm_modis": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "harm_viirs": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "harm_total": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "date",
+              "raw_modis",
+              "raw_viirs",
+              "raw_total",
+              "harm_modis",
+              "harm_viirs",
+              "harm_total"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "meta",
+        "rows"
+      ],
+      "additionalProperties": false
+    },
+    "cells": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "meta": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": [
+                "mock",
+                "live",
+                "cache",
+                "fixture"
+              ]
+            },
+            "generated_at": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T"
+            },
+            "region": {
+              "type": "object",
+              "properties": {
+                "bbox": {
+                  "type": "array",
+                  "items": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "additionalItems": false,
+                  "minItems": 4,
+                  "maxItems": 4
+                }
+              },
+              "required": [
+                "bbox"
+              ],
+              "additionalProperties": false
+            },
+            "cell_km": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "min_confidence": {
+              "type": "number"
+            },
+            "date_range": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                }
+              ],
+              "additionalItems": false,
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "source",
+            "generated_at",
+            "region",
+            "cell_km",
+            "min_confidence",
+            "date_range"
+          ],
+          "additionalProperties": false
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cell_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "bounds": {
+                "type": "array",
+                "items": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "additionalItems": false,
+                "minItems": 4,
+                "maxItems": 4
+              },
+              "raw": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "harmonized": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "peak_frp": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "cell_id",
+              "bounds",
+              "raw",
+              "harmonized",
+              "peak_frp"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "meta",
+        "rows"
+      ],
+      "additionalProperties": false
+    },
+    "baseline": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "meta": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": [
+                "mock",
+                "live",
+                "cache",
+                "fixture"
+              ]
+            },
+            "generated_at": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T"
+            },
+            "region": {
+              "type": "object",
+              "properties": {
+                "bbox": {
+                  "type": "array",
+                  "items": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "additionalItems": false,
+                  "minItems": 4,
+                  "maxItems": 4
+                }
+              },
+              "required": [
+                "bbox"
+              ],
+              "additionalProperties": false
+            },
+            "cell_km": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "min_confidence": {
+              "type": "number"
+            },
+            "date_range": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                }
+              ],
+              "additionalItems": false,
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "source",
+            "generated_at",
+            "region",
+            "cell_km",
+            "min_confidence",
+            "date_range"
+          ],
+          "additionalProperties": false
+        },
+        "window_days": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "years_used": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "doy": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 366
+              },
+              "p05": {
+                "type": "number",
+                "minimum": 0
+              },
+              "p25": {
+                "type": "number",
+                "minimum": 0
+              },
+              "p50": {
+                "type": "number",
+                "minimum": 0
+              },
+              "p75": {
+                "type": "number",
+                "minimum": 0
+              },
+              "p95": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "doy",
+              "p05",
+              "p25",
+              "p50",
+              "p75",
+              "p95"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "meta",
+        "window_days",
+        "years_used",
+        "rows"
+      ],
+      "additionalProperties": false
+    },
+    "anomaly": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "meta": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": [
+                "mock",
+                "live",
+                "cache",
+                "fixture"
+              ]
+            },
+            "generated_at": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T"
+            },
+            "region": {
+              "type": "object",
+              "properties": {
+                "bbox": {
+                  "type": "array",
+                  "items": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "additionalItems": false,
+                  "minItems": 4,
+                  "maxItems": 4
+                }
+              },
+              "required": [
+                "bbox"
+              ],
+              "additionalProperties": false
+            },
+            "cell_km": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "min_confidence": {
+              "type": "number"
+            },
+            "date_range": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                }
+              ],
+              "additionalItems": false,
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "source",
+            "generated_at",
+            "region",
+            "cell_km",
+            "min_confidence",
+            "date_range"
+          ],
+          "additionalProperties": false
+        },
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "percentile": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "baseline_window": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "doy_range": {
+          "type": "array",
+          "items": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 366
+            }
+          ],
+          "additionalItems": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "years_used": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "meta",
+        "date",
+        "value",
+        "percentile",
+        "baseline_window",
+        "doy_range",
+        "years_used"
+      ],
+      "additionalProperties": false
+    },
+    "validation": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "meta": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": [
+                "mock",
+                "live",
+                "cache",
+                "fixture"
+              ]
+            },
+            "generated_at": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T"
+            },
+            "region": {
+              "type": "object",
+              "properties": {
+                "bbox": {
+                  "type": "array",
+                  "items": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "additionalItems": false,
+                  "minItems": 4,
+                  "maxItems": 4
+                }
+              },
+              "required": [
+                "bbox"
+              ],
+              "additionalProperties": false
+            },
+            "cell_km": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "min_confidence": {
+              "type": "number"
+            },
+            "date_range": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                }
+              ],
+              "additionalItems": false,
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "source",
+            "generated_at",
+            "region",
+            "cell_km",
+            "min_confidence",
+            "date_range"
+          ],
+          "additionalProperties": false
+        },
+        "overlap": {
+          "type": "object",
+          "properties": {
+            "start": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "end": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ],
+          "additionalProperties": false
+        },
+        "raw": {
+          "type": "object",
+          "properties": {
+            "pearson": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "spearman": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "ratio": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "pearson",
+            "spearman",
+            "ratio"
+          ],
+          "additionalProperties": false
+        },
+        "harmonized": {
+          "type": "object",
+          "properties": {
+            "pearson": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "spearman": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "ratio": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "pearson",
+            "spearman",
+            "ratio"
+          ],
+          "additionalProperties": false
+        },
+        "cell_sweep": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cell_km": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "raw_pearson": {
+                "type": "number",
+                "minimum": -1,
+                "maximum": 1
+              },
+              "harmonized_pearson": {
+                "type": "number",
+                "minimum": -1,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "cell_km",
+              "raw_pearson",
+              "harmonized_pearson"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "meta",
+        "overlap",
+        "raw",
+        "harmonized",
+        "cell_sweep"
+      ],
+      "additionalProperties": false
+    },
+    "methods": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "meta": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": [
+                "mock",
+                "live",
+                "cache",
+                "fixture"
+              ]
+            },
+            "generated_at": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T"
+            },
+            "region": {
+              "type": "object",
+              "properties": {
+                "bbox": {
+                  "type": "array",
+                  "items": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "additionalItems": false,
+                  "minItems": 4,
+                  "maxItems": 4
+                }
+              },
+              "required": [
+                "bbox"
+              ],
+              "additionalProperties": false
+            },
+            "cell_km": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "min_confidence": {
+              "type": "number"
+            },
+            "date_range": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                }
+              ],
+              "additionalItems": false,
+              "minItems": 2,
+              "maxItems": 2
+            }
+          },
+          "required": [
+            "source",
+            "generated_at",
+            "region",
+            "cell_km",
+            "min_confidence",
+            "date_range"
+          ],
+          "additionalProperties": false
+        },
+        "cell_km": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "min_confidence": {
+          "type": "number"
+        },
+        "confidence_mapping": {
+          "type": "object",
+          "properties": {
+            "l": {
+              "type": "number"
+            },
+            "n": {
+              "type": "number"
+            },
+            "h": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "l",
+            "n",
+            "h"
+          ],
+          "additionalProperties": false
+        },
+        "collapse_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "datasets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "product": {
+                "type": "string",
+                "minLength": 1
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              }
+            },
+            "required": [
+              "id",
+              "product",
+              "url"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "meta",
+        "cell_km",
+        "min_confidence",
+        "confidence_mapping",
+        "collapse_rule",
+        "notices",
+        "datasets"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
