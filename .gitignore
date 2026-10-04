@@ -14,5 +14,13 @@ venv/
 .pytest_cache/
 .ruff_cache/
 
-# Node (for the frontend, when added)
+# Node (for the frontend)
 web/node_modules/
+web/dist/
+web/.vite/
+
+# Playwright artifacts
+web/test-results/
+web/playwright-report/
+web/blob-report/
+web/.playwright/
