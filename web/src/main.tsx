@@ -1,11 +1,12 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-// Self-hosted fonts, bundled locally — no CDN, no remote fonts (plan, principle 5).
-import "@fontsource/atkinson-hyperlegible/400.css";
-import "@fontsource/atkinson-hyperlegible/700.css";
-import "@fontsource/newsreader/400.css";
-import "@fontsource/newsreader/600.css";
+// Self-hosted fonts, bundled locally — no CDN, no remote fonts (DESIGN.md §4.5).
+import "@fontsource-variable/fraunces";
+import "@fontsource-variable/inter";
+import "@fontsource/jetbrains-mono/400.css";
+import "@fontsource/jetbrains-mono/500.css";
+import "@fontsource/jetbrains-mono/700.css";
 
 import "./styles/tokens.css";
 import "./styles/app.css";

@@ -1,23 +1,70 @@
 /*
- * Design tokens — Implementation plan, section 5.1.
- * Color encodes meaning consistently: raw is signal red, harmonized is teal,
- * everywhere, in every view.
+ * Design tokens — docs/DESIGN.md (v2): light world, green and black.
+ * Only shades of green and black plus neutral greys; values separate by
+ * lightness, never hue. No red, blue, orange or purple anywhere.
  */
 :root {
-  /* Meaning colors */
-  --raw: #c8372d;
-  --harmonized: #0e7c86;
+  /* Canvas and mesh gradient (visible behind the glass) */
+  --bg-0: #f4f8f4;
+  --mesh-mint: #d9f0e0;
+  --mesh-sage: #bfe0c9;
+  --mesh-lime: #e6f4d7;
 
-  /* Neutrals */
-  --ink: #14202a;
-  --muted: #5b6b76;
-  --grid: #cbd3d8;
-  --canvas: #eef1f3;
-  --surface: #ffffff;
+  /* Glass */
+  --glass-fill: rgba(255, 255, 255, 0.6);
+  --glass-fill-strong: rgba(255, 255, 255, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-shadow: 0 10px 40px rgba(15, 60, 35, 0.1);
+  --glass-blur: 24px;
 
-  /* Type */
-  --font-ui: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
-  --font-title: "Newsreader", Georgia, "Times New Roman", serif;
+  /* Text and lines */
+  --text-1: #0a0f0c; /* primary, near-black */
+  --text-2: #4e5b53; /* secondary */
+  --text-3: #7b887f; /* non-essential labels only */
+  --line: rgba(10, 15, 12, 0.1);
+  --ghost: #9ba8a0; /* inactive or comparison line */
+
+  /* Mode accents (toggle, lines, chrome) */
+  --raw: #0b0f0d; /* black */
+  --harmonized: #138a4b; /* green: fills, lines, chips */
+  --harmonized-text: #0f6b3a; /* darker green: any green TEXT */
+
+  /* Data ramp (map, globe cells, calendar), light to dark */
+  --ramp-0: #f0f8f1;
+  --ramp-1: #cfe9d5;
+  --ramp-2: #98d3a9;
+  --ramp-3: #52b26f;
+  --ramp-4: #1f8a50;
+  --ramp-5: #0f5a33;
+  --ramp-6: #040a07;
+
+  /* Source badges (no new hues). Mock = black outline until real data. */
+  --src-live: #138a4b;
+  --src-cache: #4e5b53;
+  --src-fixture: #0b0f0d;
+  --src-mock: #0b0f0d;
+
+  /* Eras (timeline bands), from /api/meta sensor windows */
+  --era-modis: rgba(10, 15, 12, 0.04);
+  --era-overlap: rgba(19, 138, 75, 0.1);
+  --era-viirs: rgba(10, 15, 12, 0.07);
+
+  /* Type — all self-hosted via fontsource, no CDN */
+  --font-display: "Fraunces Variable", Georgia, "Times New Roman", serif;
+  --font-ui: "Inter Variable", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 20px;
+  --text-xl: 28px;
+  --text-2xl: 44px;
+  --text-3xl: 72px;
+
+  /* Shape */
+  --radius-tile: 20px;
+  --radius-card: 12px;
+  --radius-pill: 999px;
 
   /* Spacing scale */
   --space-1: 0.25rem;
@@ -27,15 +74,23 @@
   --space-5: 1.5rem;
   --space-6: 2.5rem;
 
-  /* Layout */
-  --content-max: 72rem;
-  --radius: 6px;
+  --content-max: 1440px;
 }
 
-/* Visible keyboard focus, everywhere. */
+/* Visible keyboard focus, in dark green (DESIGN.md §13). */
 :focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--harmonized-text);
   outline-offset: 2px;
+}
+
+/* Browser surfaces carry the design too. */
+::selection {
+  background: var(--harmonized);
+  color: #ffffff;
+}
+
+body {
+  caret-color: var(--harmonized-text);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -45,5 +100,15 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Glass quality tier: opaque tiles for reduced-transparency users. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-fill: rgba(255, 255, 255, 0.92);
+    --glass-fill-strong: rgba(255, 255, 255, 0.96);
+    --glass-blur: 0px;
   }
 }

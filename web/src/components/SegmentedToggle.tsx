@@ -1,8 +1,9 @@
 /**
- * Segmented control: Raw | Harmonized.
- *
- * Implemented as a radio group (radiogroup + role=radio) so screen readers
- * announce state; arrow keys move selection, Tab enters/leaves the group.
+ * Segmented control: Raw | Harmonized (DESIGN.md §6.1).
+ * Radio-group semantics (radiogroup + role=radio) so screen readers
+ * announce state; arrow keys move selection, Space flips, R/H work
+ * globally from App. The thumb slides between a black RAW fill and a
+ * green HARMONIZED fill with a soft glow in the active color.
  */
 import { useRef, type ReactElement } from "react";
 import type { Mode } from "../state/urlState";
@@ -40,6 +41,11 @@ export function SegmentedToggle({ mode, onChange }: SegmentedToggleProps): React
         e.preventDefault();
         move(index, -1);
         break;
+      case " ":
+        // DESIGN.md §6.1: Space flips the mode.
+        e.preventDefault();
+        move(index, 1);
+        break;
       case "Home":
         e.preventDefault();
         onChange(MODES[0]);
@@ -57,13 +63,14 @@ export function SegmentedToggle({ mode, onChange }: SegmentedToggleProps): React
 
   return (
     <div className="segmented" role="radiogroup" aria-label="Count mode" data-testid="mode-toggle">
+      <span className="segmented-thumb" aria-hidden="true" data-mode={mode} />
       {MODES.map((m, i) => (
         <button
           key={m}
           type="button"
           role="radio"
           aria-checked={m === mode}
-          className={m === mode ? "segment selected" : "segment"}
+          className="segment"
           data-mode={m}
           tabIndex={m === mode ? 0 : -1}
           onClick={() => onChange(m)}
