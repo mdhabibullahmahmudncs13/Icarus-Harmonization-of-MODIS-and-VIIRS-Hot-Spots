@@ -63,6 +63,16 @@ A transparent record of how AI tools contributed to this repository.
   reduced-motion-aware transition); added Vitest and Playwright suites. The
   AI generated the mock numbers themselves — they are synthetic by design and
   are never evidence.
+- 4 Oct 2026 (Freebuff, redesign session): used the Impeccable design skill
+  (project-scoped at `.agents/skills/impeccable/`) to redesign the F1/F2
+  surface into the world committed in `docs/DESIGN.md` v2 — green-and-black
+  tokens, frosted-glass shell over a mesh ground, Fraunces/Inter/JetBrains
+  Mono self-hosted via fontsource, sliding-thumb Raw|Harmonized toggle,
+  era-banded timeline with a ghost comparison line and direct labels.
+  Created `PRODUCT.md` and `.impeccable/surfaces/web-src-app-tsx.md`
+  (direction contract). All copy, palette, and type come from DESIGN.md;
+  the AI made no product decisions beyond what the docs and user answers
+  specify. Captures in `.impeccable/review/` are gitignored dev artifacts.
 
 ## What the AI did not do
 
@@ -82,3 +92,8 @@ A transparent record of how AI tools contributed to this repository.
   frontend milestones F1 and F2 from docs/ImplementationPlan.md, then STOP and
   report. Do not start F3 or later. Do not touch src/compute, src/acquire or
   src/api. Do not call any NASA API." — followed; scope held to Phase 1 + F1/F2.
+- Redesign brief (4 Oct 2026): "use impeccable skill, redesign the frontend",
+  pointing at `docs/DESIGN.md` and `docs/frontend.md`. Interview answers:
+  scope = redesign the existing surface only (no globe/calendar yet); type =
+  DESIGN.md's Fraunces/Inter/JetBrains Mono; product record approved as
+  written in PRODUCT.md.
