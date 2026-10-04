@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import pytest, ruff; print\\(''pytest'', pytest.__version__\\); print\\(''ruff'', ruff.__version__\\)\")",
+      "Bash(python3 -c \"import pytest; print\\(''pytest'', pytest.__version__\\)\")",
+      "Bash(python3 -c \"import ruff; print\\(''ruff'', ruff.__version__\\)\")",
+      "Bash(python3 -c \"import requests; print\\(''requests'', requests.__version__\\)\")",
+      "Bash(python3 -c \"import pandas; print\\(''pandas'', pandas.__version__\\)\")",
+      "Bash(python3 -c \"import fastapi; print\\(''fastapi'', fastapi.__version__\\)\")",
+      "Bash(pip install:*)",
+      "Bash(python3 -m venv .venv)",
+      "Bash(.venv/bin/pip install:*)",
+      "Bash(PATH=\"/tmp/icarus_venv/bin:$PATH\" make test)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(PATH=\"/tmp/icarus_venv/bin:$PATH\" make lint)",
+      "Bash(/tmp/icarus_venv/bin/pip install:*)",
+      "Bash(/tmp/icarus_venv/bin/pip list:*)"
+    ]
+  }
+}
