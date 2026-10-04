@@ -40,6 +40,9 @@ A transparent record of how AI tools contributed to this repository.
   and `exec`s it on first use, verifying SHA-256. Not run during install. Also
   bundles `scripts/live-browser.js` (drives a local browser over
   `localhost`).
+- Freebuff (Buffy coding agent). Session of 4 Oct 2026: implemented Phase 1
+  (contract + mock data) and frontend milestones F1/F2 from
+  `docs/Implementationplan.md` in TypeScript under `web/`.
 
 ## What the AI did
 
@@ -49,15 +52,33 @@ A transparent record of how AI tools contributed to this repository.
   (36 total) and reviewed each source for executable code and outbound network
   before use. No project source, no `src/compute/` logic, and no scientific
   output were changed.
+- 4 Oct 2026 (Freebuff): wrote `docs/API_CONTRACT.md`, the zod contract in
+  `web/src/contract/` and its JSON Schema export to
+  `docs/contract.schema.json`; wrote the deterministic mock generator
+  `web/scripts/gen-mock.ts` (seeded, validated against the contract, output
+  labelled `meta.source: "mock"`); scaffolded the static offline frontend in
+  `web/` (F1: Vite + React + TS, tokens, self-hosted fonts, DataSource layer,
+  URL-synced state, mock banner, source badge, provenance drawer; F2: hero
+  SVG series chart with an accessible Raw | Harmonized toggle and a 600 ms
+  reduced-motion-aware transition); added Vitest and Playwright suites. The
+  AI generated the mock numbers themselves — they are synthetic by design and
+  are never evidence.
 
 ## What the AI did not do
 
 <!-- Be explicit. The AI should not generate final scientific decisions, dataset licenses, or anything that requires domain expertise you do not have. -->
 
-- _None yet._
+- No NASA API or any network data source was called; `src/compute`,
+  `src/acquire` and `src/api` were not touched. Sensor epoch dates in the
+  mock are placeholders marked `// TODO verify against FIRMS docs` and are
+  labelled as placeholders in the UI; they are not facts. No harmonization
+  statistics were computed for real data.
 
 ## Prompts
 
 <!-- Append key prompts verbatim, with a short note on the outcome. -->
 
-- _None yet._
+- Session brief (4 Oct 2026): "Implement Phase 1 (contract + mock data) and
+  frontend milestones F1 and F2 from docs/ImplementationPlan.md, then STOP and
+  report. Do not start F3 or later. Do not touch src/compute, src/acquire or
+  src/api. Do not call any NASA API." — followed; scope held to Phase 1 + F1/F2.
