@@ -8,8 +8,8 @@ if (source === "mock") {
   console.error(
     `\nrelease-guard: refusing to build.\n` +
       `  VITE_DATA=${JSON.stringify(source)}${process.env.VITE_DATA === undefined ? " (unset, default is mock)" : ""}\n` +
-      `  Mock data is never evidence. Set VITE_DATA=api (or cache/fixture once implemented)\n` +
-      `  to produce a release build.\n`,
+      `  Mock data is never evidence. Set VITE_DATA=api to serve the FastAPI\n` +
+      `  backend (src/api) instead, and produce a release build.\n`,
   );
   process.exit(1);
 }

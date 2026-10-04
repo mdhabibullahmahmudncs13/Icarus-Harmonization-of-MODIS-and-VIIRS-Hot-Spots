@@ -19,11 +19,23 @@ import { SegmentedToggle } from "./components/SegmentedToggle";
 import { SeriesChart } from "./components/SeriesChart";
 import { GlobeHero, type GlobeView } from "./components/GlobeHero";
 import { HottestCells } from "./components/HottestCells";
+import { CalendarHeatmap } from "./components/CalendarHeatmap";
+import { ValidationCard } from "./components/ValidationCard";
+import { AnomalyBox } from "./components/AnomalyBox";
+import { MethodsPanel } from "./components/MethodsPanel";
 import { ProvenanceDrawer } from "./components/ProvenanceDrawer";
 import { spotsFromCells } from "./globe/hotspots";
 import { GLOBE_SPEC } from "./globe/globeSpec";
 import type { GlobeSpot } from "./globe/globeSpec";
-import type { CellsResponse, MetaResponse, SeriesResponse } from "./contract";
+import type {
+  AnomalyResponse,
+  BaselineResponse,
+  CellsResponse,
+  MetaResponse,
+  MethodsResponse,
+  SeriesResponse,
+  ValidationResponse,
+} from "./contract";
 
 interface DrawerState {
   title: string;
@@ -54,6 +66,11 @@ export default function App(): ReactElement {
   const [meta, setMeta] = useState<MetaResponse | null>(null);
   const [series, setSeries] = useState<SeriesResponse | null>(null);
   const [cells, setCells] = useState<CellsResponse | null>(null);
+  const [baseline, setBaseline] = useState<BaselineResponse | null>(null);
+  const [anomaly, setAnomaly] = useState<AnomalyResponse | null>(null);
+  const [anomalyError, setAnomalyError] = useState<string | null>(null);
+  const [validation, setValidation] = useState<ValidationResponse | null>(null);
+  const [methods, setMethods] = useState<MethodsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
   // What the hero camera is looking at; the panel and the globe share it.
@@ -61,12 +78,22 @@ export default function App(): ReactElement {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([dataSource.getMeta(), dataSource.getSeries(), dataSource.getCells()])
-      .then(([m, s, c]) => {
+    Promise.all([
+      dataSource.getMeta(),
+      dataSource.getSeries(),
+      dataSource.getCells(),
+      dataSource.getBaseline(),
+      dataSource.getValidation(),
+      dataSource.getMethods(),
+    ])
+      .then(([m, s, c, b, v, meth]) => {
         if (!cancelled) {
           setMeta(m);
           setSeries(s);
           setCells(c);
+          setBaseline(b);
+          setValidation(v);
+          setMethods(meth);
         }
       })
       .catch((e: unknown) => {
@@ -76,6 +103,37 @@ export default function App(): ReactElement {
       cancelled = true;
     };
   }, [dataSource]);
+
+  // The anomaly answers for one day, and only one day: until the reader picks
+  // one, ask about the last day in the record; when they pick a day, ask again
+  // for that day. The mock source ignores the date and returns its one sample.
+  const lastDate =
+    series !== null && series.rows.length > 0 ? series.rows[series.rows.length - 1].date : null;
+  const anomalyDate = state.date ?? lastDate;
+
+  useEffect(() => {
+    if (anomalyDate === null) return;
+    let cancelled = false;
+    dataSource
+      .getAnomaly(anomalyDate)
+      .then((a) => {
+        if (!cancelled) {
+          setAnomaly(a);
+          setAnomalyError(null);
+        }
+      })
+      .catch((e: unknown) => {
+        // A day the record does not cover is not a page failure: say so in the
+        // box instead of blanking the whole app.
+        if (!cancelled) {
+          setAnomaly(null);
+          setAnomalyError(e instanceof Error ? e.message : String(e));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dataSource, anomalyDate]);
 
   // DESIGN.md §6.1: R and H set the mode from anywhere.
   useEffect(() => {
@@ -125,6 +183,9 @@ export default function App(): ReactElement {
           <nav className="top-nav" aria-label="Sections">
             <a href="#overview">Overview</a>
             <a href="#timeline">Timeline</a>
+            <a href="#calendar">Calendar</a>
+            <a href="#evidence">Evidence</a>
+            <a href="#methods">Methods</a>
             <a href="#status">Status</a>
           </nav>
           <SegmentedToggle mode={state.mode} onChange={(mode) => setState({ ...state, mode })} />
@@ -223,6 +284,81 @@ export default function App(): ReactElement {
               </figure>
             </section>
 
+            <section
+              className="glass-tile calendar-tile"
+              id="calendar"
+              aria-labelledby="calendar-title"
+            >
+              <div className="figure-head">
+                <div>
+                  <h2 id="calendar-title">Burning calendar, {rangeLabel}</h2>
+                  <p className="figure-sub">
+                    {state.mode === "raw"
+                      ? "Raw mode: every detection counted. Watch the darker band after 2012 fill in."
+                      : "Harmonized mode: one count per cell-day, so a finer sensor cannot inflate a day."}
+                  </p>
+                </div>
+              </div>
+
+              <CalendarHeatmap
+                series={series}
+                mode={state.mode}
+                selectedDate={state.date}
+                onSelectDate={(date) => setState({ ...state, date })}
+              />
+
+              <p className="figure-note">
+                Same payload as the timeline, recut by year and day, so the toggle recolors it
+                without a second fetch. Select a day here or on the chart to drive the anomaly box.
+              </p>
+            </section>
+
+            <div className="evidence-grid">
+              {validation !== null && (
+                <ValidationCard
+                  validation={validation}
+                  onViewSource={() => setDrawer({ title: "Validation", payload: validation })}
+                />
+              )}
+              {anomaly !== null && baseline !== null && (
+                <AnomalyBox
+                  anomaly={anomaly}
+                  baseline={baseline}
+                  selectedDate={state.date}
+                  onViewSource={() => setDrawer({ title: "Anomaly", payload: anomaly })}
+                />
+              )}
+              {anomaly === null && baseline !== null && (
+                <section
+                  className="glass-tile anomaly-tile"
+                  id="anomaly"
+                  aria-labelledby="anomaly-title"
+                  data-testid="anomaly-unavailable"
+                >
+                  <div className="figure-head">
+                    <div>
+                      <h2 id="anomaly-title">Is this unusual?</h2>
+                      <p className="figure-sub">
+                        {anomalyError === null
+                          ? `${anomalyDate ?? "That day"} against the seasonal baseline.`
+                          : "This day has no answer in the record."}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="figure-note">
+                    {anomalyError ?? "Reading the day's percentile against the baseline window…"}
+                  </p>
+                </section>
+              )}
+            </div>
+
+            {methods !== null && (
+              <MethodsPanel
+                methods={methods}
+                onViewSource={() => setDrawer({ title: "Methods", payload: methods })}
+              />
+            )}
+
             <aside className="glass-tile status-tile" id="status" aria-label="Status">
               <h2 className="tile-title">Status</h2>
               <div className="status-row">
@@ -245,7 +381,7 @@ export default function App(): ReactElement {
 
             <footer className="app-footer">
               <p>
-                Data: NASA FIRMS — MODIS C6.1 hotspots, VIIRS 375 m NOAA-20, VIIRS 375 m NOAA-21,
+                Data: NASA FIRMS. MODIS C6.1 hotspots, VIIRS 375 m NOAA-20, VIIRS 375 m NOAA-21,
                 VIIRS 375 m Suomi-NPP (Suomi-NPP data ends 1 Nov 2026; MODIS is being retired).
                 Product details at{" "}
                 <a href="https://firms.modaps.eosdis.nasa.gov/" rel="noreferrer noopener">

@@ -204,7 +204,7 @@ export function SeriesChart({
 
   const readout =
     hoverRow !== null
-      ? `${hoverRow.date} — ${mode === "raw" ? hoverRow.raw_total : hoverRow.harm_total} ${unit}`
+      ? `${hoverRow.date}: ${mode === "raw" ? hoverRow.raw_total : hoverRow.harm_total} ${unit}`
       : "Hover or focus the chart to read a day; click to select the date.";
 
   return (

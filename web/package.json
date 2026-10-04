@@ -6,6 +6,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "dev": "./node_modules/.bin/vite",
+    "dev:api": "VITE_DATA=api ./node_modules/.bin/vite --port 5174",
     "build": "./node_modules/.bin/tsc --noEmit && ./node_modules/.bin/vite build",
     "build:release": "node scripts/release-guard.mjs && ./node_modules/.bin/tsc --noEmit && ./node_modules/.bin/vite build",
     "preview": "./node_modules/.bin/vite preview",

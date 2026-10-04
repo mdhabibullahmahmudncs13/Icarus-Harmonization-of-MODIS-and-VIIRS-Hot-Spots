@@ -177,3 +177,100 @@ test("app loads with every external host blocked", async ({ browser }) => {
   expect(blocked).toEqual([]);
   await context.close();
 });
+
+test("the calendar reads the same payload and follows the toggle", async ({ page }) => {
+  const payload = (await (await page.request.get("/mock/series.json")).json()) as {
+    rows: { date: string; raw_total: number; harm_total: number }[];
+  };
+  // A day where the two modes genuinely differ, so the assertion can bite.
+  const target = payload.rows.find((r) => r.raw_total !== r.harm_total);
+  expect(target).toBeTruthy();
+  if (!target) return;
+
+  await page.goto("/");
+  await expect(page.getByTestId("calendar")).toBeVisible();
+  await expect(page.getByTestId("calendar-readout")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Burning calendar, 2003 to 2026/ })).toBeVisible();
+
+  const cell = page.locator(`[data-testid="cal-cell"][data-date="${target.date}"]`);
+  await expect(cell).toHaveCount(1);
+  await cell.click();
+
+  // Selection reaches the URL, and the readout quotes the raw value.
+  expect(page.url()).toContain(`date=${target.date}`);
+  await expect(page.getByTestId("calendar-readout")).toContainText(
+    `${target.date}: ${target.raw_total} detections`,
+  );
+
+  await page.getByRole("radio", { name: "Harmonized" }).click();
+  // Same cell, same payload, new mode: no refetch, just a different reading.
+  await expect(page.getByTestId("calendar-readout")).toContainText(
+    `${target.date}: ${target.harm_total} cell-days`,
+  );
+});
+
+test("the validation card and methods panel show the payload and its citations", async ({
+  page,
+}) => {
+  const validation = (await (await page.request.get("/mock/validation.json")).json()) as {
+    raw: { pearson: number };
+    harmonized: { pearson: number };
+    overlap: { start: string; end: string };
+  };
+  const methods = (await (await page.request.get("/mock/methods.json")).json()) as {
+    confidence_mapping: { l: number; n: number; h: number };
+    datasets: { id: string; url: string }[];
+    notices: string[];
+  };
+  const citedUrl = methods.datasets[0].url;
+  const map = methods.confidence_mapping;
+
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: "Validation on the overlap" })).toBeVisible();
+
+  // Scoped to the card and the table: the dates live inside a sentence and
+  // the harmonized correlation is repeated once per sweep cell.
+  const card = page.locator("#evidence");
+  await expect(card.getByText(validation.overlap.start)).toBeVisible();
+  await expect(card.getByText(validation.overlap.end)).toBeVisible();
+  const table = card.locator(".stat-table");
+  await expect(table.getByText(validation.raw.pearson.toFixed(3))).toBeVisible();
+  await expect(table.getByText(validation.harmonized.pearson.toFixed(3))).toBeVisible();
+  await expect(table.getByText("Raw detections")).toBeVisible();
+  await expect(table.getByText("Harmonized cell-days")).toBeVisible();
+
+  // Methods is a disclosure: it starts closed, then opens on click.
+  const summary = page.getByText("Methods and datasets");
+  await expect(summary).toBeVisible();
+  await summary.click();
+  await expect(page.getByText(`low ${map.l}, nominal ${map.n}, high ${map.h}`)).toBeVisible();
+  // The citations are the payload's own URLs, not a hard-coded one: every
+  // dataset must render as a link.
+  const cited = page.getByRole("link", { name: citedUrl });
+  await expect(cited).toHaveCount(methods.datasets.length);
+  await expect(cited.first()).toBeVisible();
+  await expect(page.getByText(methods.datasets[0].id)).toBeVisible();
+  await expect(page.getByText(methods.notices[0])).toBeVisible();
+});
+
+test("the anomaly box answers for the selected day against the baseline", async ({ page }) => {
+  const baseline = (await (await page.request.get("/mock/baseline.json")).json()) as {
+    rows: { doy: number; p50: number; p95: number }[];
+  };
+  const first = baseline.rows[0];
+  expect(first).toBeTruthy();
+  if (!first) return;
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Is this unusual?" })).toBeVisible();
+  // No date selected yet, so the box tells you to pick one.
+  await expect(page.getByText(/Select a day on the timeline or the calendar/)).toBeVisible();
+
+  // Clicking a day makes the box look up that day-of-year in the baseline.
+  await page.getByTestId("cal-cell").first().click();
+  await expect(page.locator(".baseline-band")).toBeVisible();
+  await expect(
+    page.locator(".baseline-band").getByText(String(first.p50), { exact: true }),
+  ).toBeVisible();
+});

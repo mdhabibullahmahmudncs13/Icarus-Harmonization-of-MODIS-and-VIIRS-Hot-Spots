@@ -87,7 +87,7 @@ export function HottestCells({
           {`${formatCount(total)} ${unit} across the region, ${dateRange[0]} to ${dateRange[1]}.`}
         </p>
         <p className="hot-bounds">
-          {`Region ${west}°E–${east}°E, ${south}°N–${north}°N. Mock values, not evidence.`}
+          {`Region ${west} to ${east} east, ${south} to ${north} north. Mock values, not evidence.`}
         </p>
         <button type="button" className="ghost-btn" onClick={onViewSource}>
           View cells JSON
