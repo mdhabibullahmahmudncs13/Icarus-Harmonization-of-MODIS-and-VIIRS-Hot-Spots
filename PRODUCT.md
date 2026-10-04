@@ -47,9 +47,13 @@ not asserted — and mock data is never presented as evidence.
 
 - Shipped today: mock data source, contract-validated payloads, daily series
   2003–2026, raw/harmonized toggle, provenance drawer, source badge, persistent
-  mock banner, and a procedural Three.js globe hero (section 1) over the
-  busiest-cells panel, with the timeline as section 2. Calendar, map,
-  validation card, methods panel and story mode are not built yet.
+  mock banner, a procedural Three.js globe hero (section 1) over the
+  busiest-cells panel, the timeline as section 2, the burning-activity calendar,
+  the overlap validation card, the anomaly box (percentile plus the day-of-year
+  baseline lookup) and a methods panel that cites every dataset with its id,
+  FIRMS product name and URL. The same app can run on the backend instead of
+  the mock files (`VITE_DATA=api`, same-origin through a dev proxy). A map is
+  not built yet.
 - Offline-first; zero third-party requests; self-hosted fonts and assets;
   deterministic science only in src/compute; the frontend displays numbers and
   never computes statistics.
@@ -70,9 +74,20 @@ not asserted — and mock data is never presented as evidence.
 
 - Committed mock fixtures: web/public/mock/*.json (synthetic, labelled
   meta.source="mock").
+- Acquisition code: src/acquire/firms.py (chunked FIRMS Area API -> parquet,
+  Suomi-NPP first, resumable, throttled, offline-safe) with offline tests.
+- Compute: src/compute (normalization, confidence mapping, 5.5 km cell-day
+  collapse, series, seasonal baseline, anomaly rank, overlap validation,
+  contract export) with tests.
+- Backend: src/api serves the seven contract endpoints offline-first from
+  cache/ then demo_fixtures/, and reports meta.source truthfully. Contract
+  tests check every response against the exported JSON Schema.
+- Offline fixture: demo_fixtures/detections.parquet (deterministic, synthetic,
+  from src/demo.py) so the pipeline runs with no key and no network.
 - Docs: PRD, TRD, Implementation plan, DESIGN.md, DATA.md, METHODS.md.
-- Absence: no real NASA FIRMS data has been downloaded yet. Future work must
-  not fabricate real-data claims.
+- Absence: no real NASA FIRMS data has been downloaded yet (cache/ is empty;
+  running `make cache` needs a FIRMS_MAP_KEY). Product dates in the module are
+  unverified placeholders. Future work must not fabricate real-data claims.
 
 ## Product Principles
 

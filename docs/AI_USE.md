@@ -93,15 +93,109 @@ A transparent record of how AI tools contributed to this repository.
   below. The AI chose the palette values, the camera framing, and which cells
   the globe draws; every number shown still comes from the payload verbatim.
 
+- 4 Oct 2026 (Freebuff, Phase 0 acquisition session): wrote `src/acquire/firms.py`
+  (download NASA FIRMS Area API CSVs for the Bangladesh box into parquet,
+  Suomi-NPP first, ≤5-day chunks, rate-limited to the documented 5,000
+  transactions / 10 minutes, resumable, offline-safe through
+  `src/acquire/safe.py`), `tests/test_firms.py` (26 offline tests), the
+  `make cache` / `make venv` targets in the `Makefile`, and the cited product
+  list in `docs/DATA.md` and `README.md`. No network call was made: the tests
+  use a fake fetcher and the endpoint shapes come from the FIRMS API docs at
+  <https://firms.modaps.eosdis.nasa.gov/api/area/>. Session prompt below. The
+  AI chose the module structure, the chunking math and the parquet layout; the
+  sensor product names, the ≤5-day API limit and the MAP_KEY limit are the
+  vendor's documented facts, not the AI's invention.
+
+- 4 Oct 2026 (Freebuff, frontend functionality + design-taste-frontend session):
+  added the four surfaces the Implementation plan still had missing —
+  `CalendarHeatmap.tsx` (F3, year x day-of-year burning calendar driven by the
+  same `series` payload, so the toggle recolors it with no refetch),
+  `ValidationCard.tsx` (the overlap correlations and cell-size sweep),
+  `AnomalyBox.tsx` (percentile, baseline window, and a day-of-year lookup into
+  `baseline`) and `MethodsPanel.tsx` (cell size, confidence mapping, collapse
+  rule, notices, and every dataset cited with id, FIRMS product name and URL).
+  Added `src/charts/calendar.ts` (pure calendar model), wired all seven
+  contract endpoints into `App.tsx`, added nav anchors, and fixed the top-nav
+  so it wraps at phone widths. Loaded the **design-taste-frontend** skill and
+  applied its applicable rules (this is product/dash UI, so its landing-page
+  rules were explicitly out of scope): one-accent lock, shape lock, full
+  interactive states, reduced motion, and the em/en-dash ban on visible copy.
+  Added `tests/unit/calendar.test.ts` (12) and
+  `tests/unit/design-tokens.test.ts` (22, WCAG contrast computed from the
+  real `tokens.css`), plus `e2e/preflight.spec.ts` (4) and 3 app e2e tests.
+  Session prompts below. No science was computed in the UI: every new number
+  is read from a payload, and bucketing is presentation only.
+
+- 4 Oct 2026 (Freebuff, toggle performance check): measured the mode toggle
+  against the under-100 ms response budget in `docs/Implementationplan.md`
+  section 5.4. On the production build the first DOM feedback lands in 16–34 ms
+  and the full chart-plus-calendar commit in 75–95 ms, so the budget is met
+  (measured with a temporary Playwright probe and the in-browser Performance
+  API; the probe was deleted after the run). Two edits that came out of the
+  check: `useDeferredValue(mode)` was tried and measured *worse* (dev ~300 ms
+  against ~200 ms), because React still rebuilds all ~8.7k calendar cell vnodes
+  in the urgent pass before re-doing them in the deferred pass, so it was
+  reverted — `CalendarHeatmap.tsx` reads `mode` directly; and the per-cell
+  mouse handlers were replaced by one delegated handler on the SVG. The 700 ms
+  chart morph is intentional (`docs/DESIGN.md` section 10) and is disabled
+  under `prefers-reduced-motion: reduce`, which is the mode the budget was
+  measured in. No science changed; this was presentation-layer timing only.
+
+- 4 Oct 2026 (Freebuff, Phase 4 API session): wrote `src/api/dataset.py` (the
+  offline-first dataset resolver: `cache/raw/*.parquet` then the committed
+  `demo_fixtures/detections.parquet`, with `OFFLINE=1` forcing the fixture),
+  `src/api/main.py` (FastAPI app exposing the seven contract endpoints plus
+  `/health`, every payload built by the already-tested
+  `src/compute/export.py` builders), `tests/test_api.py` (27 contract tests
+  that call each route through the ASGI test client and validate against
+  `docs/contract.schema.json`), and `src/demo.py` — the deterministic
+  synthetic-detection generator, moved out of `tests/synthetic.py` (which now
+  re-exports it) because the API's offline fixture is generated from the same
+  code by `python -m src.demo` / `make fixture`. The committed fixture
+  (`demo_fixtures/detections.parquet`, 2019-2020, synthetic) is what makes the
+  demo run with no API key; its numbers are never evidence and every response
+  reports `meta.source: "fixture"`. The AI chose the cache/fixture precedence,
+  the zero-fill of quiet days for the anomaly, and the CORS allow-list; it did
+  not invent any science. No real FIRMS data exists, so the API has never
+  served a real detection.
+
+- 4 Oct 2026 (Freebuff, Phase 5 frontend wiring): implemented
+  `web/src/data/ApiDataSource.ts` (the real HTTP source: `/api/*` on the
+  app's own origin, every response validated against the same zod contract
+  the mock files use), added the `/api` dev/preview proxy in
+  `web/vite.config.ts` so the browser makes no cross-origin request, split
+  the anomaly fetch in `App.tsx` so the box asks the API for the day the
+  reader selects (and reports an uncovered day inside the box rather than
+  blanking the page), and added `e2e/api-mode.spec.ts` plus an `api-mode`
+  Playwright project that runs the same app with `VITE_DATA=api` against
+  `make demo`. The AI chose the proxy-over-CORS approach, the query
+  parameter shapes and the failure wording; the payloads and every number
+  are still the API's. The banner behaviour is unchanged: `MockBanner`
+  still fires only on `source: "mock"`, which means the synthetic
+  *fixture* tier shows a source badge but no banner (see "did not do").
+
 ## What the AI did not do
 
 <!-- Be explicit. The AI should not generate final scientific decisions, dataset licenses, or anything that requires domain expertise you do not have. -->
 
-- No NASA API or any network data source was called; `src/compute`,
-  `src/acquire` and `src/api` were not touched. Sensor epoch dates in the
-  mock are placeholders marked `// TODO verify against FIRMS docs` and are
-  labelled as placeholders in the UI; they are not facts. No harmonization
-  statistics were computed for real data.
+- No NASA API or any network data source was called. `src/compute` and
+  `src/api` exist and are tested, but both have only ever run on the synthetic
+  detections in `src/demo.py`, and the frontend's `VITE_DATA=api` path has
+  only ever reached that same synthetic fixture. Two honesty gaps are left
+  open rather than papered over: (1) the committed fixture is synthetic yet
+  `MockBanner` fires only on `source: "mock"`, so an `api`-mode page shows a
+  `fixture` badge and no "not evidence" warning; (2) Phase 6 fixtures are
+  meant to be real precomputed bytes, which would make a blanket fixture
+  warning wrong. Deciding that wording needs a product call, so the banner
+  was left alone. Sensor
+  epoch dates are placeholders marked `// TODO verify against FIRMS docs` in the
+  mock and, in `src/acquire/firms.py`, flagged in `docs/DATA.md` as unverified
+  until checked against the FIRMS data-availability API; they are not facts.
+  No harmonization statistics were computed for real data, and no real FIRMS
+  data has been downloaded (`cache/` is empty). The frontend was never reviewed
+  visually in this environment: every frontend claim above is the result of
+  programmatic checks (type-check, lint, unit tests, `vite build`, and headless
+  Playwright), not a human or model look at a rendered screenshot.
 
 ## Prompts
 
@@ -121,6 +215,27 @@ A transparent record of how AI tools contributed to this repository.
   mock cells, labelled in the hero legend, because at full density the dot field
   saturates into a single white patch; the panel and the cells JSON carry all of
   them. `docs/DESIGN.md` section 0.1 records the direction.
+- Phase 0 acquisition brief (4 Oct 2026): "Implement Phase 0: make cache real
+  — a src/acquire/firms.py that downloads FIRMS parquet for the Bangladesh box,
+  Suomi-NPP first". Outcome: the module, its 26 offline tests, `make cache`, and
+  the cited dataset list in docs/DATA.md. Real downloads still need a
+  FIRMS_MAP_KEY (not supplied), so no live data was fetched.
+- Frontend functionality brief (4 Oct 2026): "make the frontend more fubnctional
+  and use this skill design-taste-frontend" (sic, quoted verbatim), followed by
+  "continue to work". Outcome: the calendar, validation card, anomaly box and
+  methods panel above, with 78 unit and 17 end-to-end tests green. The design
+  read, the three dial values and the two documented overrides (Fraunces is
+  named by this project's own DESIGN.md; the neon-green accent is the direction
+  set from the reference image) are stated in the session's design read.
+- Phase 4 API brief (4 Oct 2026): "Build the Phase 4 API: src/api serving the
+  seven contract endpoints, offline-first with contract tests". Outcome: the
+  FastAPI app above, its resolver, the 27 contract tests and the committed
+  fixture, all green with `make lint` and `make test` (115 passed). `httpx2`
+  was added to the dependencies because Starlette's test client requires it.
+- Frontend-to-API wiring (4 Oct 2026), chosen from a "what next" prompt: "Wire
+  the frontend to the API". Outcome: `ApiDataSource`, the `/api` proxy, the
+  interactive anomaly fetch, 9 unit tests and 4 api-mode e2e tests, all green
+  with `tsc`, eslint, prettier, vitest (87), `vite build` and Playwright (21).
 - Redesign brief (4 Oct 2026): "use impeccable skill, redesign the frontend",
   pointing at `docs/DESIGN.md` and `docs/frontend.md`. Interview answers:
   scope = redesign the existing surface only (no globe/calendar yet); type =
