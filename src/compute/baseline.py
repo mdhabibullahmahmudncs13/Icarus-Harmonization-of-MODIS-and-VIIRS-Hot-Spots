@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable, Sequence
 from datetime import date as _date
-from typing import Iterable, Sequence
 
 
 def doy(iso: str) -> int:

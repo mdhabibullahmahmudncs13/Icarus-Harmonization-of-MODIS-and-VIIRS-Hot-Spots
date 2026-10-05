@@ -8,7 +8,7 @@ peak the argmax. The window is [onset-1, end+1] and its mass is reported.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Iterable
+from collections.abc import Iterable
 
 from .baseline import doy
 from .series_util import bin_of_doy

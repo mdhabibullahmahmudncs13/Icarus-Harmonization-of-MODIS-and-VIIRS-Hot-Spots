@@ -25,7 +25,6 @@ import glob as globlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from threading import Lock
-from typing import Any
 
 import pandas as pd
 

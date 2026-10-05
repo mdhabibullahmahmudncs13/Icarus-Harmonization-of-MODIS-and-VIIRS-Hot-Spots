@@ -21,8 +21,9 @@ Endpoints (all ``GET``, all carrying the shared ``meta`` block):
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from datetime import date as DateType
-from typing import Annotated, Any, Mapping
+from typing import Annotated, Any
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query

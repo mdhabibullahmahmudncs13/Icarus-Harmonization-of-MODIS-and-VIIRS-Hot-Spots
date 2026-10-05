@@ -130,7 +130,7 @@ def poisson(rng: random.Random, lam: float) -> int:
 
 def cell_index(lon: float, lat: float, factor: int = 1) -> tuple[int, int]:
     step = STEP * factor
-    return int(math.floor(lon / step)), int(math.floor(lat / step))
+    return math.floor(lon / step), math.floor(lat / step)
 
 
 def build_cells() -> list[tuple[float, float, float]]:
@@ -256,8 +256,8 @@ def percentile(vals: list[float], q: float) -> float:
     if len(s) == 1:
         return s[0]
     pos = q * (len(s) - 1)
-    lo = int(math.floor(pos))
-    hi = int(math.ceil(pos))
+    lo = math.floor(pos)
+    hi = math.ceil(pos)
     if lo == hi:
         return s[lo]
     return s[lo] + (s[hi] - s[lo]) * (pos - lo)
@@ -391,7 +391,7 @@ def build_payloads(sim: dict) -> dict[str, dict]:
             "onset_bin": onset, "peak_bin": peak, "end_bin": end,
             "window": {"start_bin": max(onset - 1, 1), "end_bin": min(end + 1, 46), "mass": round(mass, 4)},
             "year_timing_deviation": [
-                {"year": y, "days": int(round(seasonal(90 + y % 7 - 3) * 30 - 20))} for y in years_used
+                {"year": y, "days": round(seasonal(90 + y % 7 - 3) * 30 - 20)} for y in years_used
             ],
         }
 

@@ -48,8 +48,8 @@ def mock_payloads() -> list[tuple[str, dict]]:
 
 def test_schema_defs_cover_every_payload(schema: dict) -> None:
     defs = schema["$defs"]
-    for name in DEF_FOR:
-        assert DEF_FOR[name] in defs, f"no $defs entry for {name!r}"
+    for name, target in DEF_FOR.items():
+        assert target in defs, f"no $defs entry for {name!r}"
 
 
 @pytest.mark.parametrize("name,payload", mock_payloads(), ids=lambda v: v if isinstance(v, str) else "")

@@ -12,8 +12,8 @@ import random
 import pytest
 
 from src.compute import (
-    Detection,
     STREAM_BITS,
+    Detection,
     anomaly,
     cell_sweep,
     collapse_cell_days,
@@ -29,7 +29,6 @@ from src.compute import (
     to_series,
 )
 from src.compute.grid import grid_snap
-
 
 # --- fixtures --------------------------------------------------------------
 
