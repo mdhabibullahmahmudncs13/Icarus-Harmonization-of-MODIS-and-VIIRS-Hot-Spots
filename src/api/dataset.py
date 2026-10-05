@@ -1,25 +1,22 @@
-"""Resolve the detections the API serves — offline-first, cache before fixture.
+"""Resolve the detections this API serves — offline-first, cache before fixture.
 
-The API never touches the network. It reads local parquet, harmonizes it with
-:mod:`src.compute` and hands the result to the payload builders in
-:mod:`src.compute.export`. Where the bytes came from is carried on every
-response as ``meta.source``:
+Track B contract server. The API never touches the network; it reads local
+parquet and hands the result to the payload builders in :mod:`src.compute.export`.
+Where the bytes came from is carried on every response as ``meta.source``:
 
-* ``"cache"`` — real detections written by ``make cache``
-  (``cache/raw/*.parquet``).
-* ``"fixture"`` — the committed offline demo fixture
-  (``demo_fixtures/detections.parquet``), synthetic by design.
+* ``"cache"`` — detections written by the tracker's ``make cache`` target.
+* ``"fixture"`` — the committed offline demo fixture.
+* ``"live"`` — real detections read from the live network (Track A).
 
-Resolution order, honouring ``OFFLINE=1`` (the plan: *OFFLINE forces
-fixtures*, so ``make demo`` is deterministic even when a real cache exists):
+Resolution order, honouring ``OFFLINE=1`` (the plan forces the fixture:
 
 * ``OFFLINE`` unset → cache, then fixture.
 * ``OFFLINE=1`` → fixture, then cache.
 
 A day with no detections is a count of zero, not a missing day, so the
-harmonized series handed to the baseline and the anomaly is reindexed onto a
-continuous daily range and zero-filled. That is why ``/api/anomaly`` can
-answer for any date the fixture covers — a candidate table, not just a fire.
+harmonized series is reindexed onto a continuous daily range. That is why
+``/api/anomaly`` can answer for any date the fixture covers — a candidate
+table, not just fire.
 """
 
 from __future__ import annotations
@@ -28,6 +25,7 @@ import glob as globlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from threading import Lock
+from typing import Any
 
 import pandas as pd
 
@@ -59,7 +57,7 @@ class Dataset:
 
 
 def _read_cache() -> tuple[pd.DataFrame, str] | None:
-    """Concatenate the raw parquet written by ``src/acquire/firms.py``."""
+    """Concatenate the raw parquet written by the acquisition layer."""
     pattern = str(safe.CACHE_DIR / "raw" / "*.parquet")
     files = sorted(globlib.glob(pattern))
     if not files:
@@ -77,12 +75,7 @@ def _read_fixture() -> tuple[pd.DataFrame, str] | None:
 
 
 def _continuous(series: pd.Series) -> pd.Series:
-    """Reindex a daily series onto every day between its ends, filling 0.
-
-    ``harmonize.harmonized_series`` only has rows for days that saw a
-    detection. A day that saw none is a real zero, so the baseline and the
-    anomaly should see it as one.
-    """
+    """Reindex a daily series onto every day between its ends, filling 0."""
     if series.empty:
         return series
     index = pd.date_range(series.index.min(), series.index.max(), freq="D")
@@ -93,8 +86,7 @@ def _continuous(series: pd.Series) -> pd.Series:
 def load_dataset(*, offline: bool | None = None) -> Dataset:
     """Read, harmonize and package the dataset to serve.
 
-    Raises :class:`NoDataError` when neither the cache nor the fixture
-    exists, so the API can answer with a clear 503 instead of a stack trace.
+    Raises :class:`NoDataError` when neither the cache nor the fixture exists.
     """
     if offline is None:
         offline = safe.is_offline()
@@ -118,7 +110,7 @@ def load_dataset(*, offline: bool | None = None) -> Dataset:
         )
 
     raise NoDataError(
-        "no detections to serve: ran `make cache`? otherwise run "
+        "no detections to serve: run `make cache` first, otherwise run "
         "`python -m src.demo` to write demo_fixtures/detections.parquet"
     )
 

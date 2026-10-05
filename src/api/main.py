@@ -1,7 +1,7 @@
 """Icarus API — the seven contract endpoints, served offline-first.
 
-Every route returns a payload built by :mod:`src.compute.export`, so the API
-and the exported static files are the same shapes and both satisfy
+Every route returns a payload built by :mod:`src.compute.export`, so the API and
+the exported static files are the same shapes and both satisfy
 ``docs/contract.schema.json``. The API reads local parquet only (see
 :mod:`src.api.dataset`); it never calls NASA, and ``OFFLINE=1`` makes it
 serve the committed fixture.
@@ -21,9 +21,8 @@ Endpoints (all ``GET``, all carrying the shared ``meta`` block):
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
 from datetime import date as DateType
-from typing import Annotated, Any
+from typing import Annotated, Any, Mapping
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
@@ -55,7 +54,6 @@ app.add_middleware(
 # --------------------------------------------------------------------------
 # Helpers
 # --------------------------------------------------------------------------
-
 
 def _dataset() -> Dataset:
     """The served dataset, or 503 when the cache and the fixture are absent."""
@@ -105,7 +103,6 @@ def _continuous(series: pd.Series) -> pd.Series:
 # --------------------------------------------------------------------------
 # Routes
 # --------------------------------------------------------------------------
-
 
 @app.get("/health")
 def health() -> dict[str, str]:

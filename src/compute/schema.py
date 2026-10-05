@@ -2,17 +2,19 @@
 
 FIRMS publishes the two sensors with different confidence conventions:
 MODIS reports 0-100, VIIRS reports ``l`` / ``n`` / ``h``. This module maps
-both onto a single numeric column so the rest of ``src/compute`` can apply
+both onto a single numeric column so the rest of ``src.compute`` can apply
 one confidence filter.
 
-Deterministic and network-free. No LLM. Nothing here computes for the UI;
-it is the shared input contract for the harmonization and validation steps.
+Deterministic and network-free. No LLM. Nothing here computes for the UI.
+It is the shared input contract for the harmonization and validation steps.
 """
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
+from typing import Any
 
 import pandas as pd
 
@@ -46,6 +48,32 @@ CANONICAL_COLUMNS = (
     "confidence_num",
     "sensor_family",
 )
+
+#: Bitmasks for each stream presence, used to build the cell-day bitmask.
+STREAM_BITS: dict[str, int] = {
+    "MOD_T": 1,
+    "MOD_A": 2,
+    "VIIRS_SNPP": 4,
+    "VIIRS_N20": 8,
+    "VIIRS_N21": 16,
+}
+
+#: A single detection on the canonical grid-cell-day schema.
+@dataclass(frozen=True)
+class Detection:
+    acq_date: str
+    acq_time: str
+    lon: float
+    lat: float
+    frp: float | None
+    conf_num: int | None
+    conf_class: str | None
+    hs_type: int | None
+    instrument: str
+    sat: str
+    stream: str
+    stream_bit: int
+
 
 _FAMILY_HINTS = (("MODIS", MODIS), ("VIIRS", VIIRS))
 
@@ -108,7 +136,9 @@ def normalize(
 
     dropped = int(frame["acq_date"].isna().sum() + frame["latitude"].isna().sum())
     if dropped:
-        logger.warning("dropping %d detection(s) with an unparseable date or coordinate", dropped)
+        logger.warning(
+            "dropping %d detection(s) with an unparseable date or coordinate", dropped
+        )
         frame = frame.dropna(subset=["latitude", "longitude", "acq_date"]).copy()
     frame = frame.dropna(subset=["confidence_num"]).copy()
 
@@ -179,15 +209,39 @@ def confidence_mapping() -> Mapping[str, float]:
     return {"l": VIIRS_CONFIDENCE_MAP["l"], "n": VIIRS_CONFIDENCE_MAP["n"], "h": VIIRS_CONFIDENCE_MAP["h"]}
 
 
-__all__: Iterable[str] = (
-    "CANONICAL_COLUMNS",
-    "MIN_CONFIDENCE",
-    "MODIS",
-    "REQUIRED_COLUMNS",
-    "VIIRS",
-    "VIIRS_CONFIDENCE_MAP",
-    "confidence_mapping",
-    "confidence_to_numeric",
-    "infer_family",
-    "normalize",
-)
+#: MODIS ``hs_type`` values the quality filter keeps (config/params.yaml
+#: ``quality.modis_allowed_types``). ``None`` is kept: MODIS rows that do not
+#: carry a type are not evidence of an urban/persistent exclusion.
+MODIS_ALLOWED_TYPES: frozenset[int] = frozenset({0})
+
+#: VIIRS confidence classes the quality filter keeps (``viirs_classes``).
+VIIRS_CLASSES: frozenset[str] = frozenset({"n", "h"})
+
+
+def quality_filter(
+    detections: Iterable[Detection],
+    *,
+    c_min: float = 30,
+) -> list[Detection]:
+    """S2: keep only detections that pass the confidence / type rules.
+
+    Rules (docs/METHODS.md, config/params.yaml ``quality``):
+
+    * MODIS rows: ``conf_num >= c_min`` and ``hs_type`` in
+      :data:`MODIS_ALLOWED_TYPES` (``None`` passes).
+    * VIIRS rows: ``conf_class`` in :data:`VIIRS_CLASSES` (``l`` is dropped).
+
+    The input order and the detection objects themselves are preserved, so
+    ``kept == [expected]`` compares equal without copying.
+    """
+    kept: list[Detection] = []
+    for det in detections:
+        if det.hs_type is not None and det.hs_type not in MODIS_ALLOWED_TYPES:
+            continue
+        if det.conf_class is not None:
+            if str(det.conf_class).strip().lower() not in VIIRS_CLASSES:
+                continue
+        elif det.conf_num is None or det.conf_num < c_min:
+            continue
+        kept.append(det)
+    return kept

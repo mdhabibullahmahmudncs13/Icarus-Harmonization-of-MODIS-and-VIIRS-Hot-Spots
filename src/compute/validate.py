@@ -15,11 +15,13 @@ import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from src.compute import harmonize, schema
+from src.compute.grid import MODIS_MASK, VIIRS_MASK
 
 #: Cell sizes, in km, swept to show the result is not an artefact of one grid.
 DEFAULT_CELL_SIZES: tuple[float, ...] = (5.5, 11.0, 16.5, 22.0)
@@ -185,12 +187,165 @@ def validate_overlap(
     )
 
 
+# --------------------------------------------------------------------------
+# List-based statistics: the cell-day / mock surface
+# --------------------------------------------------------------------------
+
+
+def pearson(xs: Sequence[float], ys: Sequence[float]) -> float | None:
+    """Pearson's r for two paired lists; ``None`` when it is undefined.
+
+    Undefined means fewer than two points, mismatched lengths, or a constant
+    series in either argument — callers must not present ``None`` as a
+    number (the contract only carries real values).
+    """
+    n = len(xs)
+    if n < 2 or n != len(ys):
+        return None
+    mean_x = sum(xs) / n
+    mean_y = sum(ys) / n
+    sxx = sum((x - mean_x) ** 2 for x in xs)
+    syy = sum((y - mean_y) ** 2 for y in ys)
+    if sxx == 0 or syy == 0:
+        return None
+    sxy = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys, strict=True))
+    return sxy / math.sqrt(sxx * syy)
+
+
+def ranks(values: Sequence[float]) -> list[float]:
+    """Average ranks (ties share the mean position), as Spearman needs."""
+    order = sorted(range(len(values)), key=lambda i: values[i])
+    out = [0.0] * len(values)
+    i = 0
+    while i < len(order):
+        j = i
+        while j + 1 < len(order) and values[order[j + 1]] == values[order[i]]:
+            j += 1
+        average = (i + j) / 2.0
+        for k in range(i, j + 1):
+            out[order[k]] = average
+        i = j + 1
+    return out
+
+
+def spearman(xs: Sequence[float], ys: Sequence[float]) -> float | None:
+    """Spearman's rho: Pearson correlation of the average ranks."""
+    if len(xs) != len(ys):
+        return None
+    return pearson(ranks(xs), ranks(ys))
+
+
+def overlap_validation(
+    rows: Sequence[Mapping[str, Any]],
+    transition: str | date | None = None,
+) -> dict[str, Any]:
+    """Raw vs harmonized agreement over the overlap, from daily series rows.
+
+    ``rows`` carries the :func:`src.compute.grid.to_series` shape (``date``,
+    ``raw_modis``, ``raw_viirs``, ``harm_modis``, ``harm_viirs``).
+    ``transition`` is the VIIRS start date: rows before it are excluded,
+    because there is no second sensor to compare against.
+
+    Returns the contract's validation payload shape without ``meta``
+    (``overlap`` / ``raw`` / ``harmonized`` / ``cell_sweep``). The sweep
+    needs the cell geometry the daily rows do not carry, so it is left empty
+    here — :func:`validate_overlap` computes it from the detections.
+    """
+    selected = list(rows)
+    if transition is not None:
+        cutoff = str(transition)
+        selected = [row for row in selected if str(row["date"]) >= cutoff]
+
+    def column(key: str) -> list[float]:
+        return [float(row[key]) for row in selected]
+
+    def block(prefix: str) -> dict[str, float | None]:
+        modis = column(f"{prefix}_modis")
+        viirs = column(f"{prefix}_viirs")
+        total_modis = sum(modis)
+        total_viirs = sum(viirs)
+        ratio = total_modis / total_viirs if total_viirs else None
+        r = pearson(modis, viirs)
+        rho = spearman(modis, viirs)
+        return {
+            "pearson": round(r, 4) if r is not None else None,
+            "spearman": round(rho, 4) if rho is not None else None,
+            "ratio": round(ratio, 4) if ratio is not None else None,
+        }
+
+    years = sorted({int(str(row["date"])[:4]) for row in selected})
+    return {
+        "overlap": {"years": years, "n_days": len(selected)},
+        "raw": block("raw"),
+        "harmonized": block("harm"),
+        "cell_sweep": [],
+    }
+
+
+def cell_sweep(
+    cell_days: Iterable,
+    *,
+    factors: Sequence[int] = (1, 2, 4),
+    cell_km: float = harmonize.DEFAULT_CELL_KM,
+) -> list[dict[str, float]]:
+    """Harmonized agreement as the grid coarsens; raw is grid-independent.
+
+    Each cell-day is re-snapped to a grid ``factor`` times coarser and the
+    per-day distinct-cell counts of the two sensors are correlated, which
+    shows the improvement is not an artefact of one cell size. Raw counts are
+    point data and do not aggregate, so ``raw_correlation`` is constant
+    across the sweep. Undefined correlations (a constant series) count as
+    0.0 rather than ``NaN``: the contract only carries real numbers.
+    """
+    items = list(cell_days)
+    dates = sorted({cd.date for cd in items})
+
+    raw_modis = dict.fromkeys(dates, 0.0)
+    raw_viirs = dict.fromkeys(dates, 0.0)
+    for cd in items:
+        if cd.stream_mask & MODIS_MASK:
+            raw_modis[cd.date] += cd.n_modis
+        if cd.stream_mask & VIIRS_MASK:
+            raw_viirs[cd.date] += cd.n_viirs
+    raw_corr = pearson(
+        [raw_modis[d] for d in dates], [raw_viirs[d] for d in dates]
+    ) or 0.0
+
+    sweep: list[dict[str, float]] = []
+    for factor in factors:
+        hit_modis = {d: set() for d in dates}
+        hit_viirs = {d: set() for d in dates}
+        for cd in items:
+            cell = (cd.cell_x // factor, cd.cell_y // factor)
+            if cd.stream_mask & MODIS_MASK:
+                hit_modis[cd.date].add(cell)
+            if cd.stream_mask & VIIRS_MASK:
+                hit_viirs[cd.date].add(cell)
+        corr = pearson(
+            [len(hit_modis[d]) for d in dates],
+            [len(hit_viirs[d]) for d in dates],
+        ) or 0.0
+        sweep.append(
+            {
+                "cell_km": round(cell_km * factor, 2),
+                "raw_correlation": round(float(raw_corr), 4),
+                "harmonized_correlation": round(float(corr), 4),
+            }
+        )
+    return sweep
+
+
 __all__: Iterable[str] = (
     "DEFAULT_CELL_SIZES",
     "Correlation",
     "ValidationReport",
+    "cell_sweep",
     "correlation_stats",
     "family_date_range",
+    "overlap_validation",
     "overlap_window",
+    "pearson",
+    "ranks",
+    "spearman",
     "validate_overlap",
 )
