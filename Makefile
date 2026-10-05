@@ -16,8 +16,8 @@ help:
 	@echo "  cache options: make cache ARGS=\"--products VIIRS_SNPP_SP --start 2012-01-01\""
 
 venv:
-	uv venv .venv
-	VIRTUAL_ENV=.venv uv pip install duckdb pandas pyarrow requests fastapi uvicorn httpx2 pytest ruff
+	[ -d .venv ] || uv venv .venv
+	VIRTUAL_ENV=.venv uv pip install duckdb pandas pyarrow requests fastapi uvicorn httpx2 jsonschema pytest ruff
 
 cache:
 	@$(PYTHON) -m src.acquire.firms $(ARGS)
