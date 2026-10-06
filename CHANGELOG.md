@@ -50,6 +50,13 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - The demo fixture now contains the outage windows from `src/outages.json`
   (MODIS blanked 10-25 June 2019, every sensor 1-5 August 2019), so the offline
   calendar shows `BRIDGE`, `VIIRS_CAL` and the hatched `NONE` state.
+- `metric=density` on `POST /api/v1/series` — the same counts divided by the
+  number of grid cells covering `meta.region.bbox`
+  (`harmonize.grid_cell_count`), so `harm_*` is the fraction of the region's
+  cells active that day (0–1) and `raw_*` is detections per cell. The contract
+  gains `$defs/densityPoint` and discriminates on `series.metric`; the
+  endpoints whose payloads have no `metric` field still refuse `density` with
+  422 `unsupported_metric` rather than silently answering in `cell_days`.
 
 ### Changed
 
@@ -62,8 +69,9 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   are computed from the availability calendar rather than from detections.
 - The API's analysis endpoints honour a JSON body: `aoi`, `date` and `bbox`
   override the query parameters, and `metric`/`view` are validated so a caller
-  cannot believe they changed anything. `metric=density` is refused rather than
-  served as `cell_days`, since the density series does not exist yet.
+  cannot believe they changed anything. `metric=density` is served by the
+  series payload (Added above); every other endpoint still refuses it rather
+  than answering in `cell_days`.
 - Every API failure is now `{code, message, field}` (`unknown_aoi`,
   `unsupported_metric`, `invalid_bbox`, `invalid_window`, `invalid_request`),
   including FastAPI's own parameter-validation errors.
@@ -87,6 +95,21 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   against the API with `VITE_DATA=api`.
 - The non-evidence banner said "Mock data" for the `fixture` tier as well; it
   now names the source it is actually showing.
+- The `aoi` field of an analysis POST body now also accepts the AOI object
+  `docs/TRD.md` §6.1 defines (`{type: "preset", id}`); the smoke-test body in
+  `docs/DEPLOYMENT.md` §8 had been rejected with "Input should be a valid
+  string" before any route ran. Custom geometry is refused with 422
+  `invalid_request` rather than silently falling back to the default area.
+- `GET /meta` — the root alias `docs/TRD.md` §6 lists and the smoke test in
+  `docs/DEPLOYMENT.md` §8 curls; only `/api/meta` and `/api/v1/meta` were
+  routed, so the runbook's own check answered 404.
+- The acquisition layer could never resume after a transient NASA throttle:
+  `download_chunk` wrote *any* payload — including the `invalid map_key.`
+  error page — to its CSV cache before parsing it, so one bad response made
+  every later run raise on the poisoned file instead of re-fetching. The CSV
+  is now written only after it parses as fire data, and an already-poisoned
+  cache falls through to a live fetch. This is what stalled `make cache` at
+  457 chunks.
 
 ### Notes
 

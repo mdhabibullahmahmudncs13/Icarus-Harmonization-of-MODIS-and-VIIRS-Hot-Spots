@@ -440,8 +440,16 @@ def download_chunk(
         return ChunkResult(chunk, "skipped", parquet=parquet_path)
 
     if csv_path.exists():
-        frame = parse_firms_csv(csv_path.read_text(), product)
-        return _write_chunk(frame, chunk, csv_path, parquet_path, "cached", "cache")
+        try:
+            frame = parse_firms_csv(csv_path.read_text(), product)
+        except ValueError:
+            # A poisoned cache — an error page saved by an earlier run, or a
+            # truncated write — is not data. Fall through to the live fetch
+            # instead of raising on every run; a successful fetch overwrites
+            # it, and an offline run just reports the chunk missing.
+            pass
+        else:
+            return _write_chunk(frame, chunk, csv_path, parquet_path, "cached", "cache")
 
     if offline is None:
         offline = is_offline()
@@ -468,8 +476,11 @@ def download_chunk(
         return ChunkResult(chunk, "missing")
 
     csv_path.parent.mkdir(parents=True, exist_ok=True)
-    csv_path.write_text(_response_text(payload))
+    # Parse first: a throttle page ("invalid map_key.") reaches here as CSV,
+    # and caching it would poison the chunk — every later run would take the
+    # "cached CSV" path above and raise instead of re-fetching.
     frame = parse_firms_csv(payload, product)
+    csv_path.write_text(_response_text(payload))
     return _write_chunk(frame, chunk, csv_path, parquet_path, "fetched", source_of_data)
 
 

@@ -312,6 +312,54 @@ def test_download_chunk_offline_without_cache_is_missing_not_fatal(tmp_path):
     assert result.status == "missing"
 
 
+def test_download_chunk_never_caches_an_error_page(tmp_path):
+    """A throttle page ("invalid map_key.") must not become the CSV cache.
+
+    It used to be written before parsing, so one transient NASA error poisoned
+    the chunk: every later run took the "cached CSV" path and raised instead
+    of re-fetching, and no download could ever resume.
+    """
+    chunk = chunk_windows(*_window())[0]
+    csv_path, parquet_path = chunk_paths("VIIRS_SNPP_SP", chunk, tmp_path)
+
+    def throttle(url: str):
+        return _Resp("invalid map_key.")
+
+    with pytest.raises(ValueError, match="missing columns"):
+        download_chunk(
+            PRODUCTS["VIIRS_SNPP_SP"],
+            chunk,
+            firms.BANGLADESH_BBOX,
+            "KEY",
+            cache_dir=tmp_path,
+            fetcher=throttle,
+            offline=False,
+        )
+    assert not csv_path.exists()
+    assert not parquet_path.exists()
+
+
+def test_a_poisoned_csv_cache_falls_through_to_the_live_fetch(tmp_path):
+    """An error page left by an older run is re-fetched, not raised forever."""
+    chunk = chunk_windows(*_window())[0]
+    csv_path, parquet_path = chunk_paths("VIIRS_SNPP_SP", chunk, tmp_path)
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    csv_path.write_text("invalid map_key.")
+
+    result = download_chunk(
+        PRODUCTS["VIIRS_SNPP_SP"],
+        chunk,
+        firms.BANGLADESH_BBOX,
+        "KEY",
+        cache_dir=tmp_path,
+        fetcher=_dated_fetcher(),
+        offline=False,
+    )
+    assert result.status == "fetched"
+    assert parquet_path.exists()
+    assert "invalid map_key" not in csv_path.read_text(), "the poison must be overwritten"
+
+
 def test_download_product_writes_one_merged_parquet_covering_every_chunk(tmp_path):
     start, end = _window()
     fetcher = _dated_fetcher()
