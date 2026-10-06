@@ -285,7 +285,7 @@ def test_methods_payload_matches_the_contract():
         "FIRMS_MODIS_SP",
         "FIRMS_VIIRS_SNPP_SP",
         "FIRMS_VIIRS_NOAA20_SP",
-        "FIRMS_VIIRS_NOAA21_SP",
+        "FIRMS_VIIRS_NOAA21_NRT",
     }
     assert all(d["sensor"] and d["used_for"] for d in payload["datasets"])
 

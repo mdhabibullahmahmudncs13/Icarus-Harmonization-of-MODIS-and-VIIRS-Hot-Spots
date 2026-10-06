@@ -1,20 +1,47 @@
 /* Icarus design tokens — see docs/DESIGN.md.
-   Dark is the default theme; light is opt-in via [data-theme="light"]. */
+   Dark is the default theme; light is opt-in via [data-theme="light"].
+
+   Glassmorphism layer: every panel is a frosted sheet (translucent fill +
+   backdrop blur + hairline border) floating over a fixed ambient gradient
+   field. Data encodings below stay opaque — the chart colours must not be
+   tinted by whatever is behind them. */
 
 :root {
-  --bg: #0e0f12;
-  --surface: #17181c;
-  --surface-hover: #202126;
-  --border: #26272d;
-  --text: #f4f4f6;
-  --text-muted: #8b8e98;
-  --text-info: #a7aab3;
+  /* ambient field behind the frosted sheets */
+  --bg: #0a0c11;
+  --bg-glow-1: rgba(196, 244, 58, 0.13);
+  --bg-glow-2: rgba(255, 122, 102, 0.11);
+  --bg-glow-3: rgba(122, 160, 255, 0.09);
+
+  /* frosted surfaces */
+  --glass-fill: rgba(255, 255, 255, 0.055);
+  --glass-fill-strong: rgba(255, 255, 255, 0.085);
+  --glass-fill-sunken: rgba(0, 0, 0, 0.22);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-border-strong: rgba(255, 255, 255, 0.2);
+  --glass-blur: 18px;
+  --glass-saturate: 165%;
+
+  --surface: var(--glass-fill);
+  --surface-strong: var(--glass-fill-strong);
+  --surface-hover: rgba(255, 255, 255, 0.11);
+  --glass-panel: rgba(10, 12, 17, 0.86);
+  --border: var(--glass-border);
+  --border-strong: var(--glass-border-strong);
+  --cell-line: rgba(255, 255, 255, 0.055);
+
+  --text: #f5f6f8;
+  --text-muted: #a2a6b0;
+  --text-info: #b9bdc6;
   --accent: #c4f43a;
   --accent-ink: #111114;
+  --accent-soft: rgba(196, 244, 58, 0.16);
+  --focus: #c4f43a;
   --status-neutral: #9a9da6;
   --status-positive: #a6e02b;
+  --danger: #ff8f7a;
 
-  /* data encodings */
+  /* data encodings — opaque on purpose */
   --series-raw: #ff7a66;
   --series-harmonized: #a6e02b;
   --cov-full: #a6e02b;
@@ -34,18 +61,57 @@
 
   --radius-card: 20px;
   --radius-control: 12px;
-  --font: 'Inter', 'Geist', 'Satoshi', system-ui, -apple-system, sans-serif;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --radius-pill: 999px;
+  --font: 'Inter', 'Geist', 'Satoshi', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  --shadow-card: 0 18px 44px rgba(0, 0, 0, 0.38), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  --shadow-pop: 0 26px 60px rgba(0, 0, 0, 0.5);
+  --shadow: var(--shadow-card);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --dur-fast: 140ms;
+  --dur: 220ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
 :root[data-theme='light'] {
-  --bg: #e7e8ee;
-  --surface: #ffffff;
-  --surface-hover: #f3f4f7;
-  --border: #ecedf1;
-  --text: #111114;
-  --text-muted: #8b8e98;
-  --text-info: #6f727c;
+  --bg: #e4e7f1;
+  --bg-glow-1: rgba(146, 196, 10, 0.22);
+  --bg-glow-2: rgba(224, 104, 75, 0.16);
+  --bg-glow-3: rgba(124, 92, 255, 0.14);
+
+  --glass-fill: rgba(255, 255, 255, 0.6);
+  --glass-fill-strong: rgba(255, 255, 255, 0.78);
+  --glass-fill-sunken: rgba(255, 255, 255, 0.45);
+  --glass-border: rgba(17, 17, 20, 0.09);
+  --glass-border-strong: rgba(17, 17, 20, 0.16);
+  --glass-blur: 20px;
+  --glass-saturate: 150%;
+
+  --surface: var(--glass-fill);
+  --surface-strong: var(--glass-fill-strong);
+  --surface-hover: rgba(255, 255, 255, 0.9);
+  --glass-panel: rgba(238, 241, 249, 0.9);
+  --border: var(--glass-border);
+  --border-strong: var(--glass-border-strong);
+  --cell-line: rgba(17, 17, 20, 0.1);
+
+  --text: #14161c;
+  --text-muted: #5c606b;
+  --text-info: #4a4e59;
+  --accent: #456d08;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(69, 109, 8, 0.14);
+  --focus: #3f6a05;
+  --danger: #b3341c;
+
   --series-raw: #c2402b;
   --series-harmonized: #3f7a1f;
   --cov-full: #a6e02b;
@@ -55,10 +121,13 @@
   --anom-elevated: #7c5cff;
   --anom-extreme: #4b2ecc;
   --anom-normal: #6f727c;
-  --ramp-0: #f3f4f7;
+  --ramp-0: #dfe3ee;
   --ramp-1: #f0c36b;
   --ramp-2: #e0684b;
   --ramp-3: #b3452f;
   --ramp-4: #111114;
-  --shadow: 0 1px 2px rgba(17, 17, 20, 0.04);
+
+  --shadow-card: 0 18px 40px rgba(28, 34, 56, 0.14), 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  --shadow-pop: 0 30px 64px rgba(28, 34, 56, 0.24);
+  --shadow: var(--shadow-card);
 }

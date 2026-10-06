@@ -159,9 +159,19 @@ def test_area_url_guards_its_inputs():
 # --------------------------------------------------------------------------
 
 
-def test_suomi_npp_is_downloaded_first_and_every_product_is_standard_processing():
+def test_suomi_npp_is_downloaded_first_and_only_noaa21_is_nrt():
+    """Everything is standard processing except NOAA-21.
+
+    FIRMS's Area API documents no ``VIIRS_NOAA21_SP`` — it answers
+    ``Invalid source.`` — and offers NOAA-21 only as ``VIIRS_NOAA21_NRT``.
+    This test pins that asymmetry so the table cannot silently regress to a
+    source the API refuses to serve.
+    """
     assert DOWNLOAD_ORDER[0] == "VIIRS_SNPP_SP"
-    assert all(PRODUCTS[source].processing == "SP" for source in DOWNLOAD_ORDER)
+    nrt = [s for s in DOWNLOAD_ORDER if PRODUCTS[s].processing != "SP"]
+    assert nrt == ["VIIRS_NOAA21_NRT"]
+    assert PRODUCTS["VIIRS_NOAA21_NRT"].start == date(2023, 1, 1)
+    assert "VIIRS_NOAA21_SP" not in PRODUCTS
 
 
 def test_suomi_npp_window_carries_the_hard_deadline():
@@ -384,7 +394,7 @@ def test_download_product_writes_one_merged_parquet_covering_every_chunk(tmp_pat
 
 def test_download_reports_a_product_with_no_overlap_without_fetching(tmp_path):
     report = download_product(
-        "VIIRS_NOAA21_SP",
+        "VIIRS_NOAA21_NRT",
         firms.BANGLADESH_BBOX,
         date(2003, 1, 1),
         date(2010, 1, 1),

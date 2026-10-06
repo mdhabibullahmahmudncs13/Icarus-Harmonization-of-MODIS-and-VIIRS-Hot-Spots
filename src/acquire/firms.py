@@ -97,7 +97,10 @@ PRODUCTS: dict[str, FirmsProduct] = {
         FirmsProduct("VIIRS_SNPP_SP", "VIIRS", "Suomi-NPP", "SP", _d("2012-01-01"), _d("2026-11-01")),
         FirmsProduct("MODIS_SP", "MODIS", "Terra+Aqua", "SP", _d("2003-01-01"), _d("2026-09-30")),
         FirmsProduct("VIIRS_NOAA20_SP", "VIIRS", "NOAA-20", "SP", _d("2018-01-01"), _d("2026-09-30")),
-        FirmsProduct("VIIRS_NOAA21_SP", "VIIRS", "NOAA-21", "SP", _d("2023-01-01"), _d("2026-09-30")),
+        # NOAA-21 is the one product FIRMS serves only as NRT: the Area API
+        # has no VIIRS_NOAA21_SP and answers "Invalid source." for it, so the
+        # archive-cached source for this satellite is VIIRS_NOAA21_NRT.
+        FirmsProduct("VIIRS_NOAA21_NRT", "VIIRS", "NOAA-21", "NRT", _d("2023-01-01"), _d("2026-09-30")),
     )
 }
 
@@ -106,7 +109,7 @@ DOWNLOAD_ORDER: tuple[str, ...] = (
     "VIIRS_SNPP_SP",
     "MODIS_SP",
     "VIIRS_NOAA20_SP",
-    "VIIRS_NOAA21_SP",
+    "VIIRS_NOAA21_NRT",
 )
 
 

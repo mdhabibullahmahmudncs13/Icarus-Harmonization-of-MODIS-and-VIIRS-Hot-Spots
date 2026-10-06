@@ -12,7 +12,7 @@ defined in `docs/PARAMETERS.md`.
 |---------|------|--------------|-------|
 | MCD14ML (MODIS C6) | Primary long record; reference scale | UMD SFTP archive (monthly `.txt.gz`) | 200K–500K lines/month globally |
 | VIIRS 375 m (Suomi-NPP) | Modern record; calibrated to MODIS | FIRMS archive / Area API (recent) | Confidence as classes [n, h, l] |
-| VIIRS N20, N21 | Optional extra streams | FIRMS archive | Ingested, not used by default |
+| VIIRS N20, N21 | Optional extra streams | FIRMS Area API (`VIIRS_NOAA20_SP`, `VIIRS_NOAA21_NRT`) | Ingested, not used by default. The Area API serves **no** `VIIRS_NOAA21_SP` (it answers `Invalid source.`), so NOAA-21 is cached from its NRT source, which begins 2023-01-01 |
 | MCD64CMQ | Independent validation reference | NASA LAADS DAAC | 0.25° burned area, hundredths of ha |
 
 Source attribution: **NASA FIRMS / LANCE / EOSDIS** and **NASA LAADS DAAC**.

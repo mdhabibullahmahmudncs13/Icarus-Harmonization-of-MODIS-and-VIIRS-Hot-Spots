@@ -401,13 +401,18 @@ release build (§3.5).
 
 ### 6.1 Phase 4 status
 
-- [x] Pipeline run on real FIRMS data — four archive products
-      (`MODIS_SP`, `VIIRS_SNPP_SP`, `VIIRS_NOAA20_SP`, `VIIRS_NOAA21_SP`)
-      downloaded through `src/acquire` into `cache/raw/*.parquet`; the
-      driver is `cache/download.sh` (two products at a time, retries with
-      backoff against NASA's throttle). The merged cache currently holds
-      three products, **1,378,592 detections**, 2003-01-02 → 2026-06-28,
-      3,054 chunk parquets; NOAA-21 (epoch starts 2023) is still retrying.
+- [x] Pipeline run on real FIRMS data — the three archive products
+      (`MODIS_SP`, `VIIRS_SNPP_SP`, `VIIRS_NOAA20_SP`) plus NOAA-21 as
+      `VIIRS_NOAA21_NRT` (the Area API serves no `VIIRS_NOAA21_SP` — it
+      answers `Invalid source.` — so NRT is the only source FIRMS offers
+      for that satellite; the product table and this plan were corrected
+      rather than leaving a source that can never download), downloaded
+      through `src/acquire` into `cache/raw/*.parquet`; the drivers are
+      `cache/download.sh` and `cache/download_n21.sh` (two products at a
+      time, retries with backoff against NASA's throttle). The merged
+      cache holds the SP archive products — **1,378,592 detections**,
+      2003-01-02 → 2026-06-28, 3,054 chunk parquets — with NOAA-21 NRT
+      (epoch starts 2023) downloading separately.
 - [x] Frontend pointed at the API (one env var:
       `VITE_DATA=api VITE_API_BASE=…`) — the badge reads `cache`,
       `params_hash f4b82ef0c728`, and `/api/v1/*` serves all six views.

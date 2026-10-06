@@ -41,7 +41,7 @@ DATASET_ORDER: tuple[str, ...] = (
     "MODIS_SP",
     "VIIRS_SNPP_SP",
     "VIIRS_NOAA20_SP",
-    "VIIRS_NOAA21_SP",
+    "VIIRS_NOAA21_NRT",
 )
 
 
@@ -51,7 +51,7 @@ PRODUCT_STREAMS: dict[str, tuple[str, ...]] = {
     "MODIS_SP": ("MOD_T", "MOD_A"),
     "VIIRS_SNPP_SP": ("VIIRS_SNPP",),
     "VIIRS_NOAA20_SP": ("VIIRS_N20",),
-    "VIIRS_NOAA21_SP": ("VIIRS_N21",),
+    "VIIRS_NOAA21_NRT": ("VIIRS_N21",),
 }
 
 #: The metrics the contract's ``series`` payload admits (``series.metric``).
@@ -75,7 +75,7 @@ SENSOR_LABELS: dict[str, tuple[str, str]] = {
     "MODIS_SP": ("MODIS C6.1 (Terra + Aqua), 1 km", "Raw + harmonized MODIS series"),
     "VIIRS_SNPP_SP": ("VIIRS 375 m, Suomi-NPP", "Raw + harmonized VIIRS series"),
     "VIIRS_NOAA20_SP": ("VIIRS 375 m, NOAA-20", "Raw + harmonized VIIRS series"),
-    "VIIRS_NOAA21_SP": ("VIIRS 375 m, NOAA-21", "Raw + harmonized VIIRS series"),
+    "VIIRS_NOAA21_NRT": ("VIIRS 375 m, NOAA-21 (NRT)", "Raw + harmonized VIIRS series"),
 }
 
 #: AOI presets, read from ``src/aoi_presets.json`` so this module and

@@ -178,7 +178,7 @@ def test_meta_reports_the_fixture_source_and_the_region(client: TestClient):
         "MODIS_SP",
         "VIIRS_SNPP_SP",
         "VIIRS_NOAA20_SP",
-        "VIIRS_NOAA21_SP",
+        "VIIRS_NOAA21_NRT",
     }
     assert meta["streams"]
 
@@ -224,7 +224,7 @@ def test_methods_cites_every_dataset_with_a_url(client: TestClient):
         "FIRMS_MODIS_SP",
         "FIRMS_VIIRS_SNPP_SP",
         "FIRMS_VIIRS_NOAA20_SP",
-        "FIRMS_VIIRS_NOAA21_SP",
+        "FIRMS_VIIRS_NOAA21_NRT",
     }
     assert all(d["url"].startswith("https://") for d in payload["datasets"])
 

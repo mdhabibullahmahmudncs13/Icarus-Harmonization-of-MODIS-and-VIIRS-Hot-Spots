@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Dataset } from './contract/types';
 import { getDataSource } from './data/DataSource';
 import { aggregateToBins } from './lib/series';
@@ -16,7 +16,8 @@ import {
   ValidationCard,
 } from './components/panels';
 import { ProvenanceDrawer } from './components/ProvenanceDrawer';
-import { KeyboardHint, MockBanner } from './components/shared';
+import { HelpDialog, KeyboardHint, LoadingSkeleton, MockBanner } from './components/shared';
+import { Icon } from './components/Icon';
 
 const TITLES: Record<View, { title: string; sub: string }> = {
   overview: { title: 'Overview', sub: 'Same fires, one honest record.' },
@@ -29,20 +30,49 @@ const TITLES: Record<View, { title: string; sub: string }> = {
   offline: { title: 'Offline', sub: 'Works without the network.' },
 };
 
+const THEME_KEY = 'icarus:theme';
+type Theme = 'dark' | 'light';
+type Overlay = { kind: 'provenance' } | { kind: 'help' } | null;
+
+function initialTheme(): Theme {
+  if (typeof window === 'undefined') return 'dark';
+  try {
+    const saved = window.localStorage.getItem(THEME_KEY);
+    if (saved === 'dark' || saved === 'light') return saved;
+  } catch {
+    /* storage unavailable — fall through to the system preference */
+  }
+  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+function formatBbox(bbox: [number, number, number, number]): string {
+  const [west, south, east, north] = bbox;
+  const lon = `${west}°–${east}°E`;
+  const lat = `${south}°–${north}°N`;
+  return `${lon} · ${lat}`;
+}
+
 export function App() {
-  const { state, setView, setMode, setAoi, setDate } = useAppState();
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const { state, setView, setMode, setDate } = useAppState();
+  const [theme, setTheme] = useState<Theme>(initialTheme);
   const [collapsed, setCollapsed] = useState(false);
   const [data, setData] = useState<Dataset | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [drawer, setDrawer] = useState<{ label: string; payload: unknown } | null>(null);
+  const [reload, setReload] = useState(0);
+  const [overlay, setOverlay] = useState<Overlay>(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    try {
+      window.localStorage.setItem(THEME_KEY, theme);
+    } catch {
+      /* storage unavailable — the theme still applies for this session */
+    }
   }, [theme]);
 
   useEffect(() => {
     let cancelled = false;
+    setError(null);
     getDataSource()
       .load()
       .then((d) => !cancelled && setData(d))
@@ -50,7 +80,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reload]);
 
   const bins = useMemo(
     () => (data ? aggregateToBins(data.series.series, 8) : []),
@@ -63,36 +93,7 @@ export function App() {
     return starts.sort()[0] ?? '2012-01-20';
   }, [data]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
-        e.preventDefault();
-        setCollapsed((c) => !c);
-        return;
-      }
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const k = e.key.toLowerCase();
-      if (k >= '1' && k <= '8') {
-        setView(VIEWS[Number(k) - 1]);
-      } else if (k === 'r') {
-        setMode('raw');
-      } else if (k === 'h') {
-        setMode('harmonized');
-      } else if (k === 't') {
-        setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
-      } else if (k === 'p') {
-        setDrawer({ label: state.view, payload: data });
-      } else if (e.key === 'Escape') {
-        setDrawer(null);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [setView, setMode, state.view, data]);
-
-  const payloadForView = (): unknown => {
+  const payloadForView = useCallback((): unknown => {
     if (!data) return null;
     switch (state.view) {
       case 'calendar':
@@ -112,10 +113,47 @@ export function App() {
       default:
         return data.series;
     }
-  };
+  }, [data, state.view]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      ) {
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        setCollapsed((c) => !c);
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k >= '1' && k <= '8') {
+        setView(VIEWS[Number(k) - 1]);
+      } else if (k === 'r') {
+        setMode('raw');
+      } else if (k === 'h') {
+        setMode('harmonized');
+      } else if (k === 't') {
+        setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
+      } else if (k === 'p') {
+        setOverlay({ kind: 'provenance' });
+      } else if (e.key === '?') {
+        setOverlay({ kind: 'help' });
+      } else if (e.key === 'Escape') {
+        setOverlay(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [setView, setMode]);
 
   const view: View = state.view;
   const heading = TITLES[view];
+  const closeOverlay = () => setOverlay(null);
 
   return (
     <div className="shell">
@@ -134,37 +172,58 @@ export function App() {
       <main className="main">
         {data ? <MockBanner source={data.meta.meta.source} /> : null}
 
-        <header style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-          <div>
+        <header className="page-head">
+          <div className="page-head__text">
             <h1 className="page-title">{heading.title}</h1>
             <p className="page-sub">{heading.sub}</p>
           </div>
-          <button
-            type="button"
-            className="nav-item"
-            style={{ marginLeft: 'auto', width: 'auto' }}
-            onClick={() => setDrawer({ label: view, payload: payloadForView() })}
-            title="Provenance (P)"
-          >
-            Provenance (P)
-          </button>
+          <div className="page-head__actions">
+            {data ? (
+              <span className="region-chip" title="Region bounding box of the loaded dataset">
+                <Icon name="area" size={15} />
+                <b>{formatBbox(data.meta.meta.region.bbox)}</b>
+              </span>
+            ) : null}
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setOverlay({ kind: 'provenance' })}
+              disabled={!data}
+              title="Provenance (P)"
+            >
+              <Icon name="fingerprint" size={16} />
+              Provenance
+              <span className="btn__key">P</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn--quiet"
+              onClick={() => setOverlay({ kind: 'help' })}
+              aria-label="Keyboard shortcuts"
+              title="Keyboard shortcuts (?)"
+            >
+              <Icon name="help" size={16} />
+            </button>
+          </div>
         </header>
 
         {error ? (
           <div className="card">
-            <div className="card__body">
-              <p className="error">
-                Could not load data: {error}. If you opened the file directly, run{' '}
-                <code>npm run dev</code> so the mock JSON is served.
-              </p>
+            <div className="card__body error">
+              <strong>Could not load data</strong>
+              <span>
+                {error}. If you opened the file directly, run <code>npm run dev</code> so the
+                payloads are served over HTTP.
+              </span>
+              <span>
+                <button type="button" className="btn btn--primary" onClick={() => setReload((r) => r + 1)}>
+                  Try again
+                </button>
+              </span>
             </div>
           </div>
         ) : !data ? (
-          <div className="card">
-            <div className="card__body">
-              <p className="empty">Loading…</p>
-            </div>
-          </div>
+          <LoadingSkeleton />
         ) : (
           <>
             {view === 'overview' && (
@@ -185,9 +244,17 @@ export function App() {
                 <div className="card">
                   <div className="card__head">
                     <span className="card__title">Burning calendar</span>
+                    <span className="badge badge--outline">{state.mode}</span>
                   </div>
                   <div className="card__body">
-                    <CalendarHeatmap bins={bins} mode={state.mode} onSelect={setDate} />
+                    <CalendarHeatmap
+                      bins={bins}
+                      mode={state.mode}
+                      selected={state.date}
+                      onSelect={setDate}
+                      onClear={() => setDate(null)}
+                      theme={theme}
+                    />
                   </div>
                 </div>
               </>
@@ -200,7 +267,14 @@ export function App() {
                   <span className="badge badge--outline">{state.mode}</span>
                 </div>
                 <div className="card__body">
-                  <CalendarHeatmap bins={bins} mode={state.mode} onSelect={setDate} />
+                  <CalendarHeatmap
+                    bins={bins}
+                    mode={state.mode}
+                    selected={state.date}
+                    onSelect={setDate}
+                    onClear={() => setDate(null)}
+                    theme={theme}
+                  />
                 </div>
               </div>
             )}
@@ -212,7 +286,11 @@ export function App() {
                   <span className="badge badge--outline">{state.mode}</span>
                 </div>
                 <div className="card__body">
-                  <RegionMap cells={data.cells.cells} mode={state.mode} bbox={data.meta.meta.region.bbox} />
+                  <RegionMap
+                    cells={data.cells.cells}
+                    mode={state.mode}
+                    theme={theme}
+                  />
                 </div>
               </div>
             )}
@@ -222,15 +300,6 @@ export function App() {
             {view === 'validation' && <ValidationCard validation={data.validation} />}
             {view === 'methods' && <MethodsPanel methods={data.methods} />}
             {view === 'offline' && <OfflinePanel source={data.meta.meta.source} />}
-
-            <section aria-label="Areas of interest" style={{ display: 'none' }}>
-              {data.aoi.presets.map((p) => (
-                <button key={p.id} type="button" onClick={() => setAoi(p.id)}>
-                  {p.name}
-                </button>
-              ))}
-              <span>{state.aoi}</span>
-            </section>
           </>
         )}
 
@@ -238,13 +307,13 @@ export function App() {
       </main>
 
       <ProvenanceDrawer
-        open={drawer !== null}
+        open={overlay?.kind === 'provenance'}
         meta={data?.meta.meta ?? null}
-        label={drawer?.label ?? ''}
-        payload={drawer?.payload ?? null}
-        onClose={() => setDrawer(null)}
+        label={view}
+        payload={payloadForView()}
+        onClose={closeOverlay}
       />
+      {overlay?.kind === 'help' ? <HelpDialog onClose={closeOverlay} /> : null}
     </div>
   );
 }
-

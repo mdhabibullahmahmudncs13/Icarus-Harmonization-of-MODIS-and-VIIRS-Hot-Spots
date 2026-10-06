@@ -38,7 +38,7 @@ STREAM_PRODUCT: dict[str, str] = {
     "MOD_A": "MODIS_SP",
     "VIIRS_SNPP": "VIIRS_SNPP_SP",
     "VIIRS_N20": "VIIRS_NOAA20_SP",
-    "VIIRS_N21": "VIIRS_NOAA21_SP",
+    "VIIRS_N21": "VIIRS_NOAA21_NRT",
 }
 
 #: Stream -> family, for rolling streams up to the coverage the contract reports.

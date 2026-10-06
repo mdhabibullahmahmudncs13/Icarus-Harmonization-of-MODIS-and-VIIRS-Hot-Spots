@@ -100,15 +100,25 @@ export function stepRatios(
   };
 }
 
+const RAMP_DARK: [number, number, number][] = [
+  [32, 33, 38],
+  [122, 90, 43],
+  [224, 104, 75],
+  [255, 177, 153],
+  [244, 244, 246],
+];
+
+const RAMP_LIGHT: [number, number, number][] = [
+  [223, 227, 238],
+  [240, 195, 107],
+  [224, 104, 75],
+  [179, 69, 47],
+  [17, 17, 20],
+];
+
 /** Interpolate a 5-stop ramp into a CSS colour, t in [0,1]. */
-export function rampColor(t: number): string {
-  const stops = [
-    [32, 33, 38],
-    [122, 90, 43],
-    [224, 104, 75],
-    [255, 177, 153],
-    [244, 244, 246],
-  ];
+export function rampColor(t: number, theme: 'dark' | 'light' = 'dark'): string {
+  const stops = theme === 'light' ? RAMP_LIGHT : RAMP_DARK;
   const clamped = Math.max(0, Math.min(1, t));
   const pos = clamped * (stops.length - 1);
   const lo = Math.floor(pos);
