@@ -210,6 +210,60 @@
       },
       "additionalProperties": false
     },
+    "densityPoint": {
+      "description": "A series row when metric=density: each count divided by the number of grid cells covering meta.region.bbox, so harm_* is the fraction of the region's cells active that day (0..1) and raw_* is detections per cell.",
+      "type": "object",
+      "required": [
+        "date",
+        "raw_modis",
+        "raw_viirs",
+        "raw_total",
+        "harm_modis",
+        "harm_viirs",
+        "harm_total",
+        "coverage",
+        "source"
+      ],
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "raw_modis": {
+          "type": "number",
+          "minimum": 0
+        },
+        "raw_viirs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "raw_total": {
+          "type": "number",
+          "minimum": 0
+        },
+        "harm_modis": {
+          "type": "number",
+          "minimum": 0
+        },
+        "harm_viirs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "harm_total": {
+          "type": "number",
+          "minimum": 0
+        },
+        "coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "source": {
+          "$ref": "#/$defs/binSource"
+        }
+      },
+      "additionalProperties": false
+    },
     "series": {
       "type": "object",
       "required": [
@@ -237,13 +291,40 @@
           ]
         },
         "series": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/seriesPoint"
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "properties": {
+          "metric": {
+            "const": "density"
+          }
+        },
+        "required": [
+          "metric"
+        ]
+      },
+      "then": {
+        "properties": {
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/densityPoint"
+            }
           }
         }
       },
-      "additionalProperties": false
+      "else": {
+        "properties": {
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/seriesPoint"
+            }
+          }
+        }
+      }
     },
     "cellPoint": {
       "type": "object",

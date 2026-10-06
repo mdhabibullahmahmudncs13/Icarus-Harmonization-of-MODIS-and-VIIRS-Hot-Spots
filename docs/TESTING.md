@@ -124,6 +124,12 @@ Output: synthetic `det.parquet` matching the normalized detection schema.
     `VIIRS_CAL` | `NONE` (`src/compute/availability.py`,
     `src/compute/coverage.py`). A `VIIRS_CAL` bin is scaled to the MODIS
     reference by the S8 factor (`src/compute/calibrate.py`).
+  - `/api/v1/series` honours `metric`: `cell_days` (the default) serves the
+    integer counts, `density` serves the same counts divided by the number of
+    grid cells covering `meta.region.bbox`, so `harm_*` is the 0–1
+    active-cell fraction (`$defs/densityPoint`). The endpoints whose payloads
+    have no `metric` field refuse `density` with 422 `unsupported_metric`
+    rather than answering in `cell_days`.
 - The schema is the single source of truth; fix shape differences in code, never
   by loosening the schema.
 

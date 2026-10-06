@@ -312,8 +312,12 @@ Status:
 - [x] Coverage/`source` per bin (`docs/TESTING.md` §7) — the S7 stage, with all
       four source classes reachable
 - [x] VIIRS-anchored bins are calibrated (S8) rather than only tagged
-- [ ] `metric=density` is refused rather than served: the density series does not
-      exist yet, and `metric=cell_days` is the only implemented metric
+- [x] `metric=density` is served by `/api/v1/series` — the same counts divided
+      by the region's grid-cell count (`harmonize.grid_cell_count`), so
+      `harm_*` is the 0–1 active-cell fraction and `raw_*` detections per cell.
+      The contract discriminates `$defs/densityPoint` from `$defs/seriesPoint`
+      on `series.metric`, and the endpoints whose payloads carry no `metric`
+      still refuse `density` (422 `unsupported_metric`) rather than ignore it
 
 **The defect this phase fixed.** The API served pre-migration payload shapes
 (`rows`, `raw_pearson`, `h`/`l`/`n`, `overlap.{start,end}`, no `params_hash`)

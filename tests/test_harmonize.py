@@ -84,6 +84,24 @@ def test_cell_bounds_contain_their_own_point():
     assert south <= 23.1 < north
 
 
+def test_grid_cell_count_covers_every_cell_the_region_touches():
+    """Density divides by the region's cells, not by the cells seen in data."""
+    west, south, east, north = 88.0, 20.0, 93.0, 27.0
+    dlat = degrees_per_lat()
+    dlon = degrees_per_lon()
+    expected = (math.floor(north / dlat) - math.floor(south / dlat) + 1) * (
+        math.floor(east / dlon) - math.floor(west / dlon) + 1
+    )
+    count = harmonize.grid_cell_count((west, south, east, north))
+    assert count == expected
+    assert count > 0
+
+
+def test_grid_cell_count_rejects_a_degenerate_bbox():
+    with pytest.raises(ValueError, match="west<east"):
+        harmonize.grid_cell_count((93.0, 20.0, 88.0, 27.0))
+
+
 def test_parse_cell_id_round_trips_and_rejects_junk():
     assert parse_cell_id(cell_id(-12, 345)) == (-12, 345)
     with pytest.raises(ValueError):

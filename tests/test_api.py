@@ -25,6 +25,7 @@ from fastapi.testclient import TestClient
 from src.acquire import safe
 from src.api import dataset as dataset_module
 from src.api.main import app
+from src.compute import export, harmonize
 from src.demo import demo_detections
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -132,6 +133,13 @@ def test_unversioned_alias_still_answers(client: TestClient, name: str):
     response = client.get(LEGACY_PATHS[name], params=params)
     assert response.status_code == 200, response.text
     assert_matches(endpoint["definition"], response.json())
+
+
+def test_root_meta_alias_answers_as_the_spec_calls_it(client: TestClient):
+    """docs/TRD.md §6 lists ``GET /meta``; docs/DEPLOYMENT.md §8 curls it."""
+    response = client.get("/meta")
+    assert response.status_code == 200, response.text
+    assert_matches("metaResponse", response.json())
 
 
 def test_analysis_endpoints_accept_post_as_the_docs_say(client: TestClient):
@@ -358,6 +366,30 @@ def test_post_body_carries_the_aoi_and_the_date(client: TestClient):
     assert payload["query"] == {"date": "2019-06-01", "aoi": "NPL"}
 
 
+def test_post_body_accepts_the_trd_aoi_object_as_well_as_a_preset_id(client: TestClient):
+    """docs/DEPLOYMENT.md §8 smoke-tests with ``{type: "preset", id}`` (TRD §6.1)."""
+    response = client.post(
+        "/api/v1/anomalies",
+        json={"aoi": {"type": "preset", "id": "NPL"}, "date": "2019-06-01"},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert_matches("anomalies", payload)
+    assert payload["query"] == {"date": "2019-06-01", "aoi": "NPL"}
+
+
+def test_post_body_refuses_an_aoi_object_it_cannot_honour(client: TestClient):
+    """Custom geometry is refused, not silently dropped for the default area."""
+    response = client.post(
+        "/api/v1/anomalies",
+        json={"aoi": {"type": "custom", "geometry": {"type": "Point", "coordinates": [90, 23]}}},
+    )
+    assert response.status_code == 422
+    body = response.json()
+    assert body["code"] == "invalid_request"
+    assert body["field"] == "aoi"
+
+
 def test_post_body_carries_an_aoi_for_the_critical_period(client: TestClient):
     payload = client.post("/api/v1/critical-period", json={"aoi": "IND-C"}).json()
     assert_matches("criticalPeriod", payload)
@@ -390,19 +422,48 @@ def test_post_body_rejects_an_unknown_aoi_with_its_field(client: TestClient):
     assert "ZZZ" in response.json()["message"]
 
 
-def test_post_body_refuses_the_unimplemented_density_metric(client: TestClient):
-    """Refused, not silently served as cell_days."""
+def test_post_body_serves_the_density_metric_on_the_series(client: TestClient):
+    """docs/ApplicationFlow.md §3 defaults to density; the series honours it."""
     response = client.post("/api/v1/series", json={"metric": "density"})
-    assert response.status_code == 422
-    assert response.json()["code"] == "unsupported_metric"
-    assert response.json()["field"] == "metric"
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["metric"] == "density"
+    assert_matches("series", payload)
+
+    counts = client.post("/api/v1/series", json={"metric": "cell_days"}).json()
+    n_cells = harmonize.grid_cell_count(export.BANGLADESH_BBOX)
+    assert len(payload["series"]) == len(counts["series"])
+    saw_active = False
+    for count_row, density_row in zip(counts["series"], payload["series"], strict=True):
+        for column in export.COUNT_COLUMNS:
+            assert density_row[column] == pytest.approx(count_row[column] / n_cells, abs=1e-12)
+        assert isinstance(count_row["harm_total"], int)
+        assert 0.0 <= density_row["harm_total"] <= 1.0
+        saw_active = saw_active or density_row["harm_total"] > 0
+    assert saw_active, "the fixture has active cells"
+
+
+def test_post_body_refuses_density_where_the_payload_has_no_metric(client: TestClient):
+    """Refused, not silently served as cell_days on an endpoint with no metric."""
+    for name in ("cells", "baseline", "anomalies", "critical-period", "validation"):
+        path = ENDPOINTS[name]["path"]
+        response = client.post(path, json={"metric": "density"})
+        assert response.status_code == 422, f"{path}: {response.text}"
+        assert response.json()["code"] == "unsupported_metric"
+        assert response.json()["field"] == "metric"
 
 
 def test_post_body_accepts_the_metrics_and_views_that_are_honoured(client: TestClient):
-    for body in ({"metric": "cell_days"}, {"view": "raw"}, {"view": "harmonized"}, {}):
+    for body, expected in (
+        ({"metric": "cell_days"}, "cell_days"),
+        ({"metric": "density"}, "density"),
+        ({"view": "raw"}, "cell_days"),
+        ({"view": "harmonized"}, "cell_days"),
+        ({}, "cell_days"),
+    ):
         response = client.post("/api/v1/series", json=body)
         assert response.status_code == 200, (body, response.text)
-        assert response.json()["metric"] == "cell_days"
+        assert response.json()["metric"] == expected
 
 
 def test_post_body_rejects_an_unknown_metric_or_view(client: TestClient):

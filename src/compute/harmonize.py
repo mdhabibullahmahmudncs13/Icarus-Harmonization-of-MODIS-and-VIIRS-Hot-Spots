@@ -110,6 +110,29 @@ def cell_bounds(
     return (col * dlon, row * dlat, (col + 1) * dlon, (row + 1) * dlat)
 
 
+def grid_cell_count(
+    bbox: tuple[float, float, float, float],
+    cell_km: float = DEFAULT_CELL_KM,
+    reference_latitude_deg: float = REFERENCE_LATITUDE_DEG,
+) -> int:
+    """Number of grid cells covering ``bbox`` (west, south, east, north).
+
+    The ``density`` metric divides a count by this figure, so it counts every
+    cell the region touches — including cells that never see a detection —
+    rather than the cells present in a detection table. A point exactly on a
+    cell boundary belongs to the higher index (the same floor semantics as
+    :func:`grid_index`), so both edges are included.
+    """
+    west, south, east, north = bbox
+    if not (west < east and south < north):
+        raise ValueError(f"bbox must satisfy west<east and south<north, got {bbox}")
+    dlat = degrees_per_lat(cell_km)
+    dlon = degrees_per_lon(cell_km, reference_latitude_deg)
+    rows = math.floor(north / dlat) - math.floor(south / dlat) + 1
+    cols = math.floor(east / dlon) - math.floor(west / dlon) + 1
+    return int(rows * cols)
+
+
 def to_grid(
     df: pd.DataFrame,
     cell_km: float = DEFAULT_CELL_KM,
@@ -450,6 +473,7 @@ __all__: Iterable[str] = (
     "degrees_per_lon",
     "doy_range",
     "family_daily_frames",
+    "grid_cell_count",
     "grid_index",
     "harmonize",
     "harmonized_series",

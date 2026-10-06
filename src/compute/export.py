@@ -54,6 +54,22 @@ PRODUCT_STREAMS: dict[str, tuple[str, ...]] = {
     "VIIRS_NOAA21_SP": ("VIIRS_N21",),
 }
 
+#: The metrics the contract's ``series`` payload admits (``series.metric``).
+SERIES_METRICS: tuple[str, ...] = ("cell_days", "density")
+
+#: The row fields that carry counts. Under ``metric=density`` each is divided
+#: by the region's grid-cell count, so ``harm_*`` becomes the fraction of the
+#: area's cells active that day (0..1) and ``raw_*`` detections per cell.
+#: ``coverage`` and ``source`` are properties of the bin, not of the metric.
+COUNT_COLUMNS: tuple[str, ...] = (
+    "raw_modis",
+    "raw_viirs",
+    "raw_total",
+    "harm_modis",
+    "harm_viirs",
+    "harm_total",
+)
+
 #: Human labels for the datasets panel, keyed by FIRMS product id.
 SENSOR_LABELS: dict[str, tuple[str, str]] = {
     "MODIS_SP": ("MODIS C6.1 (Terra + Aqua), 1 km", "Raw + harmonized MODIS series"),
@@ -255,11 +271,29 @@ def _continuous_daily(daily: pd.DataFrame, start: date, end: date) -> pd.DataFra
     return daily.set_index("date").reindex(days, fill_value=0).astype("int64").reset_index()
 
 
-def build_series(detections: pd.DataFrame, **kwargs: Any) -> dict[str, Any]:
+def build_series(
+    detections: pd.DataFrame,
+    *,
+    metric: str = "cell_days",
+    **kwargs: Any,
+) -> dict[str, Any]:
     """``GET /api/v1/series`` payload: daily counts, one row per calendar day.
 
-    ``metric`` is ``cell_days`` and ``bin_days`` is 1 because the series is not
-    binned; an 8-day view would be a different payload, not a different flag.
+    ``metric`` selects the units of the six count columns:
+
+    * ``cell_days`` (default) — the integer counts themselves: detections
+      (``raw_*``) and active cells (``harm_*``) per day.
+    * ``density`` — each count divided by the number of grid cells covering
+      the region (``harmonize.grid_cell_count`` over ``meta.region.bbox``),
+      so ``harm_*`` is the fraction of the area's cells that were active that
+      day (0..1, the density ``docs/DATA_DICTIONARY.md`` §4 documents) and
+      ``raw_*`` is detections per cell. Scaling is uniform, so every raw vs
+      harmonized ratio is unchanged.
+
+    ``bin_days`` is 1 because the series is not binned; an 8-day view would be
+    a different payload, not a different flag. ``metric`` and ``view`` are
+    deliberately *not* part of ``params_hash``: they choose how the same
+    parameter set is expressed, exactly as ``view`` already does.
 
     Each row also carries S7 ``coverage`` and ``source`` for the eight-day bin
     it falls in (docs/TESTING.md §7). Coverage and source are properties of the
@@ -267,6 +301,8 @@ def build_series(detections: pd.DataFrame, **kwargs: Any) -> dict[str, Any]:
     ``VIIRS_CAL`` has its VIIRS counts scaled to the MODIS reference by the S8
     factor, so the tag means calibration was applied.
     """
+    if metric not in SERIES_METRICS:
+        raise ValueError(f"unknown metric {metric!r}; expected one of {SERIES_METRICS}")
     kwargs.setdefault("date_range", detections_date_range(detections))
     start = date.fromisoformat(kwargs["date_range"][0])
     end = date.fromisoformat(kwargs["date_range"][1])
@@ -289,9 +325,17 @@ def build_series(detections: pd.DataFrame, **kwargs: Any) -> dict[str, Any]:
         row["date"] = stamp.strftime("%Y-%m-%d")
         row["coverage"] = coverage_value
         row["source"] = source
+    if metric == "density":
+        n_cells = harmonize.grid_cell_count(
+            kwargs.get("bbox", BANGLADESH_BBOX),
+            cell_km=kwargs.get("cell_km", harmonize.DEFAULT_CELL_KM),
+        )
+        for row in rows:
+            for column in COUNT_COLUMNS:
+                row[column] = round(float(row[column]) / n_cells, 12)
     return {
         "meta": build_meta(**kwargs),
-        "metric": "cell_days",
+        "metric": metric,
         "bin_days": 1,
         "series": rows,
     }

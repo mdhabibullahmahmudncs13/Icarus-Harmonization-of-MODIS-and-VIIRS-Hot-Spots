@@ -159,7 +159,7 @@ H(c, y, b) = undefined (source = NONE)   otherwise
 |-------|-------------|
 | `params_hash` | Hash of the parameter set that produced the response |
 | `aoi.id` / `aoi.n_cells` | Resolved AOI identifier and cell count |
-| `metric` | `density` or `cell_days` |
+| `metric` | `density` or `cell_days`. Under `density` every count is divided by the grid cells covering `meta.region.bbox`, so `harm_*` ∈ [0,1] is the active-cell fraction and `raw_*` is detections per cell (`$defs/densityPoint`); `cell_days` keeps the integer counts (`$defs/seriesPoint`) |
 | `bin_days` | Days per bin (8) |
 | `bins[].value` | Metric for the bin |
 | `bins[].lo` / `bins[].hi` | 5th / 95th bootstrap percentiles |

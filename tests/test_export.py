@@ -112,6 +112,46 @@ def test_series_payload_matches_the_contract(detections):
     assert first["raw_total"] == first["raw_modis"] + first["raw_viirs"]
 
 
+def test_density_series_divides_every_count_by_the_region_cell_count(detections):
+    """docs/DATA_DICTIONARY.md: metric=density is the 0..1 active-cell fraction."""
+    counts = export.build_series(detections)
+    density = export.build_series(detections, metric="density")
+    assert_matches("series", density)  # exercises the densityPoint branch
+    assert counts["metric"] == "cell_days"
+    assert density["metric"] == "density"
+    n_cells = harmonize.grid_cell_count(export.BANGLADESH_BBOX)
+    assert n_cells > 1
+    assert len(density["series"]) == len(counts["series"])
+    active_days = 0
+    for count_row, density_row in zip(counts["series"], density["series"], strict=True):
+        assert density_row["date"] == count_row["date"]
+        for column in export.COUNT_COLUMNS:
+            assert density_row[column] == pytest.approx(count_row[column] / n_cells, abs=1e-12)
+        # harm_* is the fraction of the region's cells active that day.
+        assert 0.0 <= density_row["harm_total"] <= 1.0
+        # Coverage and source are bin properties, not metric properties.
+        assert density_row["coverage"] == count_row["coverage"]
+        assert density_row["source"] == count_row["source"]
+        active_days += density_row["harm_total"] > 0
+    assert active_days, "the synthetic data has active cells"
+
+
+def test_density_rows_are_floats_while_cell_day_rows_stay_integers(detections):
+    counts = export.build_series(detections)
+    density = export.build_series(detections, metric="density")
+    index = next(i for i, row in enumerate(counts["series"]) if row["harm_total"] > 0)
+    count_row = counts["series"][index]
+    density_row = density["series"][index]
+    assert isinstance(count_row["harm_total"], int)
+    assert isinstance(density_row["harm_total"], float)
+    assert 0.0 < density_row["harm_total"] <= 1.0
+
+
+def test_build_series_rejects_an_unknown_metric(detections):
+    with pytest.raises(ValueError, match="unknown metric"):
+        export.build_series(detections, metric="bananas")
+
+
 def test_series_rows_carry_s7_coverage_and_source(detections):
     """docs/TESTING.md §7: /api/v1/series bins carry coverage and source."""
     payload = export.build_series(detections)

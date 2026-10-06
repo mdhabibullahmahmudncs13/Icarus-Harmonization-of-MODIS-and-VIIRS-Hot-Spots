@@ -22,10 +22,12 @@ alias so earlier callers keep working.
 * ``/api/v1/methods`` (alias ``/api/methods``)
 * ``/api/v1/aoi``
 
-Per ``docs/ApplicationFlow.md`` the analysis endpoints also accept ``POST``;
-the geometry-carrying body described there is not implemented yet, so the
-query parameters are the only inputs and a POST without query parameters is
-answered for the default AOI.
+Per ``docs/ApplicationFlow.md`` the analysis endpoints also accept ``POST``:
+``aoi``, ``date`` and ``bbox`` in the body override the query parameters, and
+``metric``/``view`` are validated (``metric=density`` is served by the series
+payload and refused elsewhere). The ``aoi`` field takes a preset id or the AOI
+object ``docs/TRD.md`` §6.1 defines; custom geometry is expressed with
+``bbox``.
 """
 
 from __future__ import annotations
@@ -147,17 +149,34 @@ def _parse_bbox(raw: str) -> tuple[float, float, float, float]:
     return west, south, east, north
 
 
+class AoiBody(BaseModel):
+    """The AOI object ``docs/TRD.md`` §6.1 defines for request bodies.
+
+    ``{type: "preset", id}`` maps onto a preset id. Custom geometry is not a
+    preset: it is expressed with the ``bbox`` field, so anything else is
+    refused rather than silently falling back to the default area.
+    """
+
+    type: str
+    id: str | None = None
+    geometry: dict[str, Any] | None = None
+
+
 class AnalysisRequest(BaseModel):
     """The optional JSON body ``docs/ApplicationFlow.md`` §4 describes.
 
-    ``aoi``, ``date`` and ``bbox`` are honoured and take precedence over the
-    query parameters. ``metric`` and ``view`` are validated so a caller cannot
-    believe they changed anything: the series is always cell-day counts and
-    every payload carries both the raw and the harmonized view. ``metric``
-    ``density`` is refused rather than quietly served as ``cell_days``.
+    ``aoi`` (a preset id or the ``{type: "preset", id}`` object), ``date`` and
+    ``bbox`` are honoured and take precedence over the query parameters.
+    ``metric`` and ``view`` are validated so a caller cannot believe they
+    changed anything: every payload carries both the raw and the harmonized
+    view, and ``metric`` selects the series units.
+
+    ``metric=density`` is served by ``/api/v1/series`` (the only payload with
+    a ``metric`` field) and refused on the other endpoints, which would
+    otherwise silently answer in ``cell_days``.
     """
 
-    aoi: str | None = None
+    aoi: str | AoiBody | None = None
     date: DateType | None = None
     bbox: list[float] | None = None
     metric: str | None = None
@@ -170,25 +189,43 @@ def _resolve(
     aoi: str = "BGD",
     date: DateType | None = None,
     bbox: str | None = None,
+    allow_density: bool = False,
 ) -> tuple[str, DateType | None, tuple[float, float, float, float] | None]:
-    """Merge an optional request body over the query parameters."""
+    """Merge an optional request body over the query parameters.
+
+    ``allow_density`` marks the endpoints whose payload actually carries a
+    ``metric`` field; elsewhere ``metric=density`` is refused rather than
+    ignored.
+    """
     if body is not None:
         if body.aoi is not None:
-            aoi = body.aoi
+            if isinstance(body.aoi, AoiBody):
+                if body.aoi.type != "preset" or not body.aoi.id:
+                    fail(
+                        422,
+                        "invalid_request",
+                        "aoi must be a preset id or {type: 'preset', id}; "
+                        "custom geometry is expressed with bbox",
+                        "aoi",
+                    )
+                aoi = body.aoi.id
+            else:
+                aoi = body.aoi
         if body.date is not None:
             date = body.date
         if body.bbox is not None:
             bbox = ",".join(str(value) for value in body.bbox)
         if body.metric is not None:
-            if body.metric == "density":
+            if body.metric not in ("cell_days", "density"):
+                fail(422, "invalid_metric", "metric must be density or cell_days", "metric")
+            if body.metric == "density" and not allow_density:
                 fail(
                     422,
                     "unsupported_metric",
-                    "the density metric is not computed yet; use metric=cell_days",
+                    "metric=density is served only by /api/v1/series; "
+                    "this payload has no metric field",
                     "metric",
                 )
-            if body.metric != "cell_days":
-                fail(422, "invalid_metric", "metric must be density or cell_days", "metric")
         if body.view is not None and body.view not in ("raw", "harmonized"):
             fail(422, "invalid_view", "view must be raw or harmonized", "view")
 
@@ -228,6 +265,7 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/meta")  # docs/TRD.md §6 and the runbook's smoke test call /meta
 @app.get("/api/meta")
 @app.get("/api/v1/meta")
 def meta() -> Mapping[str, Any]:
@@ -242,11 +280,20 @@ def meta() -> Mapping[str, Any]:
 @app.get("/api/v1/series")
 @app.post("/api/v1/series")
 def series(body: AnalysisRequest | None = None) -> Mapping[str, Any]:
-    """Daily raw and harmonized counts, one row per day."""
-    _resolve(body)
+    """Daily raw and harmonized counts, one row per day.
+
+    ``metric=density`` (the default the startup flow in
+    ``docs/ApplicationFlow.md`` §3 asks for) serves the same counts divided by
+    the region's grid-cell count; anything else is ``cell_days``.
+    """
+    _resolve(body, allow_density=True)
+    metric = body.metric if body is not None and body.metric is not None else "cell_days"
     dataset = _dataset()
     return export.build_series(
-        dataset.detections, source=dataset.source, generated_at=dataset.generated_at
+        dataset.detections,
+        metric=metric,
+        source=dataset.source,
+        generated_at=dataset.generated_at,
     )
 
 
