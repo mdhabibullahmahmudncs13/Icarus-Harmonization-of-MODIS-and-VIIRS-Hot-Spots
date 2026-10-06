@@ -143,8 +143,11 @@ Output: synthetic `det.parquet` matching the normalized detection schema.
    The external-host half is automated: `web/e2e/no-third-party.spec.ts`
    (`cd web && ./node_modules/.bin/vite build && ./node_modules/.bin/playwright test`)
    aborts and records every non-preview request while the shell and the mode
-   toggle are exercised, and fails if one was attempted. The service-worker
-   cold start remains a manual run until Phase 5 wires the worker in.
+   toggle are exercised, and fails if one was attempted. The cold-start half
+   is automated too: `web/e2e/offline-cold-start.spec.ts` waits for the
+   service worker to cache the app, sets the browser offline and reloads —
+   the shell, the data and the toggle all come from the caches. A real-device
+   run and the fallback video remain for the demo.
 3. **Toggle/verification:** the views respond to the selected mode without a
    refetch.
 

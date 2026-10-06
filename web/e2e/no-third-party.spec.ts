@@ -8,7 +8,12 @@ import { expect, test } from '@playwright/test';
  * that is not addressed to the preview server itself is aborted *and*
  * recorded; the test then exercises the shell and the mode toggle and fails
  * if a single external request was attempted.
+ *
+ * Service workers are blocked here on purpose: a worker answers fetches
+ * itself, and Playwright's route layer cannot see requests that originate
+ * inside one, so an active worker could hide a request from this check.
  */
+test.use({ serviceWorkers: 'block' });
 test('the app loads and works while every external host is blocked', async ({
   context,
   page,

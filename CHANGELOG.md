@@ -57,6 +57,15 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   gains `$defs/densityPoint` and discriminates on `series.metric`; the
   endpoints whose payloads have no `metric` field still refuse `density` with
   422 `unsupported_metric` rather than silently answering in `cell_days`.
+- The offline service worker (`web/public/sw.js`, registered in production
+  builds by `web/src/lib/sw.ts`): versioned `icarus-*` caches, a precached
+  shell, cache-first hashed assets and stale-while-revalidate data.
+  `web/e2e/offline-cold-start.spec.ts` proves the §7 gate — with the browser
+  offline the app still renders and the mode toggle still flips. Cached
+  responses are stored without the server's `Vary: Origin` /
+  `content-encoding` transport headers, which otherwise made an offline
+  reload fail with `net::ERR_FAILED`, and the page reports its used
+  resources to the worker because they are fetched before it activates.
 
 ### Changed
 

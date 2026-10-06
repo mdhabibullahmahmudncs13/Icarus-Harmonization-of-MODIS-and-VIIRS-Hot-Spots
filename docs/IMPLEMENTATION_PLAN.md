@@ -413,6 +413,37 @@ release build (§3.5).
 - **Gate:** a cold start with the network off succeeds on a real device.
   Record a fallback video.
 
+### 7.1 Phase 5 status
+
+- [x] Service worker (`web/public/sw.js`, registered by `web/src/lib/sw.ts`
+      in production builds): versioned `icarus-*` caches, the shell
+      precached, cache-first hashed assets, stale-while-revalidate for
+      `/mock/` and `/api/`, network-first navigations with the cached shell
+      as the offline fallback. The page reports the resources it used (the
+      nine mock payloads by name, plus the performance timeline) so the
+      first visit caches them deterministically — they are fetched before
+      the worker activates and would otherwise be missed. Cached responses
+      are stored without the preview server's `Vary: Origin` and
+      `content-encoding` transport headers, which otherwise made an offline
+      reload fail with `net::ERR_FAILED`.
+- [x] Cold start with the network off — the gate above, automated:
+      `web/e2e/offline-cold-start.spec.ts` waits for the worker to cache the
+      app, sets the browser offline and reloads; the shell, the data and the
+      Raw | Harmonized toggle all come from the caches. (A real-device run
+      and the fallback video are still to be recorded for the demo.)
+- [x] Self-host every font, glyph, sprite and library — there is nothing
+      external to host: the app uses the system font stack and bundled
+      dependencies only, which `web/e2e/no-third-party.spec.ts` proves by
+      blocking every other host.
+- [x] Source badge shown throughout (`web/src/lib/source.ts`).
+- [x] Minimum demo set committed as fixtures (`demo_fixtures/detections.parquet`).
+- [ ] Package the basemap as PMTiles — not applicable yet: the map is
+      client-side SVG polygons and requests no tiles at all. Revisit when a
+      MapLibre basemap lands; the no-third-party test is what keeps it honest.
+- [ ] Backend portable as one Docker image — `make demo` is one command, but
+      the image `docs/DEPLOYMENT.md` §1 describes does not exist yet.
+- [ ] Real-device cold start and the recorded fallback video — need a device.
+
 ---
 
 ## 8. Phase 6 — Validation (E1–E9)
