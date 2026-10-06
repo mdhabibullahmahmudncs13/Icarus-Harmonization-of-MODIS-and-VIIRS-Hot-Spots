@@ -1,34 +1,14 @@
 [project]
 name = "icarus"
-version = "0.0.1"
+version = "0.1.0"
 description = "Harmonization of MODIS and VIIRS hot spots (NASA Space Apps 2026)"
 requires-python = ">=3.11"
-dependencies = [
-    "duckdb",
-    "pandas",
-    "pyarrow",
-    "requests",
-    "fastapi",
-    "uvicorn",
-    # httpx2 is what Starlette's TestClient uses; the contract tests need it.
-    "httpx2",
-    "pytest",
-    "jsonschema",
-    "ruff",
-]
-
-[build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools.packages.find]
-where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-# Vendored third-party agent skills in .agents/ are not project source.
-extend-exclude = [".agents"]
+extend-exclude = [".agents", ".claude"]
