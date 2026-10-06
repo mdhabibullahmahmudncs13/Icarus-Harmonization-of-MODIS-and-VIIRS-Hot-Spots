@@ -81,10 +81,18 @@ def read_parquet(pattern: str) -> pd.DataFrame:
 
     DuckDB's ``read_parquet`` takes a glob and unions the files by column name
     in one query, so a multi-file cache no longer needs a hand-rolled
-    ``pd.concat``. The read is in-memory, read-only and network-free.
+    ``pd.concat``. ``union_by_name`` matters because the products do not share
+    a CSV shape — MODIS reports ``brightness`` where VIIRS reports
+    ``bright_ti4`` — and the default by-position read fails with a schema
+    mismatch as soon as two products sit under ``cache/raw/``. Missing
+    columns come through as null, which is exactly what a product that never
+    reported them should look like. The read is in-memory, read-only and
+    network-free.
     """
     with _connection_lock:
-        return _connection().execute("SELECT * FROM read_parquet(?)", [pattern]).df()
+        return _connection().execute(
+            "SELECT * FROM read_parquet(?, union_by_name = true)", [pattern]
+        ).df()
 
 
 def _read_cache() -> tuple[pd.DataFrame, str] | None:

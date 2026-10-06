@@ -43,6 +43,27 @@ def test_read_parquet_unifies_a_multi_file_glob(tmp_path: Path):
     assert set(combined.columns) == set(frame.columns)
 
 
+def test_read_parquet_unions_products_that_do_not_share_a_csv_shape(tmp_path: Path):
+    """MODIS reports ``brightness`` where VIIRS reports ``bright_ti4``.
+
+    The real cache glob holds both products, and DuckDB's default by-position
+    read fails the whole dataset with a schema mismatch the moment a second
+    product lands under ``cache/raw/`` — the API then 500s on every route.
+    ``union_by_name`` keeps each product's own columns and nulls the other.
+    """
+    frame = demo_detections(days=60)
+    raw = tmp_path / "raw"
+    raw.mkdir(parents=True)
+    frame.assign(brightness=349.9).to_parquet(raw / "MODIS_SP.parquet", index=False)
+    frame.assign(bright_ti4=320.5).to_parquet(raw / "VIIRS_SNPP_SP.parquet", index=False)
+
+    combined = dataset_module.read_parquet(str(raw / "*.parquet"))
+    assert len(combined) == 2 * len(frame)
+    assert {"brightness", "bright_ti4"} <= set(combined.columns)
+    assert combined["brightness"].isna().sum() == len(frame)
+    assert combined["bright_ti4"].isna().sum() == len(frame)
+
+
 def test_the_fixture_is_read_through_duckdb_not_pandas(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     """If pandas' reader were still in the path, this test would fail loudly."""
 
