@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <title>Icarus — two sensors, one honest record</title>
+    <meta
+      name="description"
+      content="MODIS and VIIRS see the same fires and report them differently. Icarus harmonizes both into one burning-activity record, so a satellite launch stops looking like a wildfire trend."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%230a0c11'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23c4f43a'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
+
+    <canvas id="world" aria-hidden="true"></canvas>
+
+    <header class="topbar">
+      <a class="brand" href="#top">
+        <span class="brand__mark" aria-hidden="true"></span>
+        <span class="brand__name">Icarus</span>
+        <span class="brand__tag">MODIS + VIIRS</span>
+      </a>
+      <nav class="topbar__nav" aria-label="Sections">
+        <a href="#problem">Problem</a>
+        <a href="#how">How it works</a>
+        <a href="#result">Result</a>
+      </nav>
+      <a class="btn btn--primary btn--sm" data-app-link href="http://localhost:5174/">
+        Open the live app
+        <span class="btn__arrow" aria-hidden="true">→</span>
+      </a>
+    </header>
+
+    <nav class="rail" aria-label="Journey">
+      <ol id="rail-list"></ol>
+    </nav>
+
+    <main id="top">
+      <!-- 1 — hero ------------------------------------------------------- -->
+      <section class="beat beat--hero" data-title="Overview">
+        <div class="beat__inner">
+          <div class="copy copy--hero" data-reveal>
+            <p class="eyebrow">Project Icarus</p>
+            <h1>Two sensors.<br />One honest record.</h1>
+            <p class="lede">
+              Every fire satellite sees the world a little differently. Icarus harmonizes
+              NASA&rsquo;s MODIS and VIIRS hot-spot detections into a single
+              burning-activity record — so a satellite launch stops looking like a trend
+              in the burning.
+            </p>
+            <div class="actions">
+              <a class="btn btn--primary btn--lg" data-app-link href="http://localhost:5174/">
+                Open the live app
+                <span class="btn__arrow" aria-hidden="true">→</span>
+              </a>
+              <a class="btn btn--ghost btn--lg" href="#problem">See how it works</a>
+            </div>
+            <p class="hint">
+              Opens <code>localhost:5174</code> — the interactive calendar, map and
+              validation panels.
+            </p>
+            <ul class="chips">
+              <li><strong>1,484,296</strong> detections</li>
+              <li><strong>2003</strong> → <strong>2026</strong></li>
+              <li><strong>0.25°</strong> grid</li>
+              <li>offline-first</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2 — the problem ----------------------------------------------- -->
+      <section class="beat" id="problem" data-title="The problem">
+        <div class="beat__inner">
+          <div class="copy" data-reveal>
+            <p class="eyebrow">The problem</p>
+            <h2>In 2012 the count doubled. The fires didn&rsquo;t.</h2>
+            <p>
+              MODIS has watched the planet since 2000. VIIRS joined in 2012 and resolves
+              roughly three times as many hot spots inside the same cell. Left alone, the
+              record shows a step that belongs to the instrument, not to the burning.
+            </p>
+            <div class="stats">
+              <div class="stat stat--raw">
+                <span class="stat__label">Raw total, 2010–11 → 2013–14</span>
+                <span class="stat__value">5.42×</span>
+                <span class="stat__note">34.0 → 184.1 detections / day</span>
+              </div>
+              <div class="stat stat--calm">
+                <span class="stat__label">MODIS-only activity control</span>
+                <span class="stat__value">0.92×</span>
+                <span class="stat__note">the burning itself barely moved</span>
+              </div>
+            </div>
+            <p class="fine">
+              A sensor-driven jump, measured on the real archive — not a simulation.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 — how it works, part 1 -------------------------------------- -->
+      <section class="beat" id="how" data-title="Acquire & normalize">
+        <div class="beat__inner">
+          <div class="copy" data-reveal>
+            <p class="eyebrow">How it works · 01–02</p>
+            <h2>Acquire, then speak one language.</h2>
+            <p>
+              Detections come from NASA FIRMS: the MODIS and VIIRS S-NPP / NOAA-20
+              archive products, plus NOAA-21. Each carries its own columns and its own
+              confidence scale, so the first job is harmony of form.
+            </p>
+            <ul class="steps">
+              <li>
+                <span class="steps__n">01</span>
+                <div>
+                  <h3>Acquire</h3>
+                  <p>
+                    Chunked, resumable downloads into a local parquet cache, with retries
+                    for NASA throttling and a cache that never stores an error page.
+                  </p>
+                </div>
+              </li>
+              <li>
+                <span class="steps__n">02</span>
+                <div>
+                  <h3>Normalize</h3>
+                  <p>
+                    One schema, one documented confidence mapping, one 0.25° grid — then
+                    every day collapses to <em>cell-days</em>, the unit the whole record
+                    is counted in.
+                  </p>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4 — how it works, part 2 -------------------------------------- -->
+      <section class="beat" data-title="Harmonize & serve">
+        <div class="beat__inner">
+          <div class="copy" data-reveal>
+            <p class="eyebrow">How it works · 03–04</p>
+            <h2>Harmonize, then serve it straight.</h2>
+            <p>
+              Harmonization never rewrites a detection. It corrects the <em>count</em>, and
+              it says out loud which correction it applied.
+            </p>
+            <ul class="steps">
+              <li>
+                <span class="steps__n">03</span>
+                <div>
+                  <h3>Harmonize</h3>
+                  <p>
+                    A per-cell baseline and a multiplicative calibration applied to
+                    VIIRS-anchored bins, so one sensor&rsquo;s density stops standing in
+                    for activity.
+                  </p>
+                </div>
+              </li>
+              <li>
+                <span class="steps__n">04</span>
+                <div>
+                  <h3>Serve</h3>
+                  <p>
+                    FastAPI over a frozen JSON contract, read-only, every payload carrying
+                    its source and parameter hash — and a coverage tag on every bin:
+                  </p>
+                  <ul class="tags">
+                    <li class="tag tag--modis">MODIS</li>
+                    <li class="tag tag--bridge">BRIDGE</li>
+                    <li class="tag tag--cal">VIIRS_CAL</li>
+                    <li class="tag tag--none">NONE</li>
+                  </ul>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5 — the result ------------------------------------------------ -->
+      <section class="beat" id="result" data-title="Result">
+        <div class="beat__inner">
+          <div class="copy" data-reveal>
+            <p class="eyebrow">The result</p>
+            <h2>The step shrinks. It does not vanish — and we say so.</h2>
+            <p>
+              On the real archive, harmonization cuts the sensor-driven jump by about a
+              third and lifts linear agreement with the overlap period. It does not
+              pretend the two sensors are the same instrument.
+            </p>
+            <div class="stats">
+              <div class="stat stat--raw">
+                <span class="stat__label">Step, raw → harmonized</span>
+                <span class="stat__value">5.42× → 3.77×</span>
+                <span class="stat__note">still above 1 — the residual is real</span>
+              </div>
+              <div class="stat stat--good">
+                <span class="stat__label">Pearson agreement, 15-year overlap</span>
+                <span class="stat__value">0.779 → 0.823</span>
+                <span class="stat__note">4,665 days · ratio 6.54 → 4.02</span>
+              </div>
+            </div>
+            <p class="fine">
+              Every figure on the panel opens the JSON it came from.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6 — validation ------------------------------------------------ -->
+      <section class="beat" data-title="Validation">
+        <div class="beat__inner">
+          <div class="copy" data-reveal>
+            <p class="eyebrow">Validation · E1–E9</p>
+            <h2>Negative results ship too.</h2>
+            <p>
+              Nine experiments were pre-registered with their decision rules, then run and
+              published — including the two that fell short. Nothing was tuned after the
+              fact to look better.
+            </p>
+            <ul class="results">
+              <li>
+                <span class="results__k">E1</span>
+                <span class="results__t">Artificial step collapse</span>
+                <span class="results__v good">3.15× → 1.16×</span>
+              </li>
+              <li>
+                <span class="results__k">E2</span>
+                <span class="results__t">Calibration residual offset</span>
+                <span class="results__v part">1.61 → 0.39 · target 0.25 — partial</span>
+              </li>
+              <li>
+                <span class="results__k">E8</span>
+                <span class="results__t">Burned area, 0.25° cells</span>
+                <span class="results__v part">r² 0.342 · target 0.5 — partial</span>
+              </li>
+              <li>
+                <span class="results__k">E9</span>
+                <span class="results__t">Offline cost</span>
+                <span class="results__v">216 MiB cache · 1.30 s payload</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7 — finale ---------------------------------------------------- -->
+      <section class="beat beat--finale" data-title="Open the app">
+        <div class="beat__inner">
+          <div class="copy copy--center" data-reveal>
+            <p class="eyebrow">Ready</p>
+            <h2>Read the record yourself.</h2>
+            <p class="lede">
+              The interactive app runs on the real cache: flip <strong>Raw</strong> against
+              <strong>Harmonized</strong>, scrub the calendar, open the map, and check the
+              validation panels. It is offline-first — self-hosted, no third-party
+              requests.
+            </p>
+            <div class="actions actions--center">
+              <a class="btn btn--primary btn--lg" data-app-link href="http://localhost:5174/">
+                Open the live app
+                <span class="btn__arrow" aria-hidden="true">→</span>
+              </a>
+            </div>
+            <p class="hint">Opens <code>http://localhost:5174/</code></p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>Project Icarus — MODIS + VIIRS active-fire harmonization</span>
+      <span class="footer__dot" aria-hidden="true">·</span>
+      <span>Deterministic code performs the science; no model sits in the data path.</span>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
