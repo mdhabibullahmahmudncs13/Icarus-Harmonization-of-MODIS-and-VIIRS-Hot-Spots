@@ -1,4 +1,5 @@
 import type { MetaBlock, SourceKind } from '../contract/types';
+import { bannerFor, sourceNotice } from '../lib/source';
 
 const SOURCE_CLASS: Record<SourceKind, string> = {
   mock: 'badge badge--missing',
@@ -8,7 +9,7 @@ const SOURCE_CLASS: Record<SourceKind, string> = {
 };
 
 export function SourceBadge({ source }: { source: SourceKind }) {
-  const isEvidence = source === 'live' || source === 'cache';
+  const isEvidence = sourceNotice(source).isEvidence;
   return (
     <span className={SOURCE_CLASS[source]} title={isEvidence ? 'Observed data' : 'Not evidence'}>
       {source}
@@ -16,14 +17,18 @@ export function SourceBadge({ source }: { source: SourceKind }) {
   );
 }
 
+/**
+ * The non-evidence banner. It names the source it is actually showing, so the
+ * fixture tier is never labelled "mock" (`docs/IMPLEMENTATION_PLAN.md` §3.3).
+ * Evidence sources need no banner and render nothing.
+ */
 export function MockBanner({ source }: { source: SourceKind }) {
-  if (source !== 'mock' && source !== 'fixture') return null;
+  const notice = bannerFor(source);
+  if (notice === null) return null;
   return (
     <div className="mock-banner" role="status" aria-live="polite">
-      <strong>Mock data.</strong>
-      <span>
-        Generated for the interface only. Not an observation and never used as evidence.
-      </span>
+      <strong>{notice.title}</strong>
+      <span>{notice.body}</span>
     </div>
   );
 }

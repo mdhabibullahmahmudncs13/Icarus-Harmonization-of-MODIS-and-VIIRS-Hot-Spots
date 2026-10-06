@@ -30,8 +30,25 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   number that moves in the pipeline now fails the suite until the goldens are
   deliberately regenerated with `make golden`.
 
+### Added
+
+- `web/src/lib/source.ts` — one notice per data source, so a synthetic tier can
+  never be labelled with another tier's name, plus the release guard that stops
+  a release build from shipping on non-evidence data (`npm run build:release`
+  fails unless `VITE_DATA=api`).
+
 ### Changed
 
+- The API's analysis endpoints honour a JSON body: `aoi`, `date` and `bbox`
+  override the query parameters, and `metric`/`view` are validated so a caller
+  cannot believe they changed anything. `metric=density` is refused rather than
+  served as `cell_days`, since the density series does not exist yet.
+- Every API failure is now `{code, message, field}` (`unknown_aoi`,
+  `unsupported_metric`, `invalid_bbox`, `invalid_window`, `invalid_request`),
+  including FastAPI's own parameter-validation errors.
+- The layout no longer overflows at narrow widths: the shell tracks are
+  `minmax(0, 1fr)` with `min-width: 0` on their children, and a 640px breakpoint
+  collapses the rail further.
 - The API now serves the frozen contract: all nine payloads under `/api/v1`
   (`meta`, `series`, `cells`, `baseline`, `anomalies`, `critical-period`,
   `validation`, `methods`, `aoi`), each carrying `params_hash`. The unversioned
@@ -47,6 +64,8 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   validate against two disagreeing definitions, which hid it; the alias is
   removed and every test validates against `$defs`. The frontend now runs
   against the API with `VITE_DATA=api`.
+- The non-evidence banner said "Mock data" for the `fixture` tier as well; it
+  now names the source it is actually showing.
 
 ### Notes
 

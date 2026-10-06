@@ -35,8 +35,11 @@ from datetime import date as DateType
 from typing import Annotated, Any
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from src.api.dataset import Dataset, NoDataError, get_dataset
 from src.compute import export, harmonize
@@ -56,38 +59,143 @@ app = FastAPI(title="Icarus", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+#: The AOI ids the picker offers, from the one shared preset list.
+PRESET_IDS: frozenset[str] = frozenset(
+    str(preset["id"]) for preset in export.load_presets()
+)
+
+#: Contract error codes by status, for the errors that are not field-specific.
+_CODE_BY_STATUS: dict[int, str] = {
+    404: "not_found",
+    409: "conflict",
+    422: "invalid_request",
+    503: "unavailable",
+}
+
+
+# --------------------------------------------------------------------------
+# Errors: every failure is ``{code, message, field}`` (docs/TRD.md §9)
+# --------------------------------------------------------------------------
+
+
+def fail(status_code: int, code: str, message: str, field: str | None = None) -> None:
+    """Raise an error in the contract's shape."""
+    raise HTTPException(
+        status_code=status_code, detail={"code": code, "message": message, "field": field}
+    )
+
+
+@app.exception_handler(HTTPException)
+async def _http_error(_request: Request, exc: HTTPException) -> JSONResponse:
+    detail = exc.detail
+    if isinstance(detail, dict) and {"code", "message", "field"} <= set(detail):
+        return JSONResponse(status_code=exc.status_code, content=detail)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "code": _CODE_BY_STATUS.get(exc.status_code, "error"),
+            "message": str(detail),
+            "field": None,
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def _invalid_request(_request: Request, exc: RequestValidationError) -> JSONResponse:
+    """A missing or malformed parameter names the field it came from."""
+    errors = exc.errors()
+    first = errors[0] if errors else {}
+    location = [str(part) for part in first.get("loc", ()) if part not in ("body", "query", "path")]
+    return JSONResponse(
+        status_code=422,
+        content={
+            "code": "invalid_request",
+            "message": str(first.get("msg", "invalid request")),
+            "field": location[0] if location else None,
+        },
+    )
 
 
 # --------------------------------------------------------------------------
 # Helpers
 # --------------------------------------------------------------------------
 
+
 def _dataset() -> Dataset:
     """The served dataset, or 503 when the cache and the fixture are absent."""
     try:
         return get_dataset()
     except NoDataError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        fail(503, "unavailable", str(exc))
 
 
 def _parse_bbox(raw: str) -> tuple[float, float, float, float]:
     """Parse ``west,south,east,north`` into a bbox, or raise 422."""
     parts = [piece.strip() for piece in raw.split(",")]
     if len(parts) != 4:
-        raise HTTPException(
-            status_code=422,
-            detail="bbox must be four comma-separated degrees: west,south,east,north",
-        )
+        fail(422, "invalid_bbox", "bbox must be four comma-separated degrees: west,south,east,north", "bbox")
     try:
         west, south, east, north = (float(piece) for piece in parts)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail="bbox values must be numbers") from exc
+    except ValueError:
+        fail(422, "invalid_bbox", "bbox values must be numbers", "bbox")
     if not (west < east and south < north):
-        raise HTTPException(status_code=422, detail="bbox must satisfy west<east and south<north")
+        fail(422, "invalid_bbox", "bbox must satisfy west<east and south<north", "bbox")
     return west, south, east, north
+
+
+class AnalysisRequest(BaseModel):
+    """The optional JSON body ``docs/ApplicationFlow.md`` §4 describes.
+
+    ``aoi``, ``date`` and ``bbox`` are honoured and take precedence over the
+    query parameters. ``metric`` and ``view`` are validated so a caller cannot
+    believe they changed anything: the series is always cell-day counts and
+    every payload carries both the raw and the harmonized view. ``metric``
+    ``density`` is refused rather than quietly served as ``cell_days``.
+    """
+
+    aoi: str | None = None
+    date: DateType | None = None
+    bbox: list[float] | None = None
+    metric: str | None = None
+    view: str | None = None
+
+
+def _resolve(
+    body: AnalysisRequest | None,
+    *,
+    aoi: str = "BGD",
+    date: DateType | None = None,
+    bbox: str | None = None,
+) -> tuple[str, DateType | None, tuple[float, float, float, float] | None]:
+    """Merge an optional request body over the query parameters."""
+    if body is not None:
+        if body.aoi is not None:
+            aoi = body.aoi
+        if body.date is not None:
+            date = body.date
+        if body.bbox is not None:
+            bbox = ",".join(str(value) for value in body.bbox)
+        if body.metric is not None:
+            if body.metric == "density":
+                fail(
+                    422,
+                    "unsupported_metric",
+                    "the density metric is not computed yet; use metric=cell_days",
+                    "metric",
+                )
+            if body.metric != "cell_days":
+                fail(422, "invalid_metric", "metric must be density or cell_days", "metric")
+        if body.view is not None and body.view not in ("raw", "harmonized"):
+            fail(422, "invalid_view", "view must be raw or harmonized", "view")
+
+    parsed = _parse_bbox(bbox) if bbox is not None else None
+    if parsed is None and aoi not in PRESET_IDS:
+        fail(422, "unknown_aoi", f"unknown AOI {aoi!r}; known: {sorted(PRESET_IDS)}", "aoi")
+    return aoi, date, parsed
 
 
 def _within(frame: pd.DataFrame, bbox: tuple[float, float, float, float]) -> pd.DataFrame:
@@ -133,8 +241,9 @@ def meta() -> Mapping[str, Any]:
 @app.get("/api/series")
 @app.get("/api/v1/series")
 @app.post("/api/v1/series")
-def series() -> Mapping[str, Any]:
+def series(body: AnalysisRequest | None = None) -> Mapping[str, Any]:
     """Daily raw and harmonized counts, one row per day."""
+    _resolve(body)
     dataset = _dataset()
     return export.build_series(
         dataset.detections, source=dataset.source, generated_at=dataset.generated_at
@@ -147,10 +256,12 @@ def series() -> Mapping[str, Any]:
 def cells(
     start: Annotated[DateType | None, Query(description="ISO date, inclusive")] = None,
     end: Annotated[DateType | None, Query(description="ISO date, inclusive")] = None,
+    body: AnalysisRequest | None = None,
 ) -> Mapping[str, Any]:
     """Grid cells over a date window, with raw and harmonized counts."""
+    _resolve(body)
     if start is not None and end is not None and start > end:
-        raise HTTPException(status_code=422, detail="start must not be after end")
+        fail(422, "invalid_window", "start must not be after end", "start")
     dataset = _dataset()
     return export.build_cells(
         dataset.detections,
@@ -164,8 +275,9 @@ def cells(
 @app.get("/api/baseline")
 @app.get("/api/v1/baseline")
 @app.post("/api/v1/baseline")
-def baseline() -> Mapping[str, Any]:
+def baseline(body: AnalysisRequest | None = None) -> Mapping[str, Any]:
     """Seasonal baseline: day-of-year percentiles of the harmonized series."""
+    _resolve(body)
     dataset = _dataset()
     return export.build_baseline(
         dataset.series, source=dataset.source, generated_at=dataset.generated_at
@@ -176,27 +288,26 @@ def _anomaly_payload(
     dataset: Dataset,
     *,
     date: DateType | None,
-    bbox: str | None,
+    area: tuple[float, float, float, float] | None,
     aoi: str,
 ) -> Mapping[str, Any]:
     """Rank one date (or the last day in the data) against its season."""
     series = dataset.series
-    if bbox is not None:
-        frame = _within(dataset.detections, _parse_bbox(bbox))
-        series = _continuous(harmonize.harmonized_series(frame))
-        aoi = bbox
+    if area is not None:
+        series = _continuous(harmonize.harmonized_series(_within(dataset.detections, area)))
+        aoi = ",".join(str(v) for v in area)
 
     if series.empty:
-        raise HTTPException(status_code=404, detail="no detections in the requested area")
+        fail(404, "not_found", "no detections in the requested area")
     stamp = pd.Timestamp(date) if date is not None else series.index.max()
     low, high = series.index.min(), series.index.max()
     if stamp < low or stamp > high:
-        raise HTTPException(
-            status_code=404,
-            detail=(
-                f"{stamp.date().isoformat()} is outside the dataset range "
-                f"{low.date().isoformat()}..{high.date().isoformat()}"
-            ),
+        fail(
+            404,
+            "not_found",
+            f"{stamp.date().isoformat()} is outside the dataset range "
+            f"{low.date().isoformat()}..{high.date().isoformat()}",
+            "date",
         )
     return export.build_anomaly(
         series,
@@ -212,9 +323,13 @@ def anomaly(
     date: Annotated[DateType, Query(description="ISO date to judge")],
     bbox: Annotated[str | None, Query(description="west,south,east,north")] = None,
     aoi: Annotated[str, Query(description="preset id the request is for")] = "BGD",
+    body: AnalysisRequest | None = None,
 ) -> Mapping[str, Any]:
     """Rank one date against its day-of-year baseline."""
-    return _anomaly_payload(_dataset(), date=date, bbox=bbox, aoi=aoi)
+    resolved_aoi, resolved_date, area = _resolve(body, aoi=aoi, date=date, bbox=bbox)
+    return _anomaly_payload(
+        _dataset(), date=resolved_date, area=area, aoi=resolved_aoi
+    )
 
 
 @app.get("/api/v1/anomalies")
@@ -225,9 +340,13 @@ def anomalies(
     ] = None,
     bbox: Annotated[str | None, Query(description="west,south,east,north")] = None,
     aoi: Annotated[str, Query(description="preset id the request is for")] = "BGD",
+    body: AnalysisRequest | None = None,
 ) -> Mapping[str, Any]:
     """The frontend's anomalies view: the requested date, or the latest day."""
-    return _anomaly_payload(_dataset(), date=date, bbox=bbox, aoi=aoi)
+    resolved_aoi, resolved_date, area = _resolve(body, aoi=aoi, date=date, bbox=bbox)
+    return _anomaly_payload(
+        _dataset(), date=resolved_date, area=area, aoi=resolved_aoi
+    )
 
 
 @app.get("/api/critical-period")
@@ -235,11 +354,16 @@ def anomalies(
 @app.post("/api/v1/critical-period")
 def critical_period(
     aoi: Annotated[str, Query(description="preset id the request is for")] = "BGD",
+    body: AnalysisRequest | None = None,
 ) -> Mapping[str, Any]:
     """Onset, peak, end and window mass of the burning season."""
+    resolved_aoi, _, _ = _resolve(body, aoi=aoi)
     dataset = _dataset()
     return export.build_critical_period(
-        dataset.series, aoi=aoi, source=dataset.source, generated_at=dataset.generated_at
+        dataset.series,
+        aoi=resolved_aoi,
+        source=dataset.source,
+        generated_at=dataset.generated_at,
     )
 
 
@@ -258,15 +382,16 @@ def aoi() -> Mapping[str, Any]:
 @app.get("/api/validation")
 @app.get("/api/v1/validation")
 @app.post("/api/v1/validation")
-def validation() -> Mapping[str, Any]:
+def validation(body: AnalysisRequest | None = None) -> Mapping[str, Any]:
     """Overlap-period agreement, raw against harmonized."""
+    _resolve(body)
     dataset = _dataset()
     try:
         return export.build_validation(
             dataset.detections, source=dataset.source, generated_at=dataset.generated_at
         )
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        fail(409, "conflict", str(exc))
 
 
 @app.get("/api/methods")
@@ -285,4 +410,4 @@ def methods() -> Mapping[str, Any]:
     )
 
 
-__all__ = ["ALLOWED_ORIGINS", "app"]
+__all__ = ["ALLOWED_ORIGINS", "PRESET_IDS", "AnalysisRequest", "app", "fail"]

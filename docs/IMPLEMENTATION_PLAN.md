@@ -149,13 +149,29 @@ Status against the F1–F6 milestones:
 - [x] **F4** region map — cells shaded by mode, with a legend
 - [x] **F5** anomaly, critical-period, validation and methods panels + provenance drawer
 - [x] **F6** keyboard shortcuts (1–8, R/H, T, P, Ctrl/Cmd+B, Esc), loading/empty/error states, dark default
-- [ ] Frontend acceptance checks not yet automated (no-third-party-request Playwright test, release guard)
+- [x] **F6** keyboard shortcuts (1–8, R/H, T, P, Ctrl/Cmd+B, Esc), loading/empty/error states, dark default
+- [x] Release guard — `npm run build:release` fails when the build would run on
+      non-evidence data (§3.3)
+- [ ] No-third-party-request check is still manual (verified through the browser's
+      network log, `docs/IMPLEMENTATION_PLAN.md` §5.1), not an automated Playwright test
 
-Verified this session: `tsc --noEmit` clean; 16 vitest cases pass; `vite build` succeeds
-(186 kB JS / 61 kB gzip); the built app loads in a browser, the mode toggle flips
+**Source-accurate banner.** The non-evidence banner used to say "Mock data" for
+any source that was not evidence, including the `fixture` tier. Each source now
+has its own notice, defined once in `web/src/lib/source.ts` and asserted by
+`web/tests/source.test.ts`, so a tier can never be labelled with another tier's
+name.
+
+**Responsive fix.** A 390 px viewport showed horizontal overflow: the collapsed
+rail kept its content's width and the main column could not shrink below its
+content. `minmax(0, 1fr)` on the shell tracks, `min-width: 0` on the grid's
+children, and a 640 px breakpoint removed it — all six views now report
+`scrollWidth == viewport` at 390 px, and the desktop rail is unchanged at 244 px.
+
+Verified this session: `tsc --noEmit` clean; 26 vitest cases pass (16 prior +
+10 new); `vite build` succeeds and `vite build --mode release` exits 1 when
+`VITE_DATA` is not `api`. The built app loads in a browser, the mode toggle flips
 `aria-pressed` and updates the hash without a refetch, keyboard navigation reaches all
-eight views, the validation panel renders the mock's raw 0.992 / harmonized 0.997
-correlations, and the console is clean.
+eight views, and the console is clean.
 
 ---
 
@@ -279,10 +295,14 @@ Status:
 - [x] No network tier: the suite answers with sockets blocked
 - [x] 422 on a malformed window/bbox; 404 outside the data range
 - [x] The frontend runs against the API (`VITE_DATA=api`) — verified in a browser
+- [x] `POST` bodies: `aoi`, `date` and `bbox` are honoured and override the
+      query parameters; body and query share one validator
+- [x] Every failure is `{code, message, field}` (422 `unknown_aoi`,
+      `unsupported_metric`, `invalid_bbox`, `invalid_window`, `invalid_request`)
 - [ ] DuckDB queries — the data tier still reads parquet through pandas
-- [ ] `POST` bodies: the analysis endpoints accept POST, but the geometry body
-      `docs/ApplicationFlow.md` describes is not implemented (query params only)
 - [ ] Coverage/`source` per bin (`docs/TESTING.md` §9) — needs the S7 stage
+- [ ] `metric=density` is refused rather than served: the density series does not
+      exist yet, and `metric=cell_days` is the only implemented metric
 
 **The defect this phase fixed.** The API served pre-migration payload shapes
 (`rows`, `raw_pearson`, `h`/`l`/`n`, `overlap.{start,end}`, no `params_hash`)
@@ -312,9 +332,9 @@ Pearson 0.844 raw vs 0.953 harmonized (ratio 4.19 -> 1.33), the critical period
 onset bin 4 / peak 11 / mass 87%, and the anomaly panel reported `not scored`
 with its reason. No console errors or page errors.
 
-**Found, not fixed:** the app still shows its static "Mock data" banner when the
-source badge says `fixture`. That is the Phase 1 mock-banner/release-guard item
-(§3.3) and it is now a live inconsistency rather than a latent one.
+**Closed since:** the "Mock data" banner that stood over the `fixture` tier is
+fixed — the banner names its source and the release guard refuses a non-evidence
+release build (§3.5).
 
 ---
 

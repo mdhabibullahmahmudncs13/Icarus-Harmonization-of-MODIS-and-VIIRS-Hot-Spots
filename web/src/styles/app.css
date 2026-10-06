@@ -26,10 +26,17 @@ body {
 
 .shell {
   display: grid;
-  grid-template-columns: 244px 1fr;
+  grid-template-columns: 244px minmax(0, 1fr);
   gap: 20px;
   padding: 4px;
   min-height: 100%;
+}
+
+/* Grid items default to their min-content width, so one wide child — the
+   46-bin calendar, a long hint — can push the whole shell past the viewport.
+   minmax(0, ...) plus min-width: 0 lets the tracks actually shrink. */
+.shell > * {
+  min-width: 0;
 }
 
 /* --- rail --- */
@@ -393,7 +400,11 @@ kbd {
 
 @media (max-width: 1024px) {
   .shell {
-    grid-template-columns: 64px 1fr;
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+  /* The collapsed rail must not keep its content's width. */
+  .rail {
+    overflow: hidden;
   }
   .rail .nav-item span,
   .rail .brand__name,
@@ -401,4 +412,17 @@ kbd {
   .rail .nav-group__label {
     display: none;
   }
+}
+
+@media (max-width: 640px) {
+  .shell {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 10px;
+  }
+}
+
+/* Charts and maps are as wide as their box, never wider than the viewport. */
+.main svg,
+.main canvas {
+  max-width: 100%;
 }

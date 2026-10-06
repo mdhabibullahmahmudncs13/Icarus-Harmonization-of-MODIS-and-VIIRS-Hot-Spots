@@ -286,7 +286,10 @@ def test_anomaly_answers_for_a_quiet_day_with_a_real_zero(client: TestClient):
 def test_anomaly_outside_the_range_is_404(client: TestClient):
     response = client.get("/api/anomaly", params={"date": "1999-01-01"})
     assert response.status_code == 404
-    assert "outside the dataset range" in response.json()["detail"]
+    body = response.json()
+    assert set(body) == {"code", "message", "field"}
+    assert body["code"] == "not_found"
+    assert "outside the dataset range" in body["message"]
 
 
 def test_anomaly_requires_a_date_on_the_legacy_path(client: TestClient):
@@ -299,13 +302,120 @@ def test_anomaly_accepts_a_bbox(client: TestClient):
         "/api/v1/anomalies", params={"date": "2019-06-01", "bbox": "88,20,93,27"}
     ).json()
     assert_matches("anomalies", payload)
-    assert payload["query"]["aoi"] == "88,20,93,27"
+    # A bbox request echoes the area it resolved to, not a preset id: the same
+    # numbers always render the same way, whatever spacing the caller used.
+    assert payload["query"]["aoi"] == "88.0,20.0,93.0,27.0"
 
 
 def test_anomaly_rejects_a_malformed_bbox(client: TestClient):
     for bad in ("88,20,93", "a,b,c,d", "93,20,88,27"):
         response = client.get("/api/v1/anomalies", params={"date": "2019-06-01", "bbox": bad})
         assert response.status_code == 422, bad
+        assert response.json()["field"] == "bbox", bad
+
+
+# --------------------------------------------------------------------------
+# Errors: every failure is {code, message, field} (docs/TRD.md §9)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "request_args,status,code,field",
+    [
+        (("get", "/api/v1/anomalies", {"params": {"date": "2019-06-01", "bbox": "1,2,3"}}), 422, "invalid_bbox", "bbox"),
+        (("get", "/api/v1/cells", {"params": {"start": "2019-06-30", "end": "2019-06-01"}}), 422, "invalid_window", "start"),
+        (("get", "/api/v1/anomalies", {"params": {"date": "2019-06-01", "aoi": "ZZZ"}}), 422, "unknown_aoi", "aoi"),
+        # The legacy path still requires a date; /api/v1/anomalies defaults to
+        # the last day, so a missing date there is not an error.
+        (("get", "/api/anomaly", {}), 422, "invalid_request", "date"),
+        (("get", "/api/v1/anomalies", {"params": {"date": "not-a-date"}}), 422, "invalid_request", "date"),
+    ],
+)
+def test_errors_carry_a_code_a_message_and_a_field(client, request_args, status, code, field):
+    method, path, kwargs = request_args
+    response = getattr(client, method)(path, **kwargs)
+    assert response.status_code == status, response.text
+    body = response.json()
+    assert set(body) == {"code", "message", "field"}, body
+    assert body["code"] == code
+    assert body["field"] == field
+    assert body["message"]
+
+
+# --------------------------------------------------------------------------
+# POST bodies (docs/ApplicationFlow.md §4)
+# --------------------------------------------------------------------------
+
+
+def test_post_body_carries_the_aoi_and_the_date(client: TestClient):
+    response = client.post("/api/v1/anomalies", json={"aoi": "NPL", "date": "2019-06-01"})
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert_matches("anomalies", payload)
+    assert payload["query"] == {"date": "2019-06-01", "aoi": "NPL"}
+
+
+def test_post_body_carries_an_aoi_for_the_critical_period(client: TestClient):
+    payload = client.post("/api/v1/critical-period", json={"aoi": "IND-C"}).json()
+    assert_matches("criticalPeriod", payload)
+    assert payload["aoi"] == "IND-C"
+
+
+def test_post_body_bbox_is_honoured(client: TestClient):
+    payload = client.post(
+        "/api/v1/anomalies", json={"date": "2019-06-01", "bbox": [88, 20, 93, 27]}
+    ).json()
+    assert_matches("anomalies", payload)
+    assert payload["query"]["aoi"] == "88.0,20.0,93.0,27.0"
+
+
+def test_post_body_overrides_the_query_parameters(client: TestClient):
+    payload = client.post(
+        "/api/v1/anomalies", params={"aoi": "BGD"}, json={"aoi": "NPL", "date": "2019-06-01"}
+    ).json()
+    assert payload["query"]["aoi"] == "NPL"
+
+
+def test_post_body_rejects_an_unknown_aoi_with_its_field(client: TestClient):
+    response = client.post("/api/v1/anomalies", json={"aoi": "ZZZ"})
+    assert response.status_code == 422
+    assert response.json() == {
+        "code": "unknown_aoi",
+        "message": response.json()["message"],
+        "field": "aoi",
+    }
+    assert "ZZZ" in response.json()["message"]
+
+
+def test_post_body_refuses_the_unimplemented_density_metric(client: TestClient):
+    """Refused, not silently served as cell_days."""
+    response = client.post("/api/v1/series", json={"metric": "density"})
+    assert response.status_code == 422
+    assert response.json()["code"] == "unsupported_metric"
+    assert response.json()["field"] == "metric"
+
+
+def test_post_body_accepts_the_metrics_and_views_that_are_honoured(client: TestClient):
+    for body in ({"metric": "cell_days"}, {"view": "raw"}, {"view": "harmonized"}, {}):
+        response = client.post("/api/v1/series", json=body)
+        assert response.status_code == 200, (body, response.text)
+        assert response.json()["metric"] == "cell_days"
+
+
+def test_post_body_rejects_an_unknown_metric_or_view(client: TestClient):
+    for body, code, field in (
+        ({"metric": "bananas"}, "invalid_metric", "metric"),
+        ({"view": "sideways"}, "invalid_view", "view"),
+    ):
+        response = client.post("/api/v1/series", json=body)
+        assert response.status_code == 422, body
+        assert response.json()["code"] == code
+        assert response.json()["field"] == field
+
+
+def test_get_without_a_body_behaves_as_before(client: TestClient):
+    payload = client.get("/api/v1/anomalies", params={"date": "2019-06-01"}).json()
+    assert payload["query"] == {"date": "2019-06-01", "aoi": "BGD"}
 
 
 # --------------------------------------------------------------------------
@@ -362,7 +472,9 @@ def test_missing_cache_and_fixture_is_a_503(client: TestClient, tmp_path, monkey
     dataset_module.reset_dataset_cache()
     response = client.get("/api/v1/meta")
     assert response.status_code == 503
-    assert "no detections to serve" in response.json()["detail"]
+    body = response.json()
+    assert body["code"] == "unavailable"
+    assert "no detections to serve" in body["message"]
 
 
 # --------------------------------------------------------------------------
