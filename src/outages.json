@@ -1,0 +1,29 @@
+{
+  "note": "Known observing outages per stream. S7 counts these days as unavailable, so a bin inside one is never read as a zero-activity bin. Synthetic demo values; replace with a real acquisition log before the demo.",
+  "outages": [
+    {
+      "stream": "MOD_A",
+      "start": "2019-03-01",
+      "end": "2019-03-16",
+      "reason": "demo: Aqua downlink outage"
+    },
+    {
+      "stream": "MOD_T",
+      "start": "2019-06-10",
+      "end": "2019-06-25",
+      "reason": "demo: Terra downlink outage"
+    },
+    {
+      "stream": "MOD_A",
+      "start": "2019-06-10",
+      "end": "2019-06-25",
+      "reason": "demo: Aqua downlink outage"
+    },
+    {
+      "stream": "ALL",
+      "start": "2019-08-01",
+      "end": "2019-08-05",
+      "reason": "demo: comprehensive downlink gap"
+    }
+  ]
+}

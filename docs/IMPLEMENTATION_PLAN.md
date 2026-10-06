@@ -226,9 +226,11 @@ Status:
 - [x] Overlap validation and cell-size sweep
 - [x] Unit edges, property invariants (idempotence, row-order, duplicates), golden scenario
 - [x] Golden files committed as fixtures (`tests/golden/*.json`, guarded by `tests/test_golden.py`)
-- [x] Coverage stage (S7) — per-bin family coverage and `MODIS`/`VIIRS_CAL`/`NONE`
-      source tagging (`src/compute/coverage.py`)
-- [ ] Bridge/calibration stages (S8) — those belong to the calibration work, not this phase
+- [x] Coverage stage (S7) — per-stream availability from the product epochs and
+      the outage table; `MODIS`/`BRIDGE`/`VIIRS_CAL`/`NONE` source tagging
+      (`src/compute/coverage.py`, `src/compute/availability.py`)
+- [x] Multiplicative calibration (S8) — `r(t, m)` with the kappa shrinkage,
+      applied to VIIRS-anchored bins (`src/compute/calibrate.py`)
 
 The goldens cover both canonical inputs: the step scenario (series, cells,
 seasonal baseline, critical period) and the two overlap validators
@@ -276,7 +278,9 @@ Artifacts:
 |----------|------|---------|
 | Routes | `src/api/main.py` | Nine payloads under `/api/v1`, unversioned aliases kept |
 | Data tier | `src/api/dataset.py` | Cache-then-fixture resolution through DuckDB, `OFFLINE=1` forces the fixture |
+| Availability | `src/compute/availability.py`, `src/outages.json` | S7: stream epochs minus the outage table |
 | Coverage stage | `src/compute/coverage.py` | S7: per-bin coverage and source tagging |
+| Calibration | `src/compute/calibrate.py` | S8: multiplicative VIIRS-to-MODIS factor |
 | Payload builders | `src/compute/export.py` | The contract JSON, shared with the static export |
 | AOI presets | `src/aoi_presets.json` | One preset list for the API and the mock generator |
 | Contract tests | `tests/test_api.py`, `tests/test_export.py` | Every payload against `$defs` |
@@ -303,8 +307,11 @@ Status:
 - [x] Every failure is `{code, message, field}` (422 `unknown_aoi`,
       `unsupported_metric`, `invalid_bbox`, `invalid_window`, `invalid_request`)
 - [x] DuckDB data tier — the cache and the fixture are read through DuckDB's
-      `read_parquet`, which also unions a multi-file cache glob in one query
-- [x] Coverage/`source` per bin (`docs/TESTING.md` §7) — the S7 stage
+      `read_parquet` on one reused connection, which also unions a multi-file
+      cache glob in one query
+- [x] Coverage/`source` per bin (`docs/TESTING.md` §7) — the S7 stage, with all
+      four source classes reachable
+- [x] VIIRS-anchored bins are calibrated (S8) rather than only tagged
 - [ ] `metric=density` is refused rather than served: the density series does not
       exist yet, and `metric=cell_days` is the only implemented metric
 
@@ -325,30 +332,36 @@ window and failed validation; it now emits `null` with
 `insufficient_activity: true`, matching the contract. The only change to
 `docs/contract.schema.json` is the removal of the `definitions` alias.
 
-**S7 coverage (`src/compute/coverage.py`).** The series stage now emits the
-coverage the calendar needs to hatch a bin instead of reading it as a zero.
-Coverage is computed over the bin's **observing days** — the days the bin had
-any detection — because availability in the spec is an acquisition fact
-(`a(s, d)` from an `avail`/outage table) this pipeline does not yet ingest;
-the detections only carry which days a stream actually reported. ``n_days`` is
-still reported. Two honest limits are recorded rather than papered over:
-`BRIDGE` is in the contract's vocabulary but never emitted, because a bridge
-factor needs one MODIS satellite separated from the pair and the acquisition
-table exposes MODIS only as the combined `Terra+Aqua` product; and
-`VIIRS_CAL` currently records that VIIRS met coverage, not that S8 calibration
-was applied — S8 does not exist yet. The contract change is additive and
-required: `$defs/binSource` plus `coverage`/`source` on `seriesPoint`, carried
-through the mock generator, the goldens (`coverage_bins.json`), the frontend
-types and `aggregateToBins`, so an unobserved bin is never shown as zero.
+**S7 coverage is a property of the observing calendar, not of the detections.**
+`src/compute/availability.py` builds `a(s, d)` from the FIRMS product epochs
+minus the outage table (`src/outages.json`); `src/compute/coverage.py` rolls
+that up into per-bin `both_frac`/`cov_modis`/`cov_viirs` and tags the bin
+`MODIS` (both MODIS satellites up), `BRIDGE` (one), `VIIRS_CAL` (VIIRS only) or
+`NONE` (none). All four classes are reachable and the demo fixture exercises
+each, so the calendar hatches a `NONE` bin instead of reading it as zero — the
+series is continuous, so an outage bin still has rows to hatch. This closes the
+earlier limitations: availability is the acquisition calendar rather than an
+observation-day proxy, and `BRIDGE` is emitted from a real single-satellite
+window instead of being reserved.
 
-**DuckDB data tier (no behavioural gain, by measurement).** The cache and the
-fixture are now read through DuckDB rather than `pd.concat(pd.read_parquet)`.
-On the committed fixture DuckDB is the slower reader (~21 ms vs ~2 ms per
-cold read, the cost is per-connection) but its cost is flat as the cache glob
-grows, where pandas scales — ~19 ms vs ~10 ms over an eight-file cache — and
-the dataset is read once per process behind the existing cache. The change is
-an infrastructure swap requested explicitly, not a bug fix; the resolution
-order, `meta.source` values and `NoDataError`→503 behaviour are unchanged and
+**S8 calibration makes `VIIRS_CAL` true.** `src/compute/calibrate.py` implements
+`r(t, m) = (M(t, m) + kappa * r_reg(m)) / (V(t, m) + kappa)` over 1-degree tiles
+and calendar months (kappa = 50), and `build_series` scales the VIIRS counts of
+a `VIIRS_CAL` bin by the month's AOI factor. `VIIRS_CAL` now means calibration
+was applied, not merely that VIIRS had coverage.
+
+**The demo fixture shows the outages.** `python -m src.demo` blanks MODIS for a
+10-25 June 2019 window and every sensor for 1-5 August 2019, matching the
+outage table, so the offline calendar shows `BRIDGE`, `VIIRS_CAL` and the
+hatched `NONE` state without any network.
+
+**DuckDB data tier, with the connection reused.** The cache and the fixture are
+read through DuckDB's `read_parquet` on one process-wide in-memory connection;
+the fixed connection cost previously dominated a single-file read. Measured:
+~11 ms vs ~2 ms on the committed fixture and ~10 ms vs ~8 ms across an
+eight-file cache — a flat fixed cost against pandas' per-file scaling, and the
+dataset is read once per process behind the existing cache. Resolution order,
+`meta.source` values and the `NoDataError`→503 behaviour are unchanged and
 covered by `tests/test_dataset.py` plus `tests/test_api.py`.
 
 Verified this session: `make lint` clean; 201 tests pass. `OFFLINE=1` uvicorn

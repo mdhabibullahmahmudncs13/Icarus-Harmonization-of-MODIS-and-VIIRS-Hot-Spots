@@ -32,15 +32,21 @@ export function CalendarHeatmap({
                 const value = pick(b);
                 const t = value / max;
                 const low = b.coverage < 0.75;
+                // Modelled bins (one MODIS satellite, or calibrated VIIRS) are
+                // outlined, distinct from an observed-MODIS bin.
+                const modelled = b.source === 'BRIDGE' || b.source === 'VIIRS_CAL';
                 return (
                   <button
                     key={bin}
                     type="button"
-                    className={`calendar__cell${low ? ' calendar__cell--low' : ''}`}
+                    className={`calendar__cell${low ? ' calendar__cell--low' : ''}${
+                      modelled ? ' calendar__cell--modelled' : ''
+                    }`}
                     style={{ background: low ? undefined : rampColor(t) }}
                     title={`${year} bin ${bin} · ${b.start} → ${b.end} · ${value} ${
                       mode === 'raw' ? 'detections' : 'cell-days'
                     } · coverage ${(b.coverage * 100).toFixed(0)}% · ${b.source}`}
+                    data-source={b.source}
                     onClick={() => onSelect?.(b.start)}
                     aria-label={`${year} bin ${bin}`}
                   />

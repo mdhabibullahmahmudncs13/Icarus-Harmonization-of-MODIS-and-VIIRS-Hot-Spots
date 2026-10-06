@@ -205,6 +205,47 @@ def identical_cell_days(
     return pd.DataFrame(rows)
 
 
+def _family_streams() -> dict[str, tuple[str, ...]]:
+    """Streams per sensor family, from the one stream table."""
+    from src.compute.availability import STREAM_FAMILY
+
+    families: dict[str, list[str]] = {}
+    for stream, family in STREAM_FAMILY.items():
+        families.setdefault(family, []).append(stream)
+    return {family: tuple(streams) for family, streams in families.items()}
+
+
+def apply_outages(frame: pd.DataFrame, outages: list | None = None) -> pd.DataFrame:
+    """Drop detections a downlink outage means could not have been recorded.
+
+    An ``ALL`` outage silences every sensor. A single-satellite MODIS outage is
+    left alone — the fixture cannot separate Terra from Aqua, and the surviving
+    satellite still reports — so only a window where *every* stream of a family
+    is out removes that family's rows.
+    """
+    from src.compute import availability
+
+    gaps = availability.load_outages() if outages is None else outages
+    if frame.empty or not gaps:
+        return frame
+    dates = pd.to_datetime(frame["acq_date"]).dt.date
+    drop = pd.Series(False, index=frame.index)
+    for gap in gaps:
+        if gap.stream == availability.ALL_STREAMS:
+            drop |= (dates >= gap.start) & (dates <= gap.end)
+    for family, streams in _family_streams().items():
+        family_rows = frame["instrument"].eq(family)
+        every_stream_out = pd.Series(True, index=frame.index)
+        for stream in streams:
+            windows = [gap for gap in gaps if gap.stream == stream]
+            stream_out = pd.Series(False, index=frame.index)
+            for gap in windows:
+                stream_out |= (dates >= gap.start) & (dates <= gap.end)
+            every_stream_out &= stream_out
+        drop |= family_rows & every_stream_out
+    return frame[~drop].reset_index(drop=True)
+
+
 def demo_detections(
     *,
     days: int = DEFAULT_DAYS,
@@ -218,13 +259,15 @@ def demo_detections(
     (numeric for MODIS, letters for VIIRS) which parquet cannot store in one
     column, so the values are written as text — the compute schema parses
     either form. A deterministic ``frp`` column is added so ``peak_frp`` in
-    the cells payload is a real number rather than a constant zero.
+    the cells payload is a real number rather than a constant zero. Known
+    downlink outages are then applied, so the fixture and the S7 availability
+    calendar agree.
     """
     frame = synthetic_detections(days=days, start=start, seed=seed).copy()
     frame["confidence"] = frame["confidence"].astype(str)
     rng = random.Random(frp_seed)
     frame["frp"] = [round(rng.uniform(0.5, 80.0), 2) for _ in range(len(frame))]
-    return frame
+    return apply_outages(frame)
 
 
 def write_fixture(
@@ -269,6 +312,7 @@ __all__ = [
     "GRID_COLS",
     "GRID_ROWS",
     "JITTER",
+    "apply_outages",
     "cell_center",
     "demo_detections",
     "identical_cell_days",

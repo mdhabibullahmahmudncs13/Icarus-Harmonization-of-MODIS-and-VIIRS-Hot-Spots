@@ -1,51 +1,38 @@
-"""S7 availability and coverage (docs/TRD.md §5.5, docs/DATA_DICTIONARY.md §5).
+"""S7 availability and per-bin coverage (docs/TRD.md §5.5, DATA_DICTIONARY.md §5).
 
-Coverage answers "was a sensor watching?", not "was there a fire?". The frontend
-must never colour an unobserved bin as zero activity, so every harmonized bin
-carries two extra facts: how much of it the reference family saw, and which
-sensor stream the value is anchored on.
+Coverage answers "was a stream watching?", which is what stops the calendar
+colouring an unobserved bin as zero activity. It is computed from the stream
+availability calendar in :mod:`src.compute.availability` (product epochs minus
+the outage table), not from whether a fire happened:
 
-Coverage definition, against the schema this pipeline actually reads
----------------------------------------------------------------
+    cov_s(y, b) = expected_days(s) inside the bin / days of the bin in the record
 
-The spec's formula is ``cov_s(y, b) = (1 / n_days) * sum_d a(s, d)`` where
-``a(s, d)`` is 1 on a day stream ``s`` was *available*. Availability is an
-acquisition fact (the satellite downlinked that day), carried by an ``avail`` /
-outage table that this pipeline does not yet ingest. What the detections do
-carry is which days a stream actually *reported*, so coverage here is computed
-over the bin's **observing days** — the days the bin had any detection at all:
-
-    cov_f(y, b) = reported_days(f, b) / observed_days(b)
-
-where ``observed_days(b)`` counts days in the bin with any family present. A
-winter bin with two days of fire and MODIS on both is fully covered (1.0), not
-"two eighths"; a bin where VIIRS saw fire on days MODIS did not is genuinely
-under-covered by MODIS. ``n_days`` (the calendar length of the bin) is still
-reported, for the AUC and for the tests, but it is not the denominator.
+The denominator is the bin's days that fall inside the requested record window,
+so a bin clipped at the edge of the record is not punished for the days before
+the window. ``n_days`` (the bin's full calendar length, 8 or 5/6) is reported
+alongside.
 
 Source tagging (docs/DATA_DICTIONARY.md §5)
 -------------------------------------------
 
-* ``MODIS``     — MODIS family coverage meets ``cov_min``; the reference family.
-* ``VIIRS_CAL`` — MODIS does not meet ``cov_min`` but VIIRS does.
-* ``NONE``      — no family meets ``cov_min``; the value must not be read as an
-  observed zero.
-* ``BRIDGE``    — reserved. A bridge factor needs a *single* MODIS satellite
-  distinguished from the pair, and the acquisition table exposes MODIS only as
-  the combined ``Terra+Aqua`` product, so this pipeline cannot honestly emit it
-  yet. The enum keeps the word so the contract does not change when it can.
+* ``MODIS``     — both MODIS satellites available (``both_frac >= cov_min``).
+* ``BRIDGE``    — a single MODIS satellite available with adequate coverage.
+* ``VIIRS_CAL`` — MODIS below ``cov_min`` but VIIRS meets it.
+* ``NONE``      — no stream meets ``cov_min``; the bin carries no observation.
 
-Deterministic and network-free. No LLM.
+Deterministic, network-free, no LLM.
 """
 
 from __future__ import annotations
 
 import calendar
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from datetime import date, timedelta
 from typing import Any
 
 import pandas as pd
 
+from .availability import STREAM_FAMILY
 from .series_util import BIN_DAYS, bin_of_doy
 
 #: Minimum coverage fraction for a stream to anchor a bin (docs/PARAMETERS.md).
@@ -64,56 +51,22 @@ COVERAGE_COLUMNS: tuple[str, ...] = (
     "year",
     "bin",
     "n_days",
-    "observed_days",
-    "modis_days",
-    "viirs_days",
+    "window_days",
+    "mod_t_days",
+    "mod_a_days",
+    "both_days",
+    "both_frac",
+    "cov_mod_t",
+    "cov_mod_a",
     "cov_modis",
     "cov_viirs",
     "coverage",
     "source",
 )
 
-#: Floats are rounded to this many decimals so the payload and the goldens are
+#: Floats are rounded to this many decimals so payloads and goldens are
 #: byte-stable across platforms without hiding a real change in the science.
 ROUND_DP = 4
-
-
-def _timestamps(detections: pd.DataFrame) -> pd.Series:
-    if "acq_date" not in detections.columns:
-        raise ValueError("detections are missing the required column 'acq_date'")
-    return pd.to_datetime(detections["acq_date"], errors="coerce").dt.normalize()
-
-
-def family_availability(detections: pd.DataFrame) -> pd.DataFrame:
-    """Per-day family availability: one boolean column per family.
-
-    Indexed by date, one row per day the detections cover (a day with no
-    detection contributes no row). ``modis`` is 1 on a day with at least one
-    MODIS detection, ``viirs`` likewise for VIIRS.
-    """
-    if detections.empty:
-        return pd.DataFrame(columns=["modis", "viirs"], dtype=bool)
-    if "sensor_family" not in detections.columns:
-        raise ValueError("detections are missing the required column 'sensor_family'")
-    frame = detections[["sensor_family"]].copy()
-    frame["date"] = _timestamps(detections)
-    frame = frame.dropna(subset=["date"])
-    frame["family"] = frame["sensor_family"].astype(str).str.upper()
-    if frame.empty:
-        return pd.DataFrame(columns=["modis", "viirs"], dtype=bool)
-
-    pivot = (
-        frame.assign(present=1)
-        .pivot_table(
-            index="date", columns="family", values="present", aggfunc="max", fill_value=0
-        )
-    )
-    out = pd.DataFrame(index=pivot.index)
-    zero = pd.Series(0, index=pivot.index, dtype="int64")
-    out["modis"] = (pivot["MODIS"] if "MODIS" in pivot.columns else zero).astype(bool)
-    out["viirs"] = (pivot["VIIRS"] if "VIIRS" in pivot.columns else zero).astype(bool)
-    out.index.name = "date"
-    return out
 
 
 def days_in_bin(year: int, bin_number: int, bin_days: int = BIN_DAYS) -> int:
@@ -126,92 +79,149 @@ def days_in_bin(year: int, bin_number: int, bin_days: int = BIN_DAYS) -> int:
     return max(0, end_doy - start_doy + 1)
 
 
-def source_for(cov_modis: float, cov_viirs: float, cov_min: float = COV_MIN) -> str:
-    """Tag a bin: MODIS, else VIIRS_CAL, else NONE (BRIDGE is not reachable)."""
-    if cov_modis >= cov_min:
+def _stream_flags(day: date, availability: Mapping[str, set[date]]) -> tuple[bool, bool, bool]:
+    """``(mod_t, mod_a, viirs_any)`` availability for one day."""
+    mod_t = "MOD_T" in availability and day in availability["MOD_T"]
+    mod_a = "MOD_A" in availability and day in availability["MOD_A"]
+    viirs = any(
+        day in days
+        for stream, days in availability.items()
+        if STREAM_FAMILY.get(stream) == "VIIRS"
+    )
+    return mod_t, mod_a, viirs
+
+
+def source_for(
+    *,
+    both_frac: float,
+    cov_mod_t: float,
+    cov_mod_a: float,
+    cov_viirs: float,
+    cov_min: float = COV_MIN,
+) -> str:
+    """Tag a bin from the documented coverage rule."""
+    if both_frac >= cov_min:
         return MODIS_SOURCE
+    if max(cov_mod_t, cov_mod_a) >= cov_min:
+        return BRIDGE_SOURCE
     if cov_viirs >= cov_min:
         return VIIRS_SOURCE
     return NONE_SOURCE
 
 
-def coverage_for(cov_modis: float, cov_viirs: float, cov_min: float = COV_MIN) -> float:
+def coverage_for(
+    source: str,
+    *,
+    both_frac: float,
+    cov_mod_t: float,
+    cov_mod_a: float,
+    cov_viirs: float,
+) -> float:
     """The coverage that goes on the payload: the anchoring stream's fraction.
 
-    Under ``NONE`` the value is the best coverage either family reached, which
-    is by definition below ``cov_min``.
+    ``NONE`` falls back to the best MODIS coverage either way, which is by
+    definition below ``cov_min``.
     """
-    source = source_for(cov_modis, cov_viirs, cov_min)
     if source == MODIS_SOURCE:
-        return cov_modis
+        return both_frac
+    if source == BRIDGE_SOURCE:
+        return max(cov_mod_t, cov_mod_a)
     if source == VIIRS_SOURCE:
         return cov_viirs
-    return max(cov_modis, cov_viirs)
+    return max(cov_mod_t, cov_mod_a, cov_viirs)
 
 
 def bin_coverage(
-    detections: pd.DataFrame,
+    availability: Mapping[str, set[date]],
     *,
+    start: date,
+    end: date,
     bin_days: int = BIN_DAYS,
     cov_min: float = COV_MIN,
 ) -> pd.DataFrame:
-    """One row per ``(year, bin)`` present in ``detections``.
+    """One row per ``(year, bin)`` in ``start..end`` inclusive.
 
-    Columns are :data:`COVERAGE_COLUMNS`. A bin that appears at all has at
-    least one observing day by construction; ``cov_modis``/``cov_viirs`` are
-    still guarded against a zero denominator.
+    Columns are :data:`COVERAGE_COLUMNS`. A bin whose every stream is
+    unavailable is still emitted, tagged ``NONE`` with zero coverage, so the
+    caller can hatch it rather than drop it.
     """
-    availability = family_availability(detections)
-    if availability.empty:
+    if end < start:
         return pd.DataFrame(columns=[*COVERAGE_COLUMNS])
 
-    grouped: dict[tuple[int, int], dict[str, Any]] = {}
-    for date, row in availability.iterrows():
-        year = int(date.year)
-        bin_number = bin_of_doy(int(date.dayofyear), bin_days)
-        entry = grouped.setdefault(
+    buckets: dict[tuple[int, int], dict[str, int]] = {}
+    cursor = start
+    while cursor <= end:
+        year = cursor.year
+        bin_number = bin_of_doy(cursor.timetuple().tm_yday, bin_days)
+        entry = buckets.setdefault(
             (year, bin_number),
-            {
-                "n_days": days_in_bin(year, bin_number, bin_days),
-                "observed_days": 0,
-                "modis_days": 0,
-                "viirs_days": 0,
-            },
+            {"window_days": 0, "mod_t": 0, "mod_a": 0, "both": 0, "modis": 0, "viirs": 0},
         )
-        entry["observed_days"] += 1
-        entry["modis_days"] += int(bool(row["modis"]))
-        entry["viirs_days"] += int(bool(row["viirs"]))
+        mod_t, mod_a, viirs = _stream_flags(cursor, availability)
+        entry["window_days"] += 1
+        entry["mod_t"] += int(mod_t)
+        entry["mod_a"] += int(mod_a)
+        entry["both"] += int(mod_t and mod_a)
+        entry["modis"] += int(mod_t or mod_a)
+        entry["viirs"] += int(viirs)
+        cursor += timedelta(days=1)
 
     records: list[dict[str, Any]] = []
-    for (year, bin_number), entry in sorted(grouped.items()):
-        observed = entry["observed_days"]
-        cov_modis = round(entry["modis_days"] / observed, ROUND_DP) if observed else 0.0
-        cov_viirs = round(entry["viirs_days"] / observed, ROUND_DP) if observed else 0.0
+    for (year, bin_number), entry in sorted(buckets.items()):
+        window = entry["window_days"]
+        div = window if window else 1
+        cov_mod_t = round(entry["mod_t"] / div, ROUND_DP)
+        cov_mod_a = round(entry["mod_a"] / div, ROUND_DP)
+        both_frac = round(entry["both"] / div, ROUND_DP)
+        cov_modis = round(entry["modis"] / div, ROUND_DP)
+        cov_viirs = round(entry["viirs"] / div, ROUND_DP)
+        source = source_for(
+            both_frac=both_frac,
+            cov_mod_t=cov_mod_t,
+            cov_mod_a=cov_mod_a,
+            cov_viirs=cov_viirs,
+            cov_min=cov_min,
+        )
         records.append(
             {
                 "year": year,
                 "bin": bin_number,
-                "n_days": entry["n_days"],
-                "observed_days": observed,
-                "modis_days": entry["modis_days"],
-                "viirs_days": entry["viirs_days"],
+                "n_days": days_in_bin(year, bin_number, bin_days),
+                "window_days": window,
+                "mod_t_days": entry["mod_t"],
+                "mod_a_days": entry["mod_a"],
+                "both_days": entry["both"],
+                "both_frac": both_frac,
+                "cov_mod_t": cov_mod_t,
+                "cov_mod_a": cov_mod_a,
                 "cov_modis": cov_modis,
                 "cov_viirs": cov_viirs,
-                "coverage": round(coverage_for(cov_modis, cov_viirs, cov_min), ROUND_DP),
-                "source": source_for(cov_modis, cov_viirs, cov_min),
+                "coverage": round(
+                    coverage_for(
+                        source,
+                        both_frac=both_frac,
+                        cov_mod_t=cov_mod_t,
+                        cov_mod_a=cov_mod_a,
+                        cov_viirs=cov_viirs,
+                    ),
+                    ROUND_DP,
+                ),
+                "source": source,
             }
         )
     return pd.DataFrame.from_records(records, columns=[*COVERAGE_COLUMNS])
 
 
 def coverage_index(
-    detections: pd.DataFrame,
+    availability: Mapping[str, set[date]],
     *,
+    start: date,
+    end: date,
     bin_days: int = BIN_DAYS,
     cov_min: float = COV_MIN,
 ) -> dict[tuple[int, int], tuple[float, str]]:
     """Map ``(year, bin)`` -> ``(coverage, source)`` for a date lookup."""
-    table = bin_coverage(detections, bin_days=bin_days, cov_min=cov_min)
+    table = bin_coverage(availability, start=start, end=end, bin_days=bin_days, cov_min=cov_min)
     return {
         (int(row.year), int(row.bin)): (float(row.coverage), str(row.source))
         for row in table.itertuples()
@@ -219,14 +229,13 @@ def coverage_index(
 
 
 def coverage_for_date(
-    index: dict[tuple[int, int], tuple[float, str]],
+    index: Mapping[tuple[int, int], tuple[float, str]],
     date: object,
     bin_days: int = BIN_DAYS,
 ) -> tuple[float, str]:
     """Coverage and source for the bin containing ``date``.
 
-    A date with no entry has no observing day, so it is uncovered: coverage
-    ``0.0`` and source ``NONE``.
+    A date outside the indexed window is uncovered: ``0.0`` and ``NONE``.
     """
     stamp = pd.Timestamp(date)
     key = (int(stamp.year), bin_of_doy(int(stamp.dayofyear), bin_days))
@@ -247,6 +256,5 @@ __all__: Iterable[str] = (
     "coverage_for_date",
     "coverage_index",
     "days_in_bin",
-    "family_availability",
     "source_for",
 )

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import math
+from datetime import date
 from pathlib import Path
 
 import jsonschema
@@ -19,7 +20,9 @@ import pandas as pd
 import pytest
 
 from src.compute import coverage, export, harmonize
+from src.compute.availability import availability_table
 from src.compute.series_util import bin_of_doy
+from src.demo import demo_detections
 from tests.synthetic import synthetic_detections
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -128,9 +131,27 @@ def test_series_rows_carry_s7_coverage_and_source(detections):
 def test_series_coverage_equals_the_s7_stage(detections):
     """The payload must not re-derive coverage; it must be the stage's output."""
     payload = export.build_series(detections)
-    index = coverage.coverage_index(detections)
+    start, end = (date.fromisoformat(value) for value in payload["meta"]["date_range"])
+    index = coverage.coverage_index(availability_table(start, end), start=start, end=end)
     for row in payload["series"]:
         assert (row["coverage"], row["source"]) == coverage.coverage_for_date(index, row["date"])
+
+
+def test_series_is_continuous_so_an_outage_bin_still_has_rows(detections):
+    """A day with no detections is a zero count, not a missing day."""
+    payload = export.build_series(detections)
+    assert len(payload["series"]) == 120
+
+
+def test_viirs_anchored_bins_are_calibrated_to_the_modis_scale():
+    """During a MODIS outage the bin is VIIRS_CAL and S8 scales its VIIRS count."""
+    detections = harmonize.harmonize(demo_detections(days=365, start=date(2019, 1, 1)))
+    payload = export.build_series(detections)
+    viirs_rows = [row for row in payload["series"] if row["source"] == "VIIRS_CAL"]
+    assert viirs_rows, "the June MODIS outage must produce VIIRS_CAL bins"
+    for row in viirs_rows:
+        assert row["harm_total"] == row["harm_modis"] + row["harm_viirs"]
+        assert row["harm_viirs"] >= 0
 
 
 def test_cells_payload_matches_the_contract(detections):

@@ -57,6 +57,25 @@ class Dataset:
     path: str
 
 
+def _connection() -> duckdb.DuckDBPyConnection:
+    """The process-wide read-only connection, opened on first use.
+
+    A connection costs tens of milliseconds to open, which dominated the
+    single-file read; reusing one removes that fixed cost. DuckDB connections
+    are not thread-safe, so every use is serialised on :data:`_connection_lock`.
+    """
+    global _connection_handle
+    if _connection_handle is None:
+        _connection_handle = duckdb.connect(database=":memory:")
+        _connection_handle.execute("SET enable_progress_bar = false")
+    return _connection_handle
+
+
+#: Set by :func:`_connection`; ``None`` until the first read.
+_connection_handle: duckdb.DuckDBPyConnection | None = None
+_connection_lock = Lock()
+
+
 def read_parquet(pattern: str) -> pd.DataFrame:
     """Read one parquet file, or every file a glob matches, through DuckDB.
 
@@ -64,12 +83,8 @@ def read_parquet(pattern: str) -> pd.DataFrame:
     in one query, so a multi-file cache no longer needs a hand-rolled
     ``pd.concat``. The read is in-memory, read-only and network-free.
     """
-    connection = duckdb.connect(database=":memory:")
-    try:
-        connection.execute("SET enable_progress_bar = false")
-        return connection.execute("SELECT * FROM read_parquet(?)", [pattern]).df()
-    finally:
-        connection.close()
+    with _connection_lock:
+        return _connection().execute("SELECT * FROM read_parquet(?)", [pattern]).df()
 
 
 def _read_cache() -> tuple[pd.DataFrame, str] | None:

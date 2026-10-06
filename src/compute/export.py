@@ -27,7 +27,8 @@ import numpy as np
 import pandas as pd
 
 from src.acquire import firms
-from src.compute import anomaly, coverage, harmonize, schema, season, validate
+from src.compute import anomaly, calibrate, coverage, harmonize, schema, season, validate
+from src.compute.availability import availability_table
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT_DIR = REPO_ROOT / "web" / "public" / "data"
@@ -234,6 +235,26 @@ def build_meta_response(detections: pd.DataFrame, **kwargs: Any) -> dict[str, An
     }
 
 
+def _continuous_daily(daily: pd.DataFrame, start: date, end: date) -> pd.DataFrame:
+    """Reindex a daily series onto every day in ``start..end``, filling zero.
+
+    A day with no detections is a count of zero, not a missing day, so an
+    outage bin still has rows to hatch rather than vanishing from the calendar.
+    """
+    columns = [
+        "raw_modis",
+        "raw_viirs",
+        "raw_total",
+        "harm_modis",
+        "harm_viirs",
+        "harm_total",
+    ]
+    days = pd.date_range(start, end, freq="D", name="date")
+    if daily.empty:
+        return pd.DataFrame(0, index=days, columns=columns).reset_index()
+    return daily.set_index("date").reindex(days, fill_value=0).astype("int64").reset_index()
+
+
 def build_series(detections: pd.DataFrame, **kwargs: Any) -> dict[str, Any]:
     """``GET /api/v1/series`` payload: daily counts, one row per calendar day.
 
@@ -242,17 +263,29 @@ def build_series(detections: pd.DataFrame, **kwargs: Any) -> dict[str, Any]:
 
     Each row also carries S7 ``coverage`` and ``source`` for the eight-day bin
     it falls in (docs/TESTING.md §7). Coverage and source are properties of the
-    bin, so every day in a bin reports the same pair.
+    bin, so every day in a bin reports the same pair. A row whose bin is
+    ``VIIRS_CAL`` has its VIIRS counts scaled to the MODIS reference by the S8
+    factor, so the tag means calibration was applied.
     """
     kwargs.setdefault("date_range", detections_date_range(detections))
+    start = date.fromisoformat(kwargs["date_range"][0])
+    end = date.fromisoformat(kwargs["date_range"][1])
+    availability = availability_table(start, end)
+    index = coverage.coverage_index(availability, start=start, end=end)
+    factors = calibrate.factor_by_month(detections)
+
+    daily = _continuous_daily(harmonize.daily_series(detections), start, end)
     rows = [
         {key: _native(value) for key, value in row.items()}
-        for row in harmonize.daily_series(detections).to_dict(orient="records")
+        for row in daily.to_dict(orient="records")
     ]
-    index = coverage.coverage_index(detections)
     for row in rows:
         stamp = pd.Timestamp(row["date"])
         coverage_value, source = coverage.coverage_for_date(index, stamp)
+        if source == coverage.VIIRS_SOURCE:
+            factor = factors.get(int(stamp.month), calibrate.NEUTRAL_FACTOR)
+            row["harm_viirs"] = calibrate.calibrate_viirs(float(row["harm_viirs"]), factor)
+            row["harm_total"] = int(row["harm_modis"]) + int(row["harm_viirs"])
         row["date"] = stamp.strftime("%Y-%m-%d")
         row["coverage"] = coverage_value
         row["source"] = source
@@ -509,6 +542,12 @@ def build_methods(
             "Suomi-NPP VIIRS data ends 1 Nov 2026; NASA stops serving it after that date.",
             "MODIS is being retired; prefer VIIRS on NOAA-20 and NOAA-21 for continuity.",
             "Sensor epoch dates are placeholders pending verification against FIRMS docs.",
+            (
+                "VIIRS-anchored bins (source VIIRS_CAL) are scaled to the MODIS reference by "
+                "the S8 multiplicative factor (kappa=50, 1-degree tiles); MODIS-anchored bins "
+                "use the cell-day collapse. Bins below the 0.75 coverage threshold are tagged "
+                "NONE."
+            ),
         ],
         "datasets": [
             {

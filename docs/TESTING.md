@@ -119,8 +119,11 @@ Output: synthetic `det.parquet` matching the normalized detection schema.
   - Every response includes `params_hash`.
   - Invalid AOI → HTTP 422 with `{code, message, field}`.
   - `/api/v1/series` bins carry `coverage` and `source`. Coverage is the
-    anchoring stream's share of the bin's observing days; `source` is
-    `MODIS` | `BRIDGE` | `VIIRS_CAL` | `NONE` (see `src/compute/coverage.py`).
+    anchoring stream's share of the bin's days, from the availability calendar
+    (product epochs minus the outage table); `source` is `MODIS` | `BRIDGE` |
+    `VIIRS_CAL` | `NONE` (`src/compute/availability.py`,
+    `src/compute/coverage.py`). A `VIIRS_CAL` bin is scaled to the MODIS
+    reference by the S8 factor (`src/compute/calibrate.py`).
 - The schema is the single source of truth; fix shape differences in code, never
   by loosening the schema.
 
