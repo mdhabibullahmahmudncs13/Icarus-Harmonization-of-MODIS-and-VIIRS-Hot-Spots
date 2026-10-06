@@ -226,7 +226,9 @@ Status:
 - [x] Overlap validation and cell-size sweep
 - [x] Unit edges, property invariants (idempotence, row-order, duplicates), golden scenario
 - [x] Golden files committed as fixtures (`tests/golden/*.json`, guarded by `tests/test_golden.py`)
-- [ ] Coverage/bridge stages (S7/S8) — those belong to the calibration work, not this phase
+- [x] Coverage stage (S7) — per-bin family coverage and `MODIS`/`VIIRS_CAL`/`NONE`
+      source tagging (`src/compute/coverage.py`)
+- [ ] Bridge/calibration stages (S8) — those belong to the calibration work, not this phase
 
 The goldens cover both canonical inputs: the step scenario (series, cells,
 seasonal baseline, critical period) and the two overlap validators
@@ -273,7 +275,8 @@ Artifacts:
 | Artifact | Path | Purpose |
 |----------|------|---------|
 | Routes | `src/api/main.py` | Nine payloads under `/api/v1`, unversioned aliases kept |
-| Data tier | `src/api/dataset.py` | Cache-then-fixture resolution, `OFFLINE=1` forces the fixture |
+| Data tier | `src/api/dataset.py` | Cache-then-fixture resolution through DuckDB, `OFFLINE=1` forces the fixture |
+| Coverage stage | `src/compute/coverage.py` | S7: per-bin coverage and source tagging |
 | Payload builders | `src/compute/export.py` | The contract JSON, shared with the static export |
 | AOI presets | `src/aoi_presets.json` | One preset list for the API and the mock generator |
 | Contract tests | `tests/test_api.py`, `tests/test_export.py` | Every payload against `$defs` |
@@ -299,8 +302,9 @@ Status:
       query parameters; body and query share one validator
 - [x] Every failure is `{code, message, field}` (422 `unknown_aoi`,
       `unsupported_metric`, `invalid_bbox`, `invalid_window`, `invalid_request`)
-- [ ] DuckDB queries — the data tier still reads parquet through pandas
-- [ ] Coverage/`source` per bin (`docs/TESTING.md` §9) — needs the S7 stage
+- [x] DuckDB data tier — the cache and the fixture are read through DuckDB's
+      `read_parquet`, which also unions a multi-file cache glob in one query
+- [x] Coverage/`source` per bin (`docs/TESTING.md` §7) — the S7 stage
 - [ ] `metric=density` is refused rather than served: the density series does not
       exist yet, and `metric=cell_days` is the only implemented metric
 
@@ -320,6 +324,32 @@ allow. The first implementation of `build_critical_period` invented a zero
 window and failed validation; it now emits `null` with
 `insufficient_activity: true`, matching the contract. The only change to
 `docs/contract.schema.json` is the removal of the `definitions` alias.
+
+**S7 coverage (`src/compute/coverage.py`).** The series stage now emits the
+coverage the calendar needs to hatch a bin instead of reading it as a zero.
+Coverage is computed over the bin's **observing days** — the days the bin had
+any detection — because availability in the spec is an acquisition fact
+(`a(s, d)` from an `avail`/outage table) this pipeline does not yet ingest;
+the detections only carry which days a stream actually reported. ``n_days`` is
+still reported. Two honest limits are recorded rather than papered over:
+`BRIDGE` is in the contract's vocabulary but never emitted, because a bridge
+factor needs one MODIS satellite separated from the pair and the acquisition
+table exposes MODIS only as the combined `Terra+Aqua` product; and
+`VIIRS_CAL` currently records that VIIRS met coverage, not that S8 calibration
+was applied — S8 does not exist yet. The contract change is additive and
+required: `$defs/binSource` plus `coverage`/`source` on `seriesPoint`, carried
+through the mock generator, the goldens (`coverage_bins.json`), the frontend
+types and `aggregateToBins`, so an unobserved bin is never shown as zero.
+
+**DuckDB data tier (no behavioural gain, by measurement).** The cache and the
+fixture are now read through DuckDB rather than `pd.concat(pd.read_parquet)`.
+On the committed fixture DuckDB is the slower reader (~21 ms vs ~2 ms per
+cold read, the cost is per-connection) but its cost is flat as the cache glob
+grows, where pandas scales — ~19 ms vs ~10 ms over an eight-file cache — and
+the dataset is read once per process behind the existing cache. The change is
+an infrastructure swap requested explicitly, not a bug fix; the resolution
+order, `meta.source` values and `NoDataError`→503 behaviour are unchanged and
+covered by `tests/test_dataset.py` plus `tests/test_api.py`.
 
 Verified this session: `make lint` clean; 201 tests pass. `OFFLINE=1` uvicorn
 served all nine `/api/v1` routes plus `/api/meta`, each validated against

@@ -1,7 +1,8 @@
 """Resolve the detections this API serves — offline-first, cache before fixture.
 
 Track B contract server. The API never touches the network; it reads local
-parquet and hands the result to the payload builders in :mod:`src.compute.export`.
+parquet through DuckDB and hands the result to the payload builders in
+:mod:`src.compute.export`.
 Where the bytes came from is carried on every response as ``meta.source``:
 
 * ``"cache"`` — detections written by the tracker's ``make cache`` target.
@@ -26,6 +27,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from threading import Lock
 
+import duckdb
 import pandas as pd
 
 from src.acquire import safe
@@ -55,13 +57,28 @@ class Dataset:
     path: str
 
 
+def read_parquet(pattern: str) -> pd.DataFrame:
+    """Read one parquet file, or every file a glob matches, through DuckDB.
+
+    DuckDB's ``read_parquet`` takes a glob and unions the files by column name
+    in one query, so a multi-file cache no longer needs a hand-rolled
+    ``pd.concat``. The read is in-memory, read-only and network-free.
+    """
+    connection = duckdb.connect(database=":memory:")
+    try:
+        connection.execute("SET enable_progress_bar = false")
+        return connection.execute("SELECT * FROM read_parquet(?)", [pattern]).df()
+    finally:
+        connection.close()
+
+
 def _read_cache() -> tuple[pd.DataFrame, str] | None:
-    """Concatenate the raw parquet written by the acquisition layer."""
+    """Read the raw parquet written by the acquisition layer."""
     pattern = str(safe.CACHE_DIR / "raw" / "*.parquet")
     files = sorted(globlib.glob(pattern))
     if not files:
         return None
-    frame = pd.concat([pd.read_parquet(path) for path in files], ignore_index=True)
+    frame = read_parquet(pattern)
     return frame, f"{len(files)} file(s) under {pattern}"
 
 
@@ -70,7 +87,7 @@ def _read_fixture() -> tuple[pd.DataFrame, str] | None:
     path = safe.FIXTURE_DIR / FIXTURE_NAME
     if not path.exists():
         return None
-    return pd.read_parquet(path), str(path)
+    return read_parquet(str(path)), str(path)
 
 
 def _continuous(series: pd.Series) -> pd.Series:
@@ -144,5 +161,6 @@ __all__ = [
     "NoDataError",
     "get_dataset",
     "load_dataset",
+    "read_parquet",
     "reset_dataset_cache",
 ]

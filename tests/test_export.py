@@ -18,7 +18,8 @@ import jsonschema
 import pandas as pd
 import pytest
 
-from src.compute import export, harmonize
+from src.compute import coverage, export, harmonize
+from src.compute.series_util import bin_of_doy
 from tests.synthetic import synthetic_detections
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -106,6 +107,30 @@ def test_series_payload_matches_the_contract(detections):
     assert payload["series"], "the synthetic data has detections"
     first = payload["series"][0]
     assert first["raw_total"] == first["raw_modis"] + first["raw_viirs"]
+
+
+def test_series_rows_carry_s7_coverage_and_source(detections):
+    """docs/TESTING.md §7: /api/v1/series bins carry coverage and source."""
+    payload = export.build_series(detections)
+    seen: dict[tuple[int, int], tuple[float, str]] = {}
+    for row in payload["series"]:
+        assert 0.0 <= row["coverage"] <= 1.0
+        assert row["source"] in set(coverage.SOURCES)
+        key = (int(row["date"][:4]), bin_of_doy(pd.Timestamp(row["date"]).dayofyear))
+        # Coverage and source are properties of the bin, so every day in one
+        # eight-day bin reports the same pair.
+        assert seen.setdefault(key, (row["coverage"], row["source"])) == (
+            row["coverage"],
+            row["source"],
+        )
+
+
+def test_series_coverage_equals_the_s7_stage(detections):
+    """The payload must not re-derive coverage; it must be the stage's output."""
+    payload = export.build_series(detections)
+    index = coverage.coverage_index(detections)
+    for row in payload["series"]:
+        assert (row["coverage"], row["source"]) == coverage.coverage_for_date(index, row["date"])
 
 
 def test_cells_payload_matches_the_contract(detections):

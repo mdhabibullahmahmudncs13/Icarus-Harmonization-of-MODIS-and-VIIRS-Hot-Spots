@@ -36,6 +36,7 @@ WINDOW = (date(2010, 1, 1), date(2016, 12, 31))
 VIIRS_START = date(2012, 1, 20)
 MIN_CONFIDENCE = 50
 CONF_MAP = {"low": 25, "nominal": 60, "high": 90}
+COV_MIN = 0.75  # S7 minimum coverage fraction (docs/PARAMETERS.md)
 GENERATED_AT = "2026-10-05T00:00:00Z"  # fixed for byte-stable output
 COLLAPSE_RULE = "harmonized = distinct 5.5 km cell-days per day; a cell is one row"
 
@@ -112,6 +113,51 @@ def params_hash() -> str:
         separators=(",", ":"),
     ).encode()
     return hashlib.sha256(payload).hexdigest()[:12]
+
+
+def bin_source(cov_modis: float, cov_viirs: float, cov_min: float = COV_MIN) -> str:
+    """S7 source tag: MODIS, else VIIRS_CAL, else NONE (BRIDGE is reserved)."""
+    if cov_modis >= cov_min:
+        return "MODIS"
+    if cov_viirs >= cov_min:
+        return "VIIRS_CAL"
+    return "NONE"
+
+
+def attach_coverage(days: list[date], day_sets: list[tuple[set, set]], daily: list[dict]) -> None:
+    """Attach per-bin S7 ``coverage``/``source`` to each daily series row.
+
+    Coverage is computed over the bin's observing days (days with any
+    detection); see ``src/compute/coverage.py`` for the definition. The mock
+    mirrors that stage so the mock payload and the API cannot drift.
+    """
+    groups: dict[tuple[int, int], dict[str, int]] = {}
+    for day, (modis, viirs) in zip(days, day_sets):
+        key = (day.year, min((day.timetuple().tm_yday - 1) // 8 + 1, 46))
+        entry = groups.setdefault(key, {"observed": 0, "modis": 0, "viirs": 0})
+        if modis or viirs:
+            entry["observed"] += 1
+            entry["modis"] += int(bool(modis))
+            entry["viirs"] += int(bool(viirs))
+    resolved: dict[tuple[int, int], tuple[float, str]] = {}
+    for key, entry in groups.items():
+        observed = entry["observed"]
+        cov_modis = entry["modis"] / observed if observed else 0.0
+        cov_viirs = entry["viirs"] / observed if observed else 0.0
+        source = bin_source(cov_modis, cov_viirs)
+        coverage = (
+            cov_modis
+            if source == "MODIS"
+            else cov_viirs
+            if source == "VIIRS_CAL"
+            else max(cov_modis, cov_viirs)
+        )
+        resolved[key] = (round(coverage, 4), source)
+    for day, row in zip(days, daily):
+        key = (day.year, min((day.timetuple().tm_yday - 1) // 8 + 1, 46))
+        coverage, source = resolved[key]
+        row["coverage"] = coverage
+        row["source"] = source
 
 
 def seasonal(doy: int) -> float:
@@ -206,6 +252,8 @@ def simulate() -> dict:
             }
         )
         day_sets.append((modis_set, viirs_set))
+
+    attach_coverage(days, day_sets, daily)
 
     return {
         "cells": cells,

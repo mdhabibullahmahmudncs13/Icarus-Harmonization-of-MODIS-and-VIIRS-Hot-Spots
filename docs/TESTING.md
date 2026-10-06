@@ -43,7 +43,8 @@ Required coverage of edge cases:
 - **Quality filter:** confidence 29 vs 30; MODIS `hs_type` null / 0 / 2 / 3;
   VIIRS classes l / n / h.
 - **Binning:** day-of-year 1, 8, 9, 365, 366 → bins 1, 1, 2, 46, 46.
-- **Coverage:** full, partial, and zero availability; outage in a bin.
+- **Coverage:** full, partial, and zero availability; outage in a bin
+  (`src/compute/coverage.py`, `tests/test_coverage.py`).
 - **Calibration:** `V(t, m) = 0` falls back to the regional ratio; shrinkage
   behaviour as counts grow.
 - **Anomaly:** `sigma_floor` used when variance is near zero; target year
@@ -117,8 +118,9 @@ Output: synthetic `det.parquet` matching the normalized detection schema.
 - Required assertions:
   - Every response includes `params_hash`.
   - Invalid AOI → HTTP 422 with `{code, message, field}`.
-  - `/api/v1/series` bins carry `coverage` and `source`.
-  - `source ∈ {MODIS, BRIDGE, VIIRS_CAL, NONE}`.
+  - `/api/v1/series` bins carry `coverage` and `source`. Coverage is the
+    anchoring stream's share of the bin's observing days; `source` is
+    `MODIS` | `BRIDGE` | `VIIRS_CAL` | `NONE` (see `src/compute/coverage.py`).
 - The schema is the single source of truth; fix shape differences in code, never
   by loosening the schema.
 

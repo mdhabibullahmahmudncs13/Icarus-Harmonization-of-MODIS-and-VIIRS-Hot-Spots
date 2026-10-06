@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 
 from src.acquire import firms
-from src.compute import anomaly, harmonize, schema, season, validate
+from src.compute import anomaly, coverage, harmonize, schema, season, validate
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT_DIR = REPO_ROOT / "web" / "public" / "data"
@@ -239,14 +239,23 @@ def build_series(detections: pd.DataFrame, **kwargs: Any) -> dict[str, Any]:
 
     ``metric`` is ``cell_days`` and ``bin_days`` is 1 because the series is not
     binned; an 8-day view would be a different payload, not a different flag.
+
+    Each row also carries S7 ``coverage`` and ``source`` for the eight-day bin
+    it falls in (docs/TESTING.md §7). Coverage and source are properties of the
+    bin, so every day in a bin reports the same pair.
     """
     kwargs.setdefault("date_range", detections_date_range(detections))
     rows = [
         {key: _native(value) for key, value in row.items()}
         for row in harmonize.daily_series(detections).to_dict(orient="records")
     ]
+    index = coverage.coverage_index(detections)
     for row in rows:
-        row["date"] = pd.Timestamp(row["date"]).strftime("%Y-%m-%d")
+        stamp = pd.Timestamp(row["date"])
+        coverage_value, source = coverage.coverage_for_date(index, stamp)
+        row["date"] = stamp.strftime("%Y-%m-%d")
+        row["coverage"] = coverage_value
+        row["source"] = source
     return {
         "meta": build_meta(**kwargs),
         "metric": "cell_days",

@@ -7,6 +7,18 @@ report the API contract needs.
 
 from .anomaly import anomaly, anomaly_payload, anomaly_report
 from .baseline import doy, percentile, seasonal_baseline
+from .coverage import (
+    COV_MIN,
+    COVERAGE_COLUMNS,
+    SOURCES,
+    bin_coverage,
+    coverage_for,
+    coverage_for_date,
+    coverage_index,
+    days_in_bin,
+    family_availability,
+    source_for,
+)
 from .grid import (
     MODIS_MASK,
     STREAM_BITS,
@@ -71,6 +83,8 @@ from .validate import (
 __all__ = [
     "BIN_DAYS",
     "CANONICAL_COLUMNS",
+    "COVERAGE_COLUMNS",
+    "COV_MIN",
     "DEFAULT_CELL_KM",
     "DEFAULT_WINDOW_DAYS",
     "MIN_CONFIDENCE",
@@ -78,6 +92,7 @@ __all__ = [
     "MODIS_MASK",
     "REFERENCE_LATITUDE_DEG",
     "REQUIRED_COLUMNS",
+    "SOURCES",
     "STREAM_BITS",
     "VIIRS",
     "VIIRS_CONFIDENCE_MAP",
@@ -91,6 +106,7 @@ __all__ = [
     "anomaly_report",
     "anomaly_score",
     "baseline_percentiles",
+    "bin_coverage",
     "bin_of_doy",
     "cell_bounds",
     "cell_id",
@@ -99,11 +115,16 @@ __all__ = [
     "confidence_mapping",
     "confidence_to_numeric",
     "correlation_stats",
+    "coverage_for",
+    "coverage_for_date",
+    "coverage_index",
     "critical_period",
     "daily_series",
+    "days_in_bin",
     "degrees_per_lat",
     "degrees_per_lon",
     "doy",
+    "family_availability",
     "family_daily_frames",
     "family_date_range",
     "grid_index",
@@ -123,6 +144,7 @@ __all__ = [
     "ranks",
     "raw_series",
     "seasonal_baseline",
+    "source_for",
     "spearman",
     "to_cells",
     "to_grid",

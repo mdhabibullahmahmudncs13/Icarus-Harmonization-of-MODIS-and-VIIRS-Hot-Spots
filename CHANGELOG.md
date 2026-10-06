@@ -36,9 +36,20 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   never be labelled with another tier's name, plus the release guard that stops
   a release build from shipping on non-evidence data (`npm run build:release`
   fails unless `VITE_DATA=api`).
+- `src/compute/coverage.py` — the S7 availability/coverage stage: per-bin family
+  coverage and `MODIS`/`VIIRS_CAL`/`NONE` source tagging (`BRIDGE` is in the
+  vocabulary but not yet reachable). `docs/contract.schema.json` gains
+  `$defs/binSource` and `coverage`/`source` on `seriesPoint`; the mock
+  generator, the `coverage_bins.json` golden, the frontend types and
+  `aggregateToBins` all carry them, so the calendar hatches an under-observed
+  bin instead of reading it as zero activity.
 
 ### Changed
 
+- The API data tier reads parquet through DuckDB (`read_parquet`) instead of a
+  hand-rolled `pd.concat`; a multi-file cache glob is unioned in one query.
+  Resolution order, `meta.source` values and the `NoDataError` → 503 behaviour
+  are unchanged.
 - The API's analysis endpoints honour a JSON body: `aoi`, `date` and `bbox`
   override the query parameters, and `metric`/`view` are validated so a caller
   cannot believe they changed anything. `metric=density` is refused rather than

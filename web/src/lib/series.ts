@@ -1,7 +1,7 @@
 // Pure functions for the burning-activity calendar and series.
 // No I/O, no framework — unit-tested in tests/.
 
-import type { Mode, SeriesPoint } from '../contract/types';
+import type { BinSource, Mode, SeriesPoint } from '../contract/types';
 
 export interface Bin {
   year: number;
@@ -10,7 +10,8 @@ export interface Bin {
   end: string; // ISO date (inclusive)
   raw: number;
   harmonized: number;
-  coverage: number; // 0..1 (mock reports 1.0 for observed bins)
+  coverage: number; // S7, 0..1; below 0.75 hatches
+  source: BinSource;
 }
 
 export function doyFromISO(date: string): number {
@@ -59,7 +60,10 @@ export function aggregateToBins(rows: SeriesPoint[], binDays = 8): Bin[] {
         end: binEndISO(year, bin, binDays),
         raw: 0,
         harmonized: 0,
-        coverage: 1,
+        // S7 coverage and source are properties of the bin, so every day in a
+        // bin carries the same pair; take it from the first row.
+        coverage: row.coverage,
+        source: row.source,
       };
       byKey.set(key, entry);
     }

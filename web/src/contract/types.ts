@@ -22,6 +22,9 @@ export interface MetaPayload {
   streams: string[];
 }
 
+/** The observing stream a series bin is anchored on (S7). */
+export type BinSource = 'MODIS' | 'BRIDGE' | 'VIIRS_CAL' | 'NONE';
+
 export interface SeriesPoint {
   date: string;
   raw_modis: number;
@@ -30,6 +33,9 @@ export interface SeriesPoint {
   harm_modis: number;
   harm_viirs: number;
   harm_total: number;
+  /** S7 coverage of the eight-day bin this day falls in, 0..1. */
+  coverage: number;
+  source: BinSource;
 }
 
 export interface SeriesPayload {

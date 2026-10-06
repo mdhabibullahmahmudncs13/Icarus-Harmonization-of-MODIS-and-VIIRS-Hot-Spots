@@ -46,6 +46,8 @@ from src.compute import (
     to_series,
     validate_overlap,
 )
+from src.compute.coverage import bin_coverage
+from src.compute.harmonize import harmonize
 from src.demo import identical_cell_days, synthetic_detections
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -162,6 +164,49 @@ def noisy_overlap_payload() -> dict[str, Any]:
     return validate_overlap(detections, cell_km=5.5).as_dict()
 
 
+#: Two 8-day bins of the 240-day synthetic span in which MODIS is silenced, so
+#: the golden exercises the ``VIIRS_CAL`` source tag as well as ``MODIS``.
+MODIS_OUTAGE_DAYS = slice(64, 80)
+
+
+def coverage_detections() -> Any:
+    """Synthetic detections with a MODIS outage over two bins.
+
+    A real observing gap is what coverage exists to expose. Dropping MODIS for
+    sixteen days makes those bins fall back to VIIRS, so the golden records a
+    payload with more than one source class rather than a uniform 1.0.
+    """
+    frame = synthetic_detections(days=240)
+    dates = sorted({str(value) for value in frame["acq_date"].tolist()})
+    outage = set(dates[MODIS_OUTAGE_DAYS])
+    drop = (frame["instrument"] == "MODIS") & frame["acq_date"].isin(outage)
+    return frame[~drop].reset_index(drop=True)
+
+
+def coverage_payload() -> list[dict[str, Any]]:
+    """S7 per-bin coverage and source over the synthetic detections.
+
+    Frozen as a golden so a change to the coverage definition or its source
+    tagging fails a test instead of silently re-hatching the calendar.
+    """
+    table = bin_coverage(harmonize(coverage_detections()))
+    return [
+        {
+            "year": int(row.year),
+            "bin": int(row.bin),
+            "n_days": int(row.n_days),
+            "observed_days": int(row.observed_days),
+            "modis_days": int(row.modis_days),
+            "viirs_days": int(row.viirs_days),
+            "cov_modis": float(row.cov_modis),
+            "cov_viirs": float(row.cov_viirs),
+            "coverage": float(row.coverage),
+            "source": str(row.source),
+        }
+        for row in table.itertuples()
+    ]
+
+
 def build() -> dict[str, Any]:
     """Every golden keyed by file stem (``<stem>.json``)."""
     step = step_payloads()
@@ -174,6 +219,7 @@ def build() -> dict[str, Any]:
         "step_critical_period": step["critical_period"],
         "identical_overlap": identical,
         "noisy_overlap": noisy,
+        "coverage_bins": coverage_payload(),
         "headline": {
             **step["headline"],
             "identical_overlap": {

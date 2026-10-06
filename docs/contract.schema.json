@@ -13,6 +13,16 @@
         "live"
       ]
     },
+    "binSource": {
+      "type": "string",
+      "enum": [
+        "MODIS",
+        "BRIDGE",
+        "VIIRS_CAL",
+        "NONE"
+      ],
+      "description": "Which observing stream anchors a series bin (S7, docs/DATA_DICTIONARY.md §5)."
+    },
     "bbox": {
       "type": "array",
       "items": {
@@ -156,7 +166,9 @@
         "raw_total",
         "harm_modis",
         "harm_viirs",
-        "harm_total"
+        "harm_total",
+        "coverage",
+        "source"
       ],
       "properties": {
         "date": {
@@ -186,6 +198,14 @@
         "harm_total": {
           "type": "integer",
           "minimum": 0
+        },
+        "coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "source": {
+          "$ref": "#/$defs/binSource"
         }
       },
       "additionalProperties": false

@@ -40,7 +40,7 @@ export function CalendarHeatmap({
                     style={{ background: low ? undefined : rampColor(t) }}
                     title={`${year} bin ${bin} · ${b.start} → ${b.end} · ${value} ${
                       mode === 'raw' ? 'detections' : 'cell-days'
-                    } · coverage ${(b.coverage * 100).toFixed(0)}%`}
+                    } · coverage ${(b.coverage * 100).toFixed(0)}% · ${b.source}`}
                     onClick={() => onSelect?.(b.start)}
                     aria-label={`${year} bin ${bin}`}
                   />

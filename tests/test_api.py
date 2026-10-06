@@ -203,6 +203,9 @@ def test_series_rows_are_internally_consistent(client: TestClient):
         # the total is bounded by max(...) <= total <= sum(...).
         per_family = row["harm_modis"] + row["harm_viirs"]
         assert max(row["harm_modis"], row["harm_viirs"]) <= row["harm_total"] <= per_family
+        # S7: every bin names its observing coverage and the stream anchoring it.
+        assert 0.0 <= row["coverage"] <= 1.0
+        assert row["source"] in {"MODIS", "BRIDGE", "VIIRS_CAL", "NONE"}
 
 
 def test_methods_cites_every_dataset_with_a_url(client: TestClient):

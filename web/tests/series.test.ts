@@ -20,6 +20,8 @@ const row = (date: string, raw: number, harm: number): SeriesPoint => ({
   harm_modis: harm,
   harm_viirs: 0,
   harm_total: harm,
+  coverage: 1,
+  source: 'MODIS',
 });
 
 describe('binOfDoy', () => {
@@ -76,6 +78,11 @@ describe('aggregateToBins', () => {
   it('sorts by year then bin', () => {
     const bins = aggregateToBins([row('2020-01-09', 1, 1), row('2019-01-01', 1, 1)], 8);
     expect(bins.map((b) => b.year)).toEqual([2019, 2020]);
+  });
+
+  it('carries the S7 coverage and source into the bin', () => {
+    const bins = aggregateToBins([{ ...row('2019-01-02', 4, 2), coverage: 0.5, source: 'VIIRS_CAL' }], 8);
+    expect(bins[0]).toMatchObject({ year: 2019, bin: 1, coverage: 0.5, source: 'VIIRS_CAL' });
   });
 });
 
