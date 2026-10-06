@@ -13,7 +13,7 @@ defined in `docs/PARAMETERS.md`.
 | MCD14ML (MODIS C6) | Primary long record; reference scale | UMD SFTP archive (monthly `.txt.gz`) | 200K–500K lines/month globally |
 | VIIRS 375 m (Suomi-NPP) | Modern record; calibrated to MODIS | FIRMS archive / Area API (recent) | Confidence as classes [n, h, l] |
 | VIIRS N20, N21 | Optional extra streams | FIRMS Area API (`VIIRS_NOAA20_SP`, `VIIRS_NOAA21_NRT`) | Ingested, not used by default. The Area API serves **no** `VIIRS_NOAA21_SP` (it answers `Invalid source.`), so NOAA-21 is cached from its NRT source, which begins 2023-01-01 |
-| MCD64CMQ | Independent validation reference | NASA LAADS DAAC | 0.25° burned area, hundredths of ha |
+| MCD64A1 v061 | Independent validation reference (E8) | LP DAAC, via `earthaccess` + an Earthdata Login token | Monthly 500 m burned area (HDF4, sinusoidal tiles), aggregated to 0.25°. The 0.25° CMG product (**MCD64CMQ**) is **not** published to CMR, so `earthaccess` cannot discover it — MCD64A1 is regridded instead (`src/acquire/burned_area.py`) |
 
 Source attribution: **NASA FIRMS / LANCE / EOSDIS** and **NASA LAADS DAAC**.
 Every dataset that reaches a displayed number is listed here with its route.

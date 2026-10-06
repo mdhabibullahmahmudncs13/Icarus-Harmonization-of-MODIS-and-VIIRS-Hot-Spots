@@ -108,6 +108,15 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Changed
 
+- E8 external validation now runs instead of reporting a limitation. MODIS
+  **MCD64A1 v061** burned area (500 m, monthly, HDF4) is fetched through
+  `earthaccess` with an Earthdata Login token and regridded to 0.25° by the new
+  `src/acquire/burned_area.py` (the plan's 0.25° CMG product, MCD64CMQ, is not
+  published to CMR, so `earthaccess` cannot discover it). The result is honest:
+  on the 2019 slice the cell-level r² is **0.342**, below the 0.5 target, while
+  region-level monthly totals reach r² = 0.868 — seasonal timing validates, the
+  spatial target does not. Adds `pyhdf` (the only HDF4 reader available here;
+  rasterio's bundled GDAL has no HDF4 driver) and `earthaccess` to `make venv`.
 - The API data tier reads parquet through DuckDB (`read_parquet`) on a single
   process-wide connection instead of a hand-rolled `pd.concat`; a multi-file
   cache glob is unioned in one query. Resolution order, `meta.source` values

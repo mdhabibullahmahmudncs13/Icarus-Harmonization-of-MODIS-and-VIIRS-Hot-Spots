@@ -214,17 +214,31 @@ Synthetic numbers are labelled as such and are never evidence. Experiments that 
 
 ## E8 — External validation
 
-**Question.** Does harmonized density track MCD64CMQ burned area (r² > 0.5 at 0.25°)?
+**Question.** Does harmonized density track burned area (r² > 0.5 at 0.25°)?
 
-**Decision rule.** r² > 0.5 against MCD64CMQ burned area at 0.25° over the overlap.
+**Decision rule.** r² > 0.5 against MODIS burned area at 0.25° over the overlap.
 
-**Verdict:** `limitation`
+**Verdict:** `partial`
+
+**Metrics.**
+
+| cell_deg | years | cell_months | cell_pearson | cell_r2 | cell_spearman | region_months | region_pearson | region_r2 | target_r2 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0.25 | [2019] | 1949 | 0.5852 | 0.3424 | 0.3728 | 12 | 0.9314 | 0.8675 | 0.5 |
+
+| scale | n | pearson | r2 | spearman |
+| --- | --- | --- | --- | --- |
+| 0.25 cell-month (pooled) | 1949 | 0.5852 | 0.3424 | 0.3728 |
+| region monthly totals | 12 | 0.9314 | 0.8675 | — |
+
+![E8](../validation/figures/E8.svg)
 
 **Notes / limitations.**
 
-- MCD64CMQ burned-area data is not bundled with this repository and needs Earthdata authentication to fetch.
-- Not fabricated: the experiment is reported as not run rather than given an invented r².
-- To run it, fetch MCD64CMQ over the AOI and the overlap, resample to 0.25°, and correlate against the harmonized density.
+- Product: MODIS MCD64A1 v061 (500 m, monthly) aggregated to 0.25°; the 0.25° CMG product named in docs/DATA_DICTIONARY.md (MCD64CMQ) is not in CMR.
+- The decision rule names the cell-level r²; it is reported first and is not met, even though regional seasonal timing agrees strongly.
+- Burned fraction and cell-day density are different quantities, so this is agreement in rank and timing, not a calibrated relationship.
+- Only the years present in the burned-area cache are used; widen the fetch to cover the full overlap before treating this as final.
 
 ## E9 — Offline performance
 
@@ -238,17 +252,18 @@ Synthetic numbers are labelled as such and are never evidence. Experiments that 
 
 | cache_bytes | cache_mib | cache_files | api_latency_s | cold_start_s |
 | --- | --- | --- | --- | --- |
-| 226773065 | 216.3 | 6988 | 1.301 | — |
+| 226773065 | 216.3 | 6988 | 1.243 | — |
 
 | metric | value |
 | --- | --- |
 | cache size | 216.3 MiB (6988 files) |
-| API latency | 1.301 s |
+| API latency | 1.243 s |
 | offline cold start | not measured |
 | Lighthouse PWA score | not run (no headless Chrome/Lighthouse in this environment) |
 
 **Notes / limitations.**
 
+- Cache size covers the served detections cache; the E8 validation fetch (cache/burned_area) is excluded.
 - The offline cold start is automated in web/e2e/offline-cold-start.spec.ts; the real-device run and the fallback video are not recorded.
 - Lighthouse is not installed here, so its PWA score is reported as a limitation, not a number.
 

@@ -168,7 +168,7 @@ with a figure, a table, and limitation notes.
 | E5 | Non-linear calibration diagnostics | Log-log and quantile mapping vs multiplicative at region level. |
 | E6 | Temporal resolution | Daily / weekly / 8-day compared on anomalies and critical period. |
 | E7 | VIIRS satellite inclusion | S-NPP only vs S-NPP + N20 + N21. |
-| E8 | External validation | Harmonized density vs MCD64CMQ burned area; target r² > 0.5 at 0.25°. |
+| E8 | External validation | Harmonized density vs MCD64A1 v061 burned area regridded to 0.25° (the CMG product MCD64CMQ is not in CMR); target r² > 0.5. |
 | E9 | Offline performance | Cold-start time, API latency, cache size, Lighthouse PWA score. |
 
 Targets labelled "informative" are planning expectations, not claims. Report

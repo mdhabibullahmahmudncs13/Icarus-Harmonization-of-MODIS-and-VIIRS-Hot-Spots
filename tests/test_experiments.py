@@ -66,6 +66,39 @@ def test_e8_is_reported_as_a_limitation_not_a_number(results):
     assert e8["metrics"] == {}
 
 
+def test_e8_correlates_when_burned_area_is_supplied(detections):
+    """With burned area supplied, E8 computes both scales and applies the rule."""
+    import numpy as np
+
+    from src.compute import harmonize
+    from src.validate.experiments import _snap_to_grid, experiment_e8
+
+    frame = harmonize.harmonize(detections)
+    frame["lat"] = _snap_to_grid(frame["latitude"], -90.0, 0.25)
+    frame["lon"] = _snap_to_grid(frame["longitude"], -180.0, 0.25)
+    frame["year"] = frame["acq_date"].dt.year.astype("int64")
+    frame["month"] = frame["acq_date"].dt.month.astype("int64")
+    activity = (
+        frame.drop_duplicates(["cell_id", "acq_date"])
+        .groupby(["year", "lat", "lon", "month"])
+        .size()
+        .rename("cell_days")
+        .reset_index()
+    )
+    # Burned fraction perfectly proportional to activity -> r^2 == 1.
+    activity["burned_fraction"] = activity["cell_days"] / activity["cell_days"].max()
+    activity["land_pixels"] = 1000
+    burned = activity[["year", "lat", "lon", "month", "burned_fraction", "land_pixels"]]
+
+    experiment = experiment_e8(detections, burned)
+    assert experiment.verdict == "supported"
+    assert experiment.metrics["cell_r2"] == pytest.approx(1.0, abs=1e-6)
+    assert experiment.metrics["cell_months"] == len(burned)
+    assert len(experiment.table) == 2  # cell level and region level
+    assert experiment.figure["reference"] == 0.5
+    assert np.isfinite(experiment.metrics["region_r2"])
+
+
 def test_figures_render_to_svg(results):
     for experiment in results["experiments"]:
         figure = experiment["figure"]

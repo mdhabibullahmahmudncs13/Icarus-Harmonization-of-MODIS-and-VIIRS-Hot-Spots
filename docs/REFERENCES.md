@@ -19,7 +19,7 @@ All inputs are NASA open data, fetched through the FIRMS API
 | `VIIRS_SNPP_SP` | VIIRS 375 m, Suomi-NPP | Primary VIIRS stream | FIRMS archive / Area API |
 | `VIIRS_NOAA20_SP` | VIIRS 375 m, NOAA-20 | Extra VIIRS stream (ingested, not default) | FIRMS Area API |
 | `VIIRS_NOAA21_NRT` | VIIRS 375 m, NOAA-21 | Extra VIIRS stream; NRT only — the Area API serves no `VIIRS_NOAA21_SP` | FIRMS Area API |
-| `MCD64CMQ` | MODIS 500 m burned area | **Planned** external validation (E8); not bundled, needs Earthdata auth | NASA LAADS DAAC |
+| `MCD64A1` v061 | MODIS 500 m monthly burned area | External validation (E8), regridded to 0.25°; not bundled, needs an Earthdata Login token | LP DAAC, via `earthaccess` |
 
 **Attribution.** NASA FIRMS / LANCE / EOSDIS and NASA LAADS DAAC. FIRMS data
 are free and open; cite them and the algorithm papers in §3.
@@ -32,6 +32,9 @@ are free and open; cite them and the algorithm papers in §3.
   and measured in `docs/VALIDATION.md` (E1, E7).
 - NOAA-21 is available only as a near-real-time (NRT) source, which may be
   revised upstream; it is labelled `VIIRS 375 m, NOAA-21 (NRT)` throughout.
+- The 0.25° climate-modelling-grid burned-area product (MCD64CMQ) is not
+  published to CMR, so it cannot be discovered by `earthaccess`. E8 therefore
+  uses MCD64A1 v061 at 500 m and aggregates it to 0.25° itself.
 
 ---
 

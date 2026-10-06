@@ -19,7 +19,7 @@ help:
 
 venv:
 	[ -d .venv ] || uv venv .venv
-	VIRTUAL_ENV=.venv uv pip install duckdb pandas pyarrow requests fastapi uvicorn httpx2 jsonschema pytest ruff earthaccess
+	VIRTUAL_ENV=.venv uv pip install duckdb pandas pyarrow requests fastapi uvicorn httpx2 jsonschema pytest ruff earthaccess pyhdf
 
 cache:
 	@$(PYTHON) -m src.acquire.firms $(ARGS)

@@ -26,7 +26,7 @@ import sys
 import time
 from pathlib import Path
 
-from src.acquire import safe
+from src.acquire import burned_area, safe
 from src.compute import export, harmonize
 from src.validate import run_all
 from src.validate.report import render_markdown, render_svg
@@ -85,12 +85,16 @@ def main(argv: list[str] | None = None) -> int:
 
     detections, source = load(args.data)
     cache_dir = safe.CACHE_DIR if source == "cache" else None
+    # E8 needs the 0.25° burned-area grid; when it has not been fetched the
+    # experiment reports a limitation instead of a number.
+    burned = burned_area.load_derived()
     results = run_all(
         detections,
         source=source,
         cache_dir=cache_dir,
         api_latency_s=measure_api_latency(detections),
         cold_start_s=args.cold_start,
+        burned_area=burned,
     )
 
     written = artifacts(results)

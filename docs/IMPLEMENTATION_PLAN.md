@@ -524,9 +524,17 @@ deterministic synthetic input.
       peak bin.
 - [x] E7 — VIIRS inclusion: the VIIRS-to-MODIS cell-day ratio grows
       3.08 → 4.23 as NOAA-20 and NOAA-21 join S-NPP.
-- [ ] E8 — external validation: **not run**. MCD64CMQ burned area is not
-      bundled and needs Earthdata authentication; reported as a limitation,
-      never as an invented r².
+- [x] E8 — external validation: **partial, and honestly so**. MODIS
+      **MCD64A1 v061** burned area (500 m, monthly) is fetched through
+      `earthaccess` with an Earthdata Login token and regridded to 0.25° by
+      `src/acquire/burned_area.py` (the 0.25° CMG product in the original plan,
+      MCD64CMQ, is not in CMR so it cannot be discovered). Over the 2019 slice
+      (36 granules, 12 months, pilot bbox) the decision rule's cell-level r² is
+      **0.342** (r = 0.585, Spearman 0.373, n = 1,949 cell-months) — **below the
+      0.5 target** — while region-level monthly totals agree strongly at
+      r² = 0.868. Seasonal timing is validated; the spatial cell-level target is
+      not met. Only 2019 is fetched so far; widen the window before treating it
+      as final.
 - [x] E9 — offline performance: cache 216.3 MiB / 6,988 files, `/api/v1/series`
       payload 1.30 s. Lighthouse PWA score and a real-device cold start remain
       unmeasured (see §7.1).

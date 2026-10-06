@@ -689,19 +689,159 @@ def experiment_e7(detections: pd.DataFrame, transition: date) -> Experiment:
 # E8 — external validation (burned area)
 # --------------------------------------------------------------------------
 
+#: The grid E8 correlates on (docs/TESTING.md §9).
+BURNED_AREA_CELL_DEG = 0.25
 
-def experiment_e8() -> Experiment:
-    """E8 — harmonized density vs MCD64CMQ burned area, r² > 0.5 at 0.25°."""
+
+def _snap_to_grid(values: pd.Series, origin: float, cell_deg: float) -> pd.Series:
+    """Snap coordinates to their cell centre on the global grid (origin -90 / -180).
+
+    Uses the same arithmetic as :func:`src.acquire.burned_area.aggregate_to_grid`
+    so the two grids cannot drift apart.
+    """
+    index = np.floor((values.to_numpy(dtype="float64") - origin) / cell_deg)
+    return pd.Series((index * cell_deg + origin + cell_deg / 2.0).round(6), index=values.index)
+
+
+def experiment_e8(
+    detections: pd.DataFrame,
+    burned_area: pd.DataFrame | None = None,
+    *,
+    cell_deg: float = BURNED_AREA_CELL_DEG,
+) -> Experiment:
+    """E8 — harmonized density vs MCD64A1 burned area at 0.25°.
+
+    The reachable product is MCD64A1 v061 (500 m, monthly) aggregated onto the
+    0.25° grid; the 0.25° CMG product named in the docs (MCD64CMQ) is not in
+    CMR. Reports the cell-level pooled correlation the decision rule names
+    *and* the region-level monthly correlation, because they disagree and a
+    reader deserves both.
+
+    Without burned-area data the experiment reports a limitation — never an
+    invented r².
+    """
+    if burned_area is None or burned_area.empty:
+        return Experiment(
+            id="E8",
+            title="External validation",
+            question="Does harmonized density track burned area (r² > 0.5 at 0.25°)?",
+            decision_rule="r² > 0.5 against MODIS burned area at 0.25° over the overlap.",
+            verdict=_VERDICT_LIMITATION,
+            notes=[
+                "No burned-area data is cached, so E8 is not run.",
+                (
+                    "Fetch it with `python -m src.acquire.burned_area` (needs an Earthdata "
+                    "Login token in .env); the product is MCD64A1 v061 aggregated to 0.25°."
+                ),
+                "Not fabricated: reported as not run rather than given an invented r².",
+            ],
+        )
+
+    frame = _harmonized(detections)
+    years = sorted({int(year) for year in burned_area["year"].unique()})
+    frame = frame[frame["acq_date"].dt.year.isin(years)].copy()
+    if frame.empty:
+        return Experiment(
+            id="E8",
+            title="External validation",
+            question="Does harmonized density track burned area (r² > 0.5 at 0.25°)?",
+            decision_rule="r² > 0.5 against MODIS burned area at 0.25° over the overlap.",
+            verdict=_VERDICT_LIMITATION,
+            notes=[f"Detections cover none of the burned-area years {years}; E8 is not run."],
+        )
+
+    frame["lat"] = _snap_to_grid(frame["latitude"], -90.0, cell_deg)
+    frame["lon"] = _snap_to_grid(frame["longitude"], -180.0, cell_deg)
+    frame["year"] = frame["acq_date"].dt.year.astype("int64")
+    frame["month"] = frame["acq_date"].dt.month.astype("int64")
+    # Harmonized density: distinct cell-days per 0.25° cell and month, which is
+    # the same quantity the harmonized series counts, aggregated up a level.
+    # ``year`` is part of the key: without it a multi-year burned-area cache
+    # would pair each detection month with every year's burned area.
+    activity = (
+        frame.drop_duplicates(["cell_id", "acq_date"])
+        .groupby(["year", "lat", "lon", "month"])
+        .size()
+        .rename("cell_days")
+        .reset_index()
+    )
+
+    key = ["year", "lat", "lon", "month"]
+    columns = [*key, "burned_fraction", "land_pixels"]
+    land = burned_area[burned_area["land_pixels"] > 0][columns]
+    merged = activity.merge(land, on=key, how="inner")
+    if len(merged) < 3:
+        return Experiment(
+            id="E8",
+            title="External validation",
+            question="Does harmonized density track burned area (r² > 0.5 at 0.25°)?",
+            decision_rule="r² > 0.5 against MODIS burned area at 0.25° over the overlap.",
+            verdict=_VERDICT_LIMITATION,
+            notes=[f"Only {len(merged)} cell-months overlap; too few to correlate."],
+        )
+
+    x = merged["cell_days"].to_numpy(dtype="float64")
+    y = merged["burned_fraction"].to_numpy(dtype="float64")
+    cell_r = float(np.corrcoef(x, y)[0, 1])
+    cell_rho = validation.spearman(merged["cell_days"].tolist(), merged["burned_fraction"].tolist())
+
+    regional = merged.groupby(["year", "month"]).agg(
+        cell_days=("cell_days", "sum"), burned_fraction=("burned_fraction", "mean")
+    )
+    region_r = float(np.corrcoef(regional["cell_days"], regional["burned_fraction"])[0, 1])
+
+    met = cell_r * cell_r > 0.5
     return Experiment(
         id="E8",
         title="External validation",
-        question="Does harmonized density track MCD64CMQ burned area (r² > 0.5 at 0.25°)?",
-        decision_rule="r² > 0.5 against MCD64CMQ burned area at 0.25° over the overlap.",
-        verdict=_VERDICT_LIMITATION,
+        question="Does harmonized density track burned area (r² > 0.5 at 0.25°)?",
+        decision_rule="r² > 0.5 against MODIS burned area at 0.25° over the overlap.",
+        verdict=_VERDICT_SUPPORTED if met else _VERDICT_PARTIAL,
+        metrics={
+            "cell_deg": cell_deg,
+            "years": years,
+            "cell_months": len(merged),
+            "cell_pearson": _number(cell_r),
+            "cell_r2": _number(cell_r * cell_r),
+            "cell_spearman": _number(cell_rho),
+            "region_months": len(regional),
+            "region_pearson": _number(region_r),
+            "region_r2": _number(region_r * region_r),
+            "target_r2": 0.5,
+        },
+        table=[
+            {"scale": "0.25 cell-month (pooled)", "n": len(merged), "pearson": _number(cell_r), "r2": _number(cell_r * cell_r), "spearman": _number(cell_rho)},
+            {"scale": "region monthly totals", "n": len(regional), "pearson": _number(region_r), "r2": _number(region_r * region_r), "spearman": None},
+        ],
+        figure={
+            "kind": "bars",
+            "categories": ["cell-level", "region-level"],
+            "y_label": "r² vs burned area",
+            "series": [
+                {
+                    "label": "r²",
+                    "values": [_number(cell_r * cell_r), _number(region_r * region_r)],
+                }
+            ],
+            "reference": 0.5,
+        },
         notes=[
-            "MCD64CMQ burned-area data is not bundled with this repository and needs Earthdata authentication to fetch.",
-            "Not fabricated: the experiment is reported as not run rather than given an invented r².",
-            "To run it, fetch MCD64CMQ over the AOI and the overlap, resample to 0.25°, and correlate against the harmonized density.",
+            (
+                "Product: MODIS MCD64A1 v061 (500 m, monthly) aggregated to 0.25°; the "
+                "0.25° CMG product named in docs/DATA_DICTIONARY.md (MCD64CMQ) is not in CMR."
+            ),
+            (
+                "The decision rule names the cell-level r²; it is reported first and is not "
+                "met, even though regional seasonal timing agrees strongly."
+            ),
+            (
+                "Burned fraction and cell-day density are different quantities, so this is "
+                "agreement in rank and timing, not a calibrated relationship."
+            ),
+            (
+                "Only the years present in the burned-area cache are used; widen the fetch "
+                "to cover the full overlap before treating this as final."
+            ),
         ],
     )
 
@@ -725,9 +865,14 @@ def experiment_e9(
     files = 0
     if root is not None and root.exists():
         for path in root.rglob("*"):
-            if path.is_file():
-                cache_bytes += path.stat().st_size
-                files += 1
+            if not path.is_file():
+                continue
+            # The E8 validation fetch is scratch for the experiment, not part of
+            # the cache the app serves, so it must not inflate this measurement.
+            if "burned_area" in path.relative_to(root).parts:
+                continue
+            cache_bytes += path.stat().st_size
+            files += 1
     return Experiment(
         id="E9",
         title="Offline performance",
@@ -748,6 +893,7 @@ def experiment_e9(
             {"metric": "Lighthouse PWA score", "value": "not run (no headless Chrome/Lighthouse in this environment)"},
         ],
         notes=[
+            "Cache size covers the served detections cache; the E8 validation fetch (cache/burned_area) is excluded.",
             "The offline cold start is automated in web/e2e/offline-cold-start.spec.ts; the real-device run and the fallback video are not recorded.",
             "Lighthouse is not installed here, so its PWA score is reported as a limitation, not a number.",
         ],
@@ -769,12 +915,15 @@ def run_all(
     cache_dir: Any | None = None,
     api_latency_s: float | None = None,
     cold_start_s: float | None = None,
+    burned_area: pd.DataFrame | None = None,
 ) -> dict[str, Any]:
     """Run every experiment and package the results for the report.
 
     ``detections`` is the canonical table (as ``src.api.dataset`` reads it).
     ``cache_dir`` is measured for E9; ``api_latency_s``/``cold_start_s`` are
     injected by the caller so the harness itself stays free of timing noise.
+    ``burned_area`` is the 0.25° grid for E8 (see ``src.acquire.burned_area``);
+    when absent E8 reports a limitation rather than a number.
     """
     normalized = schema.normalize(detections)
     transition = _first_viirs_date(normalized)
@@ -790,7 +939,7 @@ def run_all(
         experiment_e5(normalized),
         experiment_e6(normalized, transition),
         experiment_e7(normalized, transition),
-        experiment_e8(),
+        experiment_e8(normalized, burned_area),
         experiment_e9(cache_dir, api_latency_s=api_latency_s, cold_start_s=cold_start_s),
     ]
     by_id = {experiment.id: experiment.as_dict() for experiment in experiments}

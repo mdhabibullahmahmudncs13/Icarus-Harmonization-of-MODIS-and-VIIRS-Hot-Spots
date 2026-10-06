@@ -518,16 +518,62 @@
     {
       "id": "E8",
       "title": "External validation",
-      "question": "Does harmonized density track MCD64CMQ burned area (r\u00b2 > 0.5 at 0.25\u00b0)?",
-      "decision_rule": "r\u00b2 > 0.5 against MCD64CMQ burned area at 0.25\u00b0 over the overlap.",
-      "verdict": "limitation",
-      "metrics": {},
-      "table": [],
-      "figure": null,
+      "question": "Does harmonized density track burned area (r\u00b2 > 0.5 at 0.25\u00b0)?",
+      "decision_rule": "r\u00b2 > 0.5 against MODIS burned area at 0.25\u00b0 over the overlap.",
+      "verdict": "partial",
+      "metrics": {
+        "cell_deg": 0.25,
+        "years": [
+          2019
+        ],
+        "cell_months": 1949,
+        "cell_pearson": 0.5852,
+        "cell_r2": 0.3424,
+        "cell_spearman": 0.3728,
+        "region_months": 12,
+        "region_pearson": 0.9314,
+        "region_r2": 0.8675,
+        "target_r2": 0.5
+      },
+      "table": [
+        {
+          "scale": "0.25 cell-month (pooled)",
+          "n": 1949,
+          "pearson": 0.5852,
+          "r2": 0.3424,
+          "spearman": 0.3728
+        },
+        {
+          "scale": "region monthly totals",
+          "n": 12,
+          "pearson": 0.9314,
+          "r2": 0.8675,
+          "spearman": null
+        }
+      ],
+      "figure": {
+        "kind": "bars",
+        "categories": [
+          "cell-level",
+          "region-level"
+        ],
+        "y_label": "r\u00b2 vs burned area",
+        "series": [
+          {
+            "label": "r\u00b2",
+            "values": [
+              0.3424,
+              0.8675
+            ]
+          }
+        ],
+        "reference": 0.5
+      },
       "notes": [
-        "MCD64CMQ burned-area data is not bundled with this repository and needs Earthdata authentication to fetch.",
-        "Not fabricated: the experiment is reported as not run rather than given an invented r\u00b2.",
-        "To run it, fetch MCD64CMQ over the AOI and the overlap, resample to 0.25\u00b0, and correlate against the harmonized density."
+        "Product: MODIS MCD64A1 v061 (500 m, monthly) aggregated to 0.25\u00b0; the 0.25\u00b0 CMG product named in docs/DATA_DICTIONARY.md (MCD64CMQ) is not in CMR.",
+        "The decision rule names the cell-level r\u00b2; it is reported first and is not met, even though regional seasonal timing agrees strongly.",
+        "Burned fraction and cell-day density are different quantities, so this is agreement in rank and timing, not a calibrated relationship.",
+        "Only the years present in the burned-area cache are used; widen the fetch to cover the full overlap before treating this as final."
       ]
     },
     {
@@ -540,7 +586,7 @@
         "cache_bytes": 226773065,
         "cache_mib": 216.27,
         "cache_files": 6988,
-        "api_latency_s": 1.301,
+        "api_latency_s": 1.243,
         "cold_start_s": null
       },
       "table": [
@@ -550,7 +596,7 @@
         },
         {
           "metric": "API latency",
-          "value": "1.301 s"
+          "value": "1.243 s"
         },
         {
           "metric": "offline cold start",
@@ -563,6 +609,7 @@
       ],
       "figure": null,
       "notes": [
+        "Cache size covers the served detections cache; the E8 validation fetch (cache/burned_area) is excluded.",
         "The offline cold start is automated in web/e2e/offline-cold-start.spec.ts; the real-device run and the fallback video are not recorded.",
         "Lighthouse is not installed here, so its PWA score is reported as a limitation, not a number."
       ]
