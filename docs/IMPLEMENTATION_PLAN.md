@@ -186,13 +186,17 @@ Artifacts:
 | `src/compute/season.py` | Critical fire period (onset, peak, end, window mass) |
 | `src/compute/validate.py` | Pearson/Spearman/ratio, overlap validation, cell-size sweep |
 | `src/compute/series_util.py` | 46-bin day-of-year helper |
+| `tools/gen_golden.py` | Writes the committed goldens; `--check` fails on drift |
+| `tests/golden/*.json` | Committed output of the deterministic pipeline |
 | `tests/test_compute.py` | 21 unit, property and golden cases |
+| `tests/test_golden.py` | 23 golden-drift and harmonization-mechanism cases |
 
 Run and verify:
 
 ```bash
-python3 -m pytest tests/test_compute.py -q
+python3 -m pytest tests/test_compute.py tests/test_golden.py -q
 python3 -m pytest -q
+python3 -m tools.gen_golden --check   # or: make golden  (regenerate on drift)
 ```
 
 Status:
@@ -205,17 +209,34 @@ Status:
 - [x] Critical-period detection with the insufficient-activity case
 - [x] Overlap validation and cell-size sweep
 - [x] Unit edges, property invariants (idempotence, row-order, duplicates), golden scenario
-- [ ] Golden files committed as fixtures (currently generated in-test)
+- [x] Golden files committed as fixtures (`tests/golden/*.json`, guarded by `tests/test_golden.py`)
 - [ ] Coverage/bridge stages (S7/S8) — those belong to the calibration work, not this phase
+
+The goldens cover both canonical inputs: the step scenario (series, cells,
+seasonal baseline, critical period) and the two overlap validators
+(`identical_cell_days` and `synthetic_detections`), plus a `headline` file with
+the step and agreement ratios. They are committed JSON rather than parquet so
+they are readable in a diff and outside `.gitignore`.
+
+**Note — what a golden test asserts.** `tests/test_golden.py` recomputes each
+payload and compares it to the committed file, so any number that moves fails
+the suite until the goldens are deliberately regenerated. `tests/test_compute.py`
+reads the committed `step_series.json` for its headline ratio assertion rather
+than regenerating the scenario in-test.
 
 **Note — deliberate extension over the spec.** The spec's `cell_day` stores a
 single combined `n_det`, which cannot yield per-stream *detection* totals. Each
 `CellDay` here also carries `n_modis` and `n_viirs` so the raw series is
 derivable in one pass. `n_det` remains the combined total and is unchanged.
 
-Verified this session: 41 tests pass (20 contract + 21 compute); no network
-access anywhere in `src/compute`; the golden scenario gives a raw step of 3.0x
-and a harmonized step of 1.0x on the same cells.
+Verified this session: `make lint` clean; 179 tests pass, of which 21 are
+`test_compute.py` and 23 are `test_golden.py`; no network access anywhere in
+`src/compute`. The committed goldens record a raw step of 3.00x against a
+harmonized step of 1.00x on the same cells, a 3.0x-to-1.0x collapse on the
+identical-sensor overlap, and a Pearson of 0.707 raw to 0.901 harmonized on
+the noisy overlap. Drift is proven caught: perturbing `step_series.json` fails
+both `pytest tests/test_golden.py` and `python3 -m tools.gen_golden --check`,
+and `make golden` restores the file byte-for-byte.
 
 ---
 

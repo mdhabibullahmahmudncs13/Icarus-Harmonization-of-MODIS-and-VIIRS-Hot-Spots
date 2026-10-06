@@ -1,4 +1,4 @@
-.PHONY: cache demo fixture test lint help
+.PHONY: cache demo fixture golden test lint help
 
 # Prefer the project venv (created with `uv venv .venv`) when it exists.
 PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
@@ -9,6 +9,7 @@ help:
 	@echo "  venv  - create .venv and install the dependencies"
 	@echo "  cache   - download NASA FIRMS hot spots to cache/raw (Suomi-NPP first)"
 	@echo "  fixture - write the offline demo detections to demo_fixtures/"
+	@echo "  golden  - regenerate the committed Phase 2 golden fixtures"
 	@echo "  demo    - run the API offline (OFFLINE=1) against demo_fixtures/"
 	@echo "  test    - run the test suite"
 	@echo "  lint  - run ruff"
@@ -24,6 +25,9 @@ cache:
 
 fixture:
 	@$(PYTHON) -m src.demo
+
+golden:
+	@$(PYTHON) -m tools.gen_golden --check || $(PYTHON) -m tools.gen_golden
 
 demo:
 	OFFLINE=1 $(PYTHON) -m uvicorn src.api.main:app

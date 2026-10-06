@@ -25,6 +25,10 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   - `docs/DEPLOYMENT.md` — deployment and offline runbook.
   - `docs/ROADMAP.md` — work breakdown and milestones.
   - `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`.
+- Committed golden fixtures for the Phase 2 compute core (`tests/golden/*.json`),
+  written by `tools/gen_golden.py` and guarded by `tests/test_golden.py`. A
+  number that moves in the pipeline now fails the suite until the goldens are
+  deliberately regenerated with `make golden`.
 
 ### Notes
 

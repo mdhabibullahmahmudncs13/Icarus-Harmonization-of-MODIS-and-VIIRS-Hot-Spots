@@ -1,0 +1,542 @@
+[
+  {
+    "date": "2011-06-01",
+    "raw_modis": 2,
+    "raw_viirs": 0,
+    "raw_total": 2,
+    "harm_modis": 2,
+    "harm_viirs": 0,
+    "harm_total": 2
+  },
+  {
+    "date": "2011-06-02",
+    "raw_modis": 3,
+    "raw_viirs": 0,
+    "raw_total": 3,
+    "harm_modis": 3,
+    "harm_viirs": 0,
+    "harm_total": 3
+  },
+  {
+    "date": "2011-06-03",
+    "raw_modis": 2,
+    "raw_viirs": 0,
+    "raw_total": 2,
+    "harm_modis": 2,
+    "harm_viirs": 0,
+    "harm_total": 2
+  },
+  {
+    "date": "2011-06-04",
+    "raw_modis": 3,
+    "raw_viirs": 0,
+    "raw_total": 3,
+    "harm_modis": 3,
+    "harm_viirs": 0,
+    "harm_total": 3
+  },
+  {
+    "date": "2011-06-05",
+    "raw_modis": 2,
+    "raw_viirs": 0,
+    "raw_total": 2,
+    "harm_modis": 2,
+    "harm_viirs": 0,
+    "harm_total": 2
+  },
+  {
+    "date": "2011-06-06",
+    "raw_modis": 3,
+    "raw_viirs": 0,
+    "raw_total": 3,
+    "harm_modis": 3,
+    "harm_viirs": 0,
+    "harm_total": 3
+  },
+  {
+    "date": "2011-06-07",
+    "raw_modis": 2,
+    "raw_viirs": 0,
+    "raw_total": 2,
+    "harm_modis": 2,
+    "harm_viirs": 0,
+    "harm_total": 2
+  },
+  {
+    "date": "2011-06-08",
+    "raw_modis": 3,
+    "raw_viirs": 0,
+    "raw_total": 3,
+    "harm_modis": 3,
+    "harm_viirs": 0,
+    "harm_total": 3
+  },
+  {
+    "date": "2011-06-09",
+    "raw_modis": 2,
+    "raw_viirs": 0,
+    "raw_total": 2,
+    "harm_modis": 2,
+    "harm_viirs": 0,
+    "harm_total": 2
+  },
+  {
+    "date": "2011-06-10",
+    "raw_modis": 3,
+    "raw_viirs": 0,
+    "raw_total": 3,
+    "harm_modis": 3,
+    "harm_viirs": 0,
+    "harm_total": 3
+  },
+  {
+    "date": "2011-06-11",
+    "raw_modis": 2,
+    "raw_viirs": 0,
+    "raw_total": 2,
+    "harm_modis": 2,
+    "harm_viirs": 0,
+    "harm_total": 2
+  },
+  {
+    "date": "2011-06-12",
+    "raw_modis": 3,
+    "raw_viirs": 0,
+    "raw_total": 3,
+    "harm_modis": 3,
+    "harm_viirs": 0,
+    "harm_total": 3
+  },
+  {
+    "date": "2011-06-13",
+    "raw_modis": 2,
+    "raw_viirs": 0,
+    "raw_total": 2,
+    "harm_modis": 2,
+    "harm_viirs": 0,
+    "harm_total": 2
+  },
+  {
+    "date": "2011-06-14",
+    "raw_modis": 3,
+    "raw_viirs": 0,
+    "raw_total": 3,
+    "harm_modis": 3,
+    "harm_viirs": 0,
+    "harm_total": 3
+  },
+  {
+    "date": "2011-06-15",
+    "raw_modis": 2,
+    "raw_viirs": 0,
+    "raw_total": 2,
+    "harm_modis": 2,
+    "harm_viirs": 0,
+    "harm_total": 2
+  },
+  {
+    "date": "2011-06-16",
+    "raw_modis": 3,
+    "raw_viirs": 0,
+    "raw_total": 3,
+    "harm_modis": 3,
+    "harm_viirs": 0,
+    "harm_total": 3
+  },
+  {
+    "date": "2011-06-17",
+    "raw_modis": 2,
+    "raw_viirs": 0,
+    "raw_total": 2,
+    "harm_modis": 2,
+    "harm_viirs": 0,
+    "harm_total": 2
+  },
+  {
+    "date": "2011-06-18",
+    "raw_modis": 3,
+    "raw_viirs": 0,
+    "raw_total": 3,
+    "harm_modis": 3,
+    "harm_viirs": 0,
+    "harm_total": 3
+  },
+  {
+    "date": "2011-06-19",
+    "raw_modis": 2,
+    "raw_viirs": 0,
+    "raw_total": 2,
+    "harm_modis": 2,
+    "harm_viirs": 0,
+    "harm_total": 2
+  },
+  {
+    "date": "2011-06-20",
+    "raw_modis": 3,
+    "raw_viirs": 0,
+    "raw_total": 3,
+    "harm_modis": 3,
+    "harm_viirs": 0,
+    "harm_total": 3
+  },
+  {
+    "date": "2011-06-21",
+    "raw_modis": 2,
+    "raw_viirs": 0,
+    "raw_total": 2,
+    "harm_modis": 2,
+    "harm_viirs": 0,
+    "harm_total": 2
+  },
+  {
+    "date": "2011-06-22",
+    "raw_modis": 3,
+    "raw_viirs": 0,
+    "raw_total": 3,
+    "harm_modis": 3,
+    "harm_viirs": 0,
+    "harm_total": 3
+  },
+  {
+    "date": "2011-06-23",
+    "raw_modis": 2,
+    "raw_viirs": 0,
+    "raw_total": 2,
+    "harm_modis": 2,
+    "harm_viirs": 0,
+    "harm_total": 2
+  },
+  {
+    "date": "2011-06-24",
+    "raw_modis": 3,
+    "raw_viirs": 0,
+    "raw_total": 3,
+    "harm_modis": 3,
+    "harm_viirs": 0,
+    "harm_total": 3
+  },
+  {
+    "date": "2011-06-25",
+    "raw_modis": 2,
+    "raw_viirs": 0,
+    "raw_total": 2,
+    "harm_modis": 2,
+    "harm_viirs": 0,
+    "harm_total": 2
+  },
+  {
+    "date": "2011-06-26",
+    "raw_modis": 3,
+    "raw_viirs": 0,
+    "raw_total": 3,
+    "harm_modis": 3,
+    "harm_viirs": 0,
+    "harm_total": 3
+  },
+  {
+    "date": "2011-06-27",
+    "raw_modis": 2,
+    "raw_viirs": 0,
+    "raw_total": 2,
+    "harm_modis": 2,
+    "harm_viirs": 0,
+    "harm_total": 2
+  },
+  {
+    "date": "2011-06-28",
+    "raw_modis": 3,
+    "raw_viirs": 0,
+    "raw_total": 3,
+    "harm_modis": 3,
+    "harm_viirs": 0,
+    "harm_total": 3
+  },
+  {
+    "date": "2011-06-29",
+    "raw_modis": 2,
+    "raw_viirs": 0,
+    "raw_total": 2,
+    "harm_modis": 2,
+    "harm_viirs": 0,
+    "harm_total": 2
+  },
+  {
+    "date": "2011-06-30",
+    "raw_modis": 3,
+    "raw_viirs": 0,
+    "raw_total": 3,
+    "harm_modis": 3,
+    "harm_viirs": 0,
+    "harm_total": 3
+  },
+  {
+    "date": "2013-06-01",
+    "raw_modis": 2,
+    "raw_viirs": 4,
+    "raw_total": 6,
+    "harm_modis": 2,
+    "harm_viirs": 2,
+    "harm_total": 2
+  },
+  {
+    "date": "2013-06-02",
+    "raw_modis": 3,
+    "raw_viirs": 6,
+    "raw_total": 9,
+    "harm_modis": 3,
+    "harm_viirs": 3,
+    "harm_total": 3
+  },
+  {
+    "date": "2013-06-03",
+    "raw_modis": 2,
+    "raw_viirs": 4,
+    "raw_total": 6,
+    "harm_modis": 2,
+    "harm_viirs": 2,
+    "harm_total": 2
+  },
+  {
+    "date": "2013-06-04",
+    "raw_modis": 3,
+    "raw_viirs": 6,
+    "raw_total": 9,
+    "harm_modis": 3,
+    "harm_viirs": 3,
+    "harm_total": 3
+  },
+  {
+    "date": "2013-06-05",
+    "raw_modis": 2,
+    "raw_viirs": 4,
+    "raw_total": 6,
+    "harm_modis": 2,
+    "harm_viirs": 2,
+    "harm_total": 2
+  },
+  {
+    "date": "2013-06-06",
+    "raw_modis": 3,
+    "raw_viirs": 6,
+    "raw_total": 9,
+    "harm_modis": 3,
+    "harm_viirs": 3,
+    "harm_total": 3
+  },
+  {
+    "date": "2013-06-07",
+    "raw_modis": 2,
+    "raw_viirs": 4,
+    "raw_total": 6,
+    "harm_modis": 2,
+    "harm_viirs": 2,
+    "harm_total": 2
+  },
+  {
+    "date": "2013-06-08",
+    "raw_modis": 3,
+    "raw_viirs": 6,
+    "raw_total": 9,
+    "harm_modis": 3,
+    "harm_viirs": 3,
+    "harm_total": 3
+  },
+  {
+    "date": "2013-06-09",
+    "raw_modis": 2,
+    "raw_viirs": 4,
+    "raw_total": 6,
+    "harm_modis": 2,
+    "harm_viirs": 2,
+    "harm_total": 2
+  },
+  {
+    "date": "2013-06-10",
+    "raw_modis": 3,
+    "raw_viirs": 6,
+    "raw_total": 9,
+    "harm_modis": 3,
+    "harm_viirs": 3,
+    "harm_total": 3
+  },
+  {
+    "date": "2013-06-11",
+    "raw_modis": 2,
+    "raw_viirs": 4,
+    "raw_total": 6,
+    "harm_modis": 2,
+    "harm_viirs": 2,
+    "harm_total": 2
+  },
+  {
+    "date": "2013-06-12",
+    "raw_modis": 3,
+    "raw_viirs": 6,
+    "raw_total": 9,
+    "harm_modis": 3,
+    "harm_viirs": 3,
+    "harm_total": 3
+  },
+  {
+    "date": "2013-06-13",
+    "raw_modis": 2,
+    "raw_viirs": 4,
+    "raw_total": 6,
+    "harm_modis": 2,
+    "harm_viirs": 2,
+    "harm_total": 2
+  },
+  {
+    "date": "2013-06-14",
+    "raw_modis": 3,
+    "raw_viirs": 6,
+    "raw_total": 9,
+    "harm_modis": 3,
+    "harm_viirs": 3,
+    "harm_total": 3
+  },
+  {
+    "date": "2013-06-15",
+    "raw_modis": 2,
+    "raw_viirs": 4,
+    "raw_total": 6,
+    "harm_modis": 2,
+    "harm_viirs": 2,
+    "harm_total": 2
+  },
+  {
+    "date": "2013-06-16",
+    "raw_modis": 3,
+    "raw_viirs": 6,
+    "raw_total": 9,
+    "harm_modis": 3,
+    "harm_viirs": 3,
+    "harm_total": 3
+  },
+  {
+    "date": "2013-06-17",
+    "raw_modis": 2,
+    "raw_viirs": 4,
+    "raw_total": 6,
+    "harm_modis": 2,
+    "harm_viirs": 2,
+    "harm_total": 2
+  },
+  {
+    "date": "2013-06-18",
+    "raw_modis": 3,
+    "raw_viirs": 6,
+    "raw_total": 9,
+    "harm_modis": 3,
+    "harm_viirs": 3,
+    "harm_total": 3
+  },
+  {
+    "date": "2013-06-19",
+    "raw_modis": 2,
+    "raw_viirs": 4,
+    "raw_total": 6,
+    "harm_modis": 2,
+    "harm_viirs": 2,
+    "harm_total": 2
+  },
+  {
+    "date": "2013-06-20",
+    "raw_modis": 3,
+    "raw_viirs": 6,
+    "raw_total": 9,
+    "harm_modis": 3,
+    "harm_viirs": 3,
+    "harm_total": 3
+  },
+  {
+    "date": "2013-06-21",
+    "raw_modis": 2,
+    "raw_viirs": 4,
+    "raw_total": 6,
+    "harm_modis": 2,
+    "harm_viirs": 2,
+    "harm_total": 2
+  },
+  {
+    "date": "2013-06-22",
+    "raw_modis": 3,
+    "raw_viirs": 6,
+    "raw_total": 9,
+    "harm_modis": 3,
+    "harm_viirs": 3,
+    "harm_total": 3
+  },
+  {
+    "date": "2013-06-23",
+    "raw_modis": 2,
+    "raw_viirs": 4,
+    "raw_total": 6,
+    "harm_modis": 2,
+    "harm_viirs": 2,
+    "harm_total": 2
+  },
+  {
+    "date": "2013-06-24",
+    "raw_modis": 3,
+    "raw_viirs": 6,
+    "raw_total": 9,
+    "harm_modis": 3,
+    "harm_viirs": 3,
+    "harm_total": 3
+  },
+  {
+    "date": "2013-06-25",
+    "raw_modis": 2,
+    "raw_viirs": 4,
+    "raw_total": 6,
+    "harm_modis": 2,
+    "harm_viirs": 2,
+    "harm_total": 2
+  },
+  {
+    "date": "2013-06-26",
+    "raw_modis": 3,
+    "raw_viirs": 6,
+    "raw_total": 9,
+    "harm_modis": 3,
+    "harm_viirs": 3,
+    "harm_total": 3
+  },
+  {
+    "date": "2013-06-27",
+    "raw_modis": 2,
+    "raw_viirs": 4,
+    "raw_total": 6,
+    "harm_modis": 2,
+    "harm_viirs": 2,
+    "harm_total": 2
+  },
+  {
+    "date": "2013-06-28",
+    "raw_modis": 3,
+    "raw_viirs": 6,
+    "raw_total": 9,
+    "harm_modis": 3,
+    "harm_viirs": 3,
+    "harm_total": 3
+  },
+  {
+    "date": "2013-06-29",
+    "raw_modis": 2,
+    "raw_viirs": 4,
+    "raw_total": 6,
+    "harm_modis": 2,
+    "harm_viirs": 2,
+    "harm_total": 2
+  },
+  {
+    "date": "2013-06-30",
+    "raw_modis": 3,
+    "raw_viirs": 6,
+    "raw_total": 9,
+    "harm_modis": 3,
+    "harm_viirs": 3,
+    "harm_total": 3
+  }
+]

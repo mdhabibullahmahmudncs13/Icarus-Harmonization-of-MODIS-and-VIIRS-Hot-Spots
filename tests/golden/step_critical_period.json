@@ -1,0 +1,11 @@
+{
+  "insufficient_activity": false,
+  "onset_bin": 20,
+  "peak_bin": 20,
+  "end_bin": 23,
+  "window": {
+    "start_bin": 19,
+    "end_bin": 24,
+    "mass": 1.0
+  }
+}

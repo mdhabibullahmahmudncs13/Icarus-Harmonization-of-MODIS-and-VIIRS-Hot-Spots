@@ -1,0 +1,17 @@
+{
+  "transition": "2012-01-20",
+  "pre_days": 30,
+  "post_days": 30,
+  "raw_step_ratio": 3.0,
+  "harmonized_step_ratio": 1.0,
+  "identical_overlap": {
+    "raw_ratio": 3.0,
+    "harmonized_ratio": 1.0
+  },
+  "noisy_overlap": {
+    "raw_pearson": 0.707258,
+    "harmonized_pearson": 0.90105,
+    "raw_ratio": 4.255392,
+    "harmonized_ratio": 1.345772
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "overlap": {
+    "start": "2015-01-01",
+    "end": "2015-08-28"
+  },
+  "raw": {
+    "pearson": 0.707258,
+    "spearman": 0.68448,
+    "ratio": 4.255392
+  },
+  "harmonized": {
+    "pearson": 0.90105,
+    "spearman": 0.871968,
+    "ratio": 1.345772
+  },
+  "cell_sweep": [
+    {
+      "cell_km": 5.5,
+      "raw_pearson": 0.707258,
+      "harmonized_pearson": 0.90105
+    },
+    {
+      "cell_km": 11.0,
+      "raw_pearson": 0.707258,
+      "harmonized_pearson": 0.92257
+    },
+    {
+      "cell_km": 16.5,
+      "raw_pearson": 0.707258,
+      "harmonized_pearson": 0.923486
+    },
+    {
+      "cell_km": 22.0,
+      "raw_pearson": 0.707258,
+      "harmonized_pearson": 0.909117
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "overlap": {
+    "start": "2015-01-01",
+    "end": "2015-02-09"
+  },
+  "raw": {
+    "pearson": 1.0,
+    "spearman": 1.0,
+    "ratio": 3.0
+  },
+  "harmonized": {
+    "pearson": 1.0,
+    "spearman": 1.0,
+    "ratio": 1.0
+  },
+  "cell_sweep": [
+    {
+      "cell_km": 5.5,
+      "raw_pearson": 1.0,
+      "harmonized_pearson": 1.0
+    },
+    {
+      "cell_km": 11.0,
+      "raw_pearson": 1.0,
+      "harmonized_pearson": 1.0
+    },
+    {
+      "cell_km": 16.5,
+      "raw_pearson": 1.0,
+      "harmonized_pearson": 1.0
+    },
+    {
+      "cell_km": 22.0,
+      "raw_pearson": 1.0,
+      "harmonized_pearson": 1.0
+    }
+  ]
+}

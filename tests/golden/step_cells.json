@@ -1,0 +1,62 @@
+[
+  {
+    "cell_id": "2_2",
+    "bounds": [
+      0.1,
+      0.1,
+      0.15,
+      0.15
+    ],
+    "raw": 60,
+    "harmonized": 30,
+    "peak_frp": 10.0
+  },
+  {
+    "cell_id": "6_6",
+    "bounds": [
+      0.3,
+      0.3,
+      0.35,
+      0.35
+    ],
+    "raw": 60,
+    "harmonized": 30,
+    "peak_frp": 10.0
+  },
+  {
+    "cell_id": "10_10",
+    "bounds": [
+      0.5,
+      0.5,
+      0.55,
+      0.55
+    ],
+    "raw": 60,
+    "harmonized": 30,
+    "peak_frp": 10.0
+  },
+  {
+    "cell_id": "14_14",
+    "bounds": [
+      0.7,
+      0.7,
+      0.75,
+      0.75
+    ],
+    "raw": 60,
+    "harmonized": 30,
+    "peak_frp": 10.0
+  },
+  {
+    "cell_id": "18_18",
+    "bounds": [
+      0.9,
+      0.9,
+      0.95,
+      0.95
+    ],
+    "raw": 60,
+    "harmonized": 30,
+    "peak_frp": 10.0
+  }
+]

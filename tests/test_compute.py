@@ -7,7 +7,9 @@ where VIIRS emits ~3x the detections of MODIS in the same cells.
 
 from __future__ import annotations
 
+import json
 import random
+from pathlib import Path
 
 import pytest
 
@@ -294,24 +296,17 @@ def test_cell_sweep_shape() -> None:
 
 # --- golden scenario: the whole point of the project ------------------------
 
-
-def _scenario() -> list[dict]:
-    dets: list[Detection] = []
-    cells = [(0.1 + 0.2 * i, 0.1 + 0.2 * i) for i in range(5)]
-    for month_year in ("2011-06", "2013-06"):
-        for day in range(1, 31):
-            date = f"{month_year}-{day:02d}"
-            for i, (lon, lat) in enumerate(cells):
-                if (day + i) % 2 == 0:
-                    dets.append(modis(lon, lat, date))
-                    if month_year == "2013-06":  # VIIRS only after the transition
-                        dets.append(viirs(lon, lat, date))
-                        dets.append(viirs(lon, lat, date))
-    return to_series(collapse_cell_days(dets))
+#: The committed fixture, written by ``tools/gen_golden.py``. Its detections are
+#: built by ``tools.gen_golden.step_detections`` and ``tests/test_golden.py``
+#: fails if this file drifts from a fresh run of the pipeline, so the headline
+#: numbers live in one place instead of being regenerated inside the test.
+GOLDEN_SERIES: list[dict] = json.loads(
+    (Path(__file__).parent / "golden" / "step_series.json").read_text()
+)
 
 
 def test_golden_raw_step_is_three_x_harmonized_is_flat() -> None:
-    series = _scenario()
+    series = GOLDEN_SERIES
     pre = [r for r in series if r["date"] < "2012-01-20"]
     post = [r for r in series if r["date"] >= "2012-01-20"]
 
