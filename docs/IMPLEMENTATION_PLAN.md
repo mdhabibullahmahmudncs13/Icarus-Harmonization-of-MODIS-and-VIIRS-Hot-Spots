@@ -399,6 +399,46 @@ release build (§3.5).
 4. Report validation numbers honestly.
 5. Lock scope; apply the cut order if behind (§9).
 
+### 6.1 Phase 4 status
+
+- [x] Pipeline run on real FIRMS data — four archive products
+      (`MODIS_SP`, `VIIRS_SNPP_SP`, `VIIRS_NOAA20_SP`, `VIIRS_NOAA21_SP`)
+      downloaded through `src/acquire` into `cache/raw/*.parquet`; the
+      driver is `cache/download.sh` (two products at a time, retries with
+      backoff against NASA's throttle). The merged cache currently holds
+      three products, **1,378,592 detections**, 2003-01-02 → 2026-06-28,
+      3,054 chunk parquets; NOAA-21 (epoch starts 2023) is still retrying.
+- [x] Frontend pointed at the API (one env var:
+      `VITE_DATA=api VITE_API_BASE=…`) — the badge reads `cache`,
+      `params_hash f4b82ef0c728`, and `/api/v1/*` serves all six views.
+- [x] Shape differences fixed in code, never by loosening the schema —
+      MODIS CSVs carry `brightness`, VIIRS carries `bright_ti4`; a plain
+      glob made DuckDB reject every request. Fixed with
+      `read_parquet(..., union_by_name = true)` in
+      `src/api/dataset.py`, guarded by
+      `tests/test_dataset.py::test_read_parquet_unions_products_that_do_not_share_a_csv_shape`.
+- [x] **Check the finding** — pre (2010–11, MODIS-only) vs post
+      (2013–14): raw total **34.0 → 184.1 detections/day = 5.42×**;
+      harmonized total **18.2 → 68.5 cell-days/day = 3.77×**; the
+      MODIS-only activity control is **0.92×**, so the jump is
+      sensor-driven, not burning-driven. First VIIRS detection:
+      2012-01-20. Mechanism: inside MODIS-supported cells the factor is
+      3.65× while VIIRS-novel cells add only ~2/day — the residual step
+      is VIIRS's temporal density (more days / more inside-cell events),
+      not newly covered land.
+- [x] Browser verification on the real cache — the overview chart shows
+      the raw step with the “VIIRS begins” marker (pre-2012 peaks
+      ≈2,000/day, post-2012 peaks 5,000–10,000/day), the harmonized mode
+      overlays a visibly flatter series, and flipping Raw ⇄ Harmonized
+      issues **zero new requests** (both series ship in one payload).
+      The validation card reports the overlap numbers below.
+- [x] Report validation numbers honestly — overlap over 15 years / 4,665
+      days: Pearson **0.779 → 0.823**, Spearman 0.822 → 0.812, ratio
+      **6.54 → 4.02**. Harmonization **reduces but does not eliminate**
+      the real-data step; the calibration shrinks the sensor jump by
+      about a third and lifts linear agreement, while rank agreement is
+      essentially flat. This is the honest result and it ships as-is.
+
 ---
 
 ## 7. Phase 5 — Offline hardening

@@ -66,6 +66,19 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   `content-encoding` transport headers, which otherwise made an offline
   reload fail with `net::ERR_FAILED`, and the page reports its used
   resources to the worker because they are fetched before it activates.
+- Phase 4 — the app now runs on real FIRMS data. Three archive products
+  (`MODIS_SP`, `VIIRS_SNPP_SP`, `VIIRS_NOAA20_SP`) are downloaded through
+  `src/acquire` into `cache/raw/*.parquet` — 1,378,592 detections,
+  2003-01-02 → 2026-06-28 — and the frontend points at the API with
+  `VITE_DATA=api`; the badge reads `cache` with `params_hash f4b82ef0c728`.
+  The finding holds on real data: pre (2010–11) vs post (2013–14) the raw
+  total jumps **5.42×** (34.0 → 184.1 detections/day) while the MODIS-only
+  activity control is 0.92×, and harmonization cuts the jump to **3.77×**
+  (18.2 → 68.5 cell-days/day). Overlap validation over 15 years / 4,665 days:
+  Pearson 0.779 → 0.823, ratio 6.54 → 4.02 (Spearman 0.822 → 0.812).
+  Harmonization reduces but does not eliminate the real-data step — the
+  residual is VIIRS's temporal density inside already-covered cells, not
+  newly covered land. `docs/IMPLEMENTATION_PLAN.md` §6.1 records it in full.
 
 ### Changed
 
@@ -119,6 +132,12 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   is now written only after it parses as fire data, and an already-poisoned
   cache falls through to a live fetch. This is what stalled `make cache` at
   457 chunks.
+- The real cache could not be read at all: MODIS CSVs carry `brightness` and
+  VIIRS CSVs carry `bright_ti4`, so a plain `read_parquet` glob failed on the
+  schema mismatch and every `/api/v1/*` route answered 500. The union is now
+  requested explicitly (`union_by_name = true` in `src/api/dataset.py`) with
+  `tests/test_dataset.py::test_read_parquet_unions_products_that_do_not_share_a_csv_shape`
+  guarding it; the contract was never loosened to accommodate the shape.
 
 ### Notes
 
