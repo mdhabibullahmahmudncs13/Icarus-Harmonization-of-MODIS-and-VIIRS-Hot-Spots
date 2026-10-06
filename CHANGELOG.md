@@ -82,6 +82,29 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   Harmonization reduces but does not eliminate the real-data step — the
   residual is VIIRS's temporal density inside already-covered cells, not
   newly covered land. `docs/IMPLEMENTATION_PLAN.md` §6.1 records it in full.
+- Phase 6 — the E1–E9 validation experiments (`src/validate/experiments.py`,
+  run by `python -m tools.experiments`, i.e. `make validate`). `docs/VALIDATION.md`
+  ships a table, an SVG figure and limitation notes per experiment, with the
+  machine-readable results in `validation/results.json`; `tests/test_experiments.py`
+  covers the harness on the deterministic synthetic input. Honest outcomes on
+  the current cache (1,484,296 detections, VIIRS join 2012-01-20): E1 the
+  artificial step shrinks 3.15× → 1.16× (the observed two-year-window step
+  3.03× → 2.12×); E2 **partial** — calibration cuts the leave-one-year-out
+  median |log offset| from 1.61 to 0.39, still above the report's pre-registered
+  0.25 ceiling; E3 the `c_min` sweep moves the kept fraction by 0.10 and the
+  step by 0.13; E4 a static mask at `min_days` 32 would remove 4.0% of
+  cell-days; E5 quantile mapping (0.41) beats multiplicative (0.54) and
+  log-log (0.63) in-sample; E6 the seasonal peak bin is stable across
+  daily/weekly/8-day; E7 the VIIRS-to-MODIS ratio grows 3.08 → 4.23 as NOAA-20
+  and NOAA-21 join S-NPP; E8 **not run** — no MCD64CMQ burned-area data is
+  bundled and it needs Earthdata authentication, so it is reported as a
+  limitation rather than an invented r²; E9 cache 216.3 MiB, API payload
+  latency 1.30 s, with Lighthouse and a real-device cold start not run.
+- `docs/REFERENCES.md` — dataset provenance (FIRMS products and routes, with
+  attribution), the project's AI-use policy (deterministic code performs the
+  science; no model in the path; synthetic data always labelled) and the method
+  bibliography, closing the "documents datasets, AI use, and references" item
+  of `docs/IMPLEMENTATION_PLAN.md` §11.
 
 ### Changed
 

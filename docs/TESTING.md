@@ -174,6 +174,15 @@ with a figure, a table, and limitation notes.
 Targets labelled "informative" are planning expectations, not claims. Report
 negative results.
 
+The experiments are implemented in `src/validate/experiments.py` and run by
+`python -m tools.experiments` (`make validate`). Each writes a table, a figure
+(`validation/figures/E*.svg`) and its limitation notes into
+`docs/VALIDATION.md`, with the machine-readable results in
+`validation/results.json`. The harness is covered by `tests/test_experiments.py`
+on the deterministic synthetic input; E9 measures the environment (cache size,
+API latency), so the report records one run rather than acting as a byte-exact
+golden.
+
 ---
 
 ## 10. Fixtures policy

@@ -1,0 +1,571 @@
+{
+  "params_hash": "716993489141",
+  "source": "cache",
+  "data": {
+    "rows": 1484296,
+    "date_range": [
+      "2003-01-02",
+      "2026-09-30"
+    ],
+    "viirs_join": "2012-01-20"
+  },
+  "experiments": [
+    {
+      "id": "E1",
+      "title": "Step-change detection",
+      "question": "Does the artificial cell-day step at the VIIRS join shrink after harmonization?",
+      "decision_rule": "The harmonized step is smaller than the raw step at the same join.",
+      "verdict": "supported",
+      "metrics": {
+        "synthetic_raw_step": 3.15,
+        "synthetic_harmonized_step": 1.1579,
+        "step_removed_fraction": 0.9266,
+        "observed_raw_step": 3.0314,
+        "observed_harmonized_step": 2.1217
+      },
+      "table": [
+        {
+          "join": "artificial (seeded)",
+          "raw_step": 3.15,
+          "harmonized_step": 1.1579
+        },
+        {
+          "join": "observed (2012-01-20)",
+          "raw_step": 3.0314,
+          "harmonized_step": 2.1217
+        }
+      ],
+      "figure": {
+        "kind": "bars",
+        "categories": [
+          "Raw",
+          "Harmonized"
+        ],
+        "y_label": "step ratio (post / pre)",
+        "series": [
+          {
+            "label": "artificial",
+            "values": [
+              3.15,
+              1.1579
+            ]
+          },
+          {
+            "label": "observed",
+            "values": [
+              3.0314,
+              2.1217
+            ]
+          }
+        ],
+        "reference": 1.0
+      },
+      "notes": [
+        "The artificial step is generated (docs/TESTING.md \u00a79 E1); it is a mechanism check, not evidence about real fires.",
+        "The observed step is the real MODIS/VIIRS join from the cache and is reported honestly, not tuned away.",
+        "Observed windows are two years either side of the join (2010-01-20..2012-01-20 vs 2012-01-20..2014-01-20), so these ratios differ from the Phase 4 finding in docs/IMPLEMENTATION_PLAN.md \u00a76.1, which uses the 2010-11 and 2013-14 windows."
+      ]
+    },
+    {
+      "id": "E2",
+      "title": "Calibration residual offset",
+      "question": "Does calibration pull the VIIRS/MODIS cell-day ratio toward 1 on held-out years?",
+      "decision_rule": "Leave-one-year-out median |log offset| <= 0.25 (\u2248 \u00b128%).",
+      "verdict": "partial",
+      "metrics": {
+        "overlap_start": "2012-01-20",
+        "overlap_end": "2026-06-03",
+        "overlap_years": 15,
+        "median_abs_offset_raw": 1.6094,
+        "median_abs_offset_calibrated": 0.3867,
+        "ceiling": 0.25
+      },
+      "table": [
+        {
+          "year": 2012,
+          "days": 288,
+          "median_abs_offset_raw": 1.2528,
+          "median_abs_offset_calibrated": 0.3936
+        },
+        {
+          "year": 2013,
+          "days": 309,
+          "median_abs_offset_raw": 1.2528,
+          "median_abs_offset_calibrated": 0.3205
+        },
+        {
+          "year": 2014,
+          "days": 316,
+          "median_abs_offset_raw": 1.4948,
+          "median_abs_offset_calibrated": 0.3278
+        },
+        {
+          "year": 2015,
+          "days": 315,
+          "median_abs_offset_raw": 1.3863,
+          "median_abs_offset_calibrated": 0.3385
+        },
+        {
+          "year": 2016,
+          "days": 317,
+          "median_abs_offset_raw": 1.3863,
+          "median_abs_offset_calibrated": 0.3702
+        },
+        {
+          "year": 2017,
+          "days": 308,
+          "median_abs_offset_raw": 1.3863,
+          "median_abs_offset_calibrated": 0.3971
+        },
+        {
+          "year": 2018,
+          "days": 331,
+          "median_abs_offset_raw": 1.6094,
+          "median_abs_offset_calibrated": 0.3898
+        },
+        {
+          "year": 2019,
+          "days": 337,
+          "median_abs_offset_raw": 1.8405,
+          "median_abs_offset_calibrated": 0.416
+        },
+        {
+          "year": 2020,
+          "days": 332,
+          "median_abs_offset_raw": 1.7918,
+          "median_abs_offset_calibrated": 0.3844
+        },
+        {
+          "year": 2021,
+          "days": 337,
+          "median_abs_offset_raw": 1.6438,
+          "median_abs_offset_calibrated": 0.3327
+        },
+        {
+          "year": 2022,
+          "days": 339,
+          "median_abs_offset_raw": 1.7918,
+          "median_abs_offset_calibrated": 0.4066
+        },
+        {
+          "year": 2023,
+          "days": 340,
+          "median_abs_offset_raw": 1.8845,
+          "median_abs_offset_calibrated": 0.4263
+        },
+        {
+          "year": 2024,
+          "days": 335,
+          "median_abs_offset_raw": 1.9459,
+          "median_abs_offset_calibrated": 0.3879
+        },
+        {
+          "year": 2025,
+          "days": 331,
+          "median_abs_offset_raw": 1.9459,
+          "median_abs_offset_calibrated": 0.3857
+        },
+        {
+          "year": 2026,
+          "days": 154,
+          "median_abs_offset_raw": 2.2122,
+          "median_abs_offset_calibrated": 0.6385
+        }
+      ],
+      "figure": {
+        "kind": "bars",
+        "categories": [
+          "Raw",
+          "Calibrated"
+        ],
+        "y_label": "median |log offset|",
+        "series": [
+          {
+            "label": "leave-one-year-out",
+            "values": [
+              1.6094,
+              0.3867
+            ]
+          }
+        ],
+        "reference": 0.25
+      },
+      "notes": [
+        "Offset is |log((VIIRS cell-days + 1) / (MODIS cell-days + 1))| per day; the median is over held-out days.",
+        "The ceiling 0.25 is pre-registered for this report; it is not a published value."
+      ]
+    },
+    {
+      "id": "E3",
+      "title": "Sensitivity to the quality threshold",
+      "question": "How much do the series and the step move when c_min varies?",
+      "decision_rule": "Report the change; no pass/fail. A large swing means the result is threshold-fragile.",
+      "verdict": "supported",
+      "metrics": {
+        "c_min_values": [
+          20.0,
+          30.0,
+          40.0,
+          50.0
+        ],
+        "kept_fraction_span": 0.1017,
+        "harmonized_step_span": 0.1308
+      },
+      "table": [
+        {
+          "c_min": 20.0,
+          "detections_kept": 1479444,
+          "kept_fraction": 0.9967,
+          "mean_harmonized_per_day": 73.912,
+          "mean_raw_per_day": 224.7712,
+          "harmonized_step": 2.1821
+        },
+        {
+          "c_min": 30.0,
+          "detections_kept": 1365796,
+          "kept_fraction": 0.9202,
+          "mean_harmonized_per_day": 70.8867,
+          "mean_raw_per_day": 208.9012,
+          "harmonized_step": 2.0571
+        },
+        {
+          "c_min": 40.0,
+          "detections_kept": 1352027,
+          "kept_fraction": 0.9109,
+          "mean_harmonized_per_day": 71.0202,
+          "mean_raw_per_day": 208.904,
+          "harmonized_step": 2.0514
+        },
+        {
+          "c_min": 50.0,
+          "detections_kept": 1328525,
+          "kept_fraction": 0.8951,
+          "mean_harmonized_per_day": 70.5877,
+          "mean_raw_per_day": 207.3229,
+          "harmonized_step": 2.1217
+        }
+      ],
+      "figure": {
+        "kind": "lines",
+        "x": [
+          "20.0",
+          "30.0",
+          "40.0",
+          "50.0"
+        ],
+        "x_label": "c_min",
+        "y_label": "mean harmonized cell-days / day",
+        "series": [
+          {
+            "label": "mean per day",
+            "values": [
+              73.912,
+              70.8867,
+              71.0202,
+              70.5877
+            ]
+          }
+        ]
+      },
+      "notes": [
+        "The default c_min is 30 (docs/PARAMETERS.md); the higher thresholds trade sensitivity for specificity.",
+        "Detections kept is the share of the raw table that survives the cut after the VIIRS confidence mapping."
+      ]
+    },
+    {
+      "id": "E4",
+      "title": "Static-mask sensitivity",
+      "question": "What fraction of cells and cell-days would a static activity mask remove at each min_days?",
+      "decision_rule": "Report the removal fraction; no pass/fail. A large fraction means the mask would bite.",
+      "verdict": "supported",
+      "metrics": {
+        "cells_total": 8241,
+        "min_days_values": [
+          8,
+          16,
+          32
+        ],
+        "max_cell_days_removed_fraction": 0.0401
+      },
+      "table": [
+        {
+          "min_days": 8,
+          "cells_removed": 2900,
+          "cells_removed_fraction": 0.3519,
+          "cell_days_removed_fraction": 0.0076
+        },
+        {
+          "min_days": 16,
+          "cells_removed": 3860,
+          "cells_removed_fraction": 0.4684,
+          "cell_days_removed_fraction": 0.0179
+        },
+        {
+          "min_days": 32,
+          "cells_removed": 4791,
+          "cells_removed_fraction": 0.5814,
+          "cell_days_removed_fraction": 0.0401
+        }
+      ],
+      "figure": {
+        "kind": "bars",
+        "categories": [
+          "8",
+          "16",
+          "32"
+        ],
+        "x_label": "min_days",
+        "y_label": "fraction of cell-days removed",
+        "series": [
+          {
+            "label": "cell-days removed",
+            "values": [
+              0.0076,
+              0.0179,
+              0.0401
+            ]
+          }
+        ]
+      },
+      "notes": [
+        "The pipeline as built applies no static activity mask; this reports what one would remove.",
+        "Removal is measured on the working grid (cell-days), not the documented ~550 m fine grid."
+      ]
+    },
+    {
+      "id": "E5",
+      "title": "Non-linear calibration diagnostics",
+      "question": "Do log-log or quantile mapping beat multiplicative at tile level?",
+      "decision_rule": "Report median |log residual| per method; lower is better.",
+      "verdict": "supported",
+      "metrics": {
+        "tiles": 294,
+        "loglog_slope": 0.9219,
+        "loglog_intercept": -1.3972,
+        "best_method": "quantile mapping"
+      },
+      "table": [
+        {
+          "method": "multiplicative",
+          "median_abs_log_residual": 0.5352
+        },
+        {
+          "method": "log-log",
+          "median_abs_log_residual": 0.6279
+        },
+        {
+          "method": "quantile mapping",
+          "median_abs_log_residual": 0.4055
+        }
+      ],
+      "figure": {
+        "kind": "bars",
+        "categories": [
+          "multiplicative",
+          "log-log",
+          "quantile mapping"
+        ],
+        "y_label": "median |log residual|",
+        "series": [
+          {
+            "label": "residual",
+            "values": [
+              0.5352,
+              0.6279,
+              0.4055
+            ]
+          }
+        ]
+      },
+      "notes": [
+        "Residual is |log((predicted + 1) / (MODIS + 1))| at the 1\u00b0 tile / month level.",
+        "Quantile mapping is in-sample here (it uses the same tiles it scores) and is optimistic by construction."
+      ]
+    },
+    {
+      "id": "E6",
+      "title": "Temporal resolution",
+      "question": "Do weekly and 8-day views change the step or the critical period?",
+      "decision_rule": "The seasonal peak bin is stable across resolutions; report step and timing.",
+      "verdict": "supported",
+      "metrics": {
+        "peak_bin_stable": true,
+        "resolutions": [
+          "daily",
+          "weekly",
+          "8-day"
+        ]
+      },
+      "table": [
+        {
+          "resolution": "daily",
+          "bins": 6408,
+          "mean_per_bin": 70.5877,
+          "step_ratio": 2.1217,
+          "onset_bin": 6,
+          "peak_bin": 11,
+          "end_bin": 16
+        },
+        {
+          "resolution": "weekly",
+          "bins": 1117,
+          "mean_per_bin": 404.9472,
+          "step_ratio": 2.7015,
+          "onset_bin": 6,
+          "peak_bin": 11,
+          "end_bin": 16
+        },
+        {
+          "resolution": "8-day",
+          "bins": 990,
+          "mean_per_bin": 456.8949,
+          "step_ratio": 2.8076,
+          "onset_bin": 6,
+          "peak_bin": 11,
+          "end_bin": 16
+        }
+      ],
+      "figure": {
+        "kind": "bars",
+        "categories": [
+          "daily",
+          "weekly",
+          "8-day"
+        ],
+        "x_label": "resolution",
+        "y_label": "step ratio (post / pre)",
+        "series": [
+          {
+            "label": "step",
+            "values": [
+              2.1217,
+              2.7015,
+              2.8076
+            ]
+          }
+        ],
+        "reference": 1.0
+      },
+      "notes": [
+        "The critical period is computed on the whole series, not just the overlap, at 8-day doy bins.",
+        "Weekly and 8-day bins aggregate more activity and are less sensitive to single-day outliers."
+      ]
+    },
+    {
+      "id": "E7",
+      "title": "VIIRS satellite inclusion",
+      "question": "What changes when NOAA-20 and NOAA-21 join S-NPP?",
+      "decision_rule": "Report the step, overlap correlation and ratio as satellites accumulate; no pass/fail.",
+      "verdict": "supported",
+      "metrics": {
+        "satellites_swept": [
+          "Suomi-NPP",
+          "NOAA-20",
+          "NOAA-21"
+        ],
+        "groups": 3,
+        "final_viirs_cell_days": 362132
+      },
+      "table": [
+        {
+          "included": "Suomi-NPP",
+          "viirs_cell_days": 260479,
+          "step_ratio": 2.1217,
+          "modis_viirs_pearson": 0.8325,
+          "modis_viirs_ratio": 3.0825
+        },
+        {
+          "included": "Suomi-NPP + NOAA-20",
+          "viirs_cell_days": 342965,
+          "step_ratio": 2.1217,
+          "modis_viirs_pearson": 0.8226,
+          "modis_viirs_ratio": 4.0152
+        },
+        {
+          "included": "Suomi-NPP + NOAA-20 + NOAA-21",
+          "viirs_cell_days": 362132,
+          "step_ratio": 2.1217,
+          "modis_viirs_pearson": 0.8141,
+          "modis_viirs_ratio": 4.2279
+        }
+      ],
+      "figure": {
+        "kind": "lines",
+        "x": [
+          "Suomi-NPP",
+          "Suomi-NPP + NOAA-20",
+          "Suomi-NPP + NOAA-20 + NOAA-21"
+        ],
+        "x_label": "VIIRS included",
+        "y_label": "step ratio (post / pre)",
+        "series": [
+          {
+            "label": "step",
+            "values": [
+              2.1217,
+              2.1217,
+              2.1217
+            ]
+          }
+        ],
+        "reference": 1.0
+      },
+      "notes": [
+        "Adding satellites changes the raw density and the overlap only from the later satellites' epochs.",
+        "NOAA-21 is ingested from the NRT source (the FIRMS Area API serves no SP source for it)."
+      ]
+    },
+    {
+      "id": "E8",
+      "title": "External validation",
+      "question": "Does harmonized density track MCD64CMQ burned area (r\u00b2 > 0.5 at 0.25\u00b0)?",
+      "decision_rule": "r\u00b2 > 0.5 against MCD64CMQ burned area at 0.25\u00b0 over the overlap.",
+      "verdict": "limitation",
+      "metrics": {},
+      "table": [],
+      "figure": null,
+      "notes": [
+        "MCD64CMQ burned-area data is not bundled with this repository and needs Earthdata authentication to fetch.",
+        "Not fabricated: the experiment is reported as not run rather than given an invented r\u00b2.",
+        "To run it, fetch MCD64CMQ over the AOI and the overlap, resample to 0.25\u00b0, and correlate against the harmonized density."
+      ]
+    },
+    {
+      "id": "E9",
+      "title": "Offline performance",
+      "question": "How big is the cache, how fast is the API, how fast is an offline cold start?",
+      "decision_rule": "Measure and report each; Lighthouse and a real-device start are reported as limitations.",
+      "verdict": "partial",
+      "metrics": {
+        "cache_bytes": 226773065,
+        "cache_mib": 216.27,
+        "cache_files": 6988,
+        "api_latency_s": 1.301,
+        "cold_start_s": null
+      },
+      "table": [
+        {
+          "metric": "cache size",
+          "value": "216.3 MiB (6988 files)"
+        },
+        {
+          "metric": "API latency",
+          "value": "1.301 s"
+        },
+        {
+          "metric": "offline cold start",
+          "value": "not measured"
+        },
+        {
+          "metric": "Lighthouse PWA score",
+          "value": "not run (no headless Chrome/Lighthouse in this environment)"
+        }
+      ],
+      "figure": null,
+      "notes": [
+        "The offline cold start is automated in web/e2e/offline-cold-start.spec.ts; the real-device run and the fallback video are not recorded.",
+        "Lighthouse is not installed here, so its PWA score is reported as a limitation, not a number."
+      ]
+    }
+  ]
+}

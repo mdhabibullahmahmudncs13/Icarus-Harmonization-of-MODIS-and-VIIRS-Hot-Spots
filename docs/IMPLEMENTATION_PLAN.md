@@ -497,6 +497,40 @@ Run and document the pre-registered experiments (see `docs/TESTING.md` §9).
 Report negative results. Each result ships with a figure, a table, and
 limitations.
 
+### 8.1 Phase 6 status
+
+Implemented in `src/validate/experiments.py`, run by `python -m tools.experiments`
+(`make validate`) over the served detections; the report is `docs/VALIDATION.md`,
+with figures under `validation/figures/` and machine-readable results in
+`validation/results.json`. `tests/test_experiments.py` covers the harness on the
+deterministic synthetic input.
+
+- [x] E1 — step-change detection: the artificial cell-day step at the join
+      shrinks **3.15× → 1.16×**; the observed two-year-window step shrinks
+      3.03× → 2.12× (a different window from §6.1, and noted as such).
+- [x] E2 — calibration residual offset: **partial**. Leave-one-year-out the
+      median |log offset| falls 1.61 → 0.39, an improvement that still sits
+      above this report's pre-registered 0.25 ceiling.
+- [x] E3 — quality threshold: sweeping `c_min` {20,30,40,50} moves the kept
+      fraction by 0.10 and the harmonized step by 0.13 — the result is not
+      threshold-fragile.
+- [x] E4 — static-mask sensitivity: `min_days` {8,16,32} would remove 0.8%,
+      1.8% and 4.0% of cell-days respectively (the pipeline itself applies no
+      mask).
+- [x] E5 — non-linear calibration: quantile mapping (0.41) beats
+      multiplicative (0.54) and log-log (0.63) in-sample; quantile mapping is
+      optimistic by construction and flagged.
+- [x] E6 — temporal resolution: daily / weekly / 8-day agree on the seasonal
+      peak bin.
+- [x] E7 — VIIRS inclusion: the VIIRS-to-MODIS cell-day ratio grows
+      3.08 → 4.23 as NOAA-20 and NOAA-21 join S-NPP.
+- [ ] E8 — external validation: **not run**. MCD64CMQ burned area is not
+      bundled and needs Earthdata authentication; reported as a limitation,
+      never as an invented r².
+- [x] E9 — offline performance: cache 216.3 MiB / 6,988 files, `/api/v1/series`
+      payload 1.30 s. Lighthouse PWA score and a real-device cold start remain
+      unmeasured (see §7.1).
+
 ---
 
 ## 9. Cut order (if behind)
@@ -533,4 +567,7 @@ Never cut the toggle demo or the offline cold start.
   with the network off.
 - The validation card shows raw and harmonized correlations from the overlap.
 - The repo is public, Apache-2.0, and documents datasets, AI use, and
-  references.
+  references — `docs/REFERENCES.md` (datasets, the no-LLM-in-the-science
+  policy, and the bibliography), with field detail in `docs/DATA_DICTIONARY.md`.
+  The root `README.md` and `LICENSE` were intentionally retired in `c8781da`;
+  Apache-2.0 is still the stated intent and should be restored before release.

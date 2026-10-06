@@ -17,6 +17,8 @@ defined in `docs/PARAMETERS.md`.
 
 Source attribution: **NASA FIRMS / LANCE / EOSDIS** and **NASA LAADS DAAC**.
 Every dataset that reaches a displayed number is listed here with its route.
+Dataset provenance, the project's AI-use policy and the method bibliography are
+in `docs/REFERENCES.md`.
 
 ---
 
