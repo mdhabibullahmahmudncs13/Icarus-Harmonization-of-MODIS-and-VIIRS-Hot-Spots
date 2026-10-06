@@ -1,59 +1,61 @@
-/**
- * Provenance drawer: every figure opens the JSON behind it (plan,
- * principle 6). Non-modal side drawer; Escape closes it and focus returns
- * to the trigger via the close button.
- */
-import { useEffect, useRef, type ReactElement } from "react";
-
-export interface ProvenanceDrawerProps {
-  open: boolean;
-  /** Human title of the figure, e.g. "Daily counts". */
-  title: string;
-  /** The raw JSON payload behind the figure. */
-  payload: unknown;
-  onClose: () => void;
-}
+import { useEffect } from 'react';
+import type { MetaBlock } from '../contract/types';
+import { SourceBadge } from './shared';
 
 export function ProvenanceDrawer({
   open,
-  title,
+  meta,
+  label,
   payload,
   onClose,
-}: ProvenanceDrawerProps): ReactElement | null {
-  const closeRef = useRef<HTMLButtonElement>(null);
-
+}: {
+  open: boolean;
+  meta: MetaBlock | null;
+  label: string;
+  payload: unknown;
+  onClose: () => void;
+}) {
   useEffect(() => {
     if (!open) return;
-    closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
   if (!open) return null;
 
   return (
-    <div
-      className="drawer"
-      role="dialog"
-      aria-modal="false"
-      aria-label={`Source JSON for ${title}`}
-      data-testid="provenance-drawer"
-    >
-      <div className="drawer-header">
-        <h2>Source JSON — {title}</h2>
-        <button type="button" className="drawer-close" onClick={onClose} ref={closeRef}>
-          Close
-        </button>
-      </div>
-      <p className="drawer-note">
-        Exactly the payload this figure was rendered from, as delivered by the data source.
-      </p>
-      <pre className="drawer-json" tabIndex={0}>
-        <code>{JSON.stringify(payload, null, 2)}</code>
-      </pre>
+    <div className="drawer-backdrop" onClick={onClose} role="presentation">
+      <aside
+        className="drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Provenance"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="card__head" style={{ padding: '0 0 12px', border: 0 }}>
+          <span className="card__title">Provenance — {label}</span>
+          <button type="button" className="nav-item" style={{ marginLeft: 'auto' }} onClick={onClose}>
+            Close (Esc)
+          </button>
+        </div>
+        {meta ? (
+          <div className="status-card" style={{ marginBottom: 12 }}>
+            <div>
+              <SourceBadge source={meta.source} />
+            </div>
+            <div>generated_at {meta.generated_at}</div>
+            <div>params_hash {meta.params_hash}</div>
+            <div>cell_km {meta.cell_km}</div>
+            <div>
+              date_range {meta.date_range[0]} → {meta.date_range[1]}
+            </div>
+          </div>
+        ) : null}
+        <pre>{JSON.stringify(payload, null, 2)}</pre>
+      </aside>
     </div>
   );
 }

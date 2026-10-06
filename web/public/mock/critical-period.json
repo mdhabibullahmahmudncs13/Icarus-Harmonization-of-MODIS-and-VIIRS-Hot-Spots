@@ -1,0 +1,61 @@
+{
+  "meta": {
+    "source": "mock",
+    "generated_at": "2026-10-05T00:00:00Z",
+    "region": {
+      "bbox": [
+        60.0,
+        5.0,
+        93.0,
+        36.0
+      ]
+    },
+    "cell_km": 5.5,
+    "min_confidence": 50,
+    "date_range": [
+      "2010-01-01",
+      "2016-12-31"
+    ],
+    "params_hash": "b516d1ea6176"
+  },
+  "aoi": "BGD",
+  "insufficient_activity": false,
+  "onset_bin": 4,
+  "peak_bin": 11,
+  "end_bin": 34,
+  "window": {
+    "start_bin": 3,
+    "end_bin": 35,
+    "mass": 0.8613
+  },
+  "year_timing_deviation": [
+    {
+      "year": 2010,
+      "days": 10
+    },
+    {
+      "year": 2011,
+      "days": 10
+    },
+    {
+      "year": 2012,
+      "days": 10
+    },
+    {
+      "year": 2013,
+      "days": 10
+    },
+    {
+      "year": 2014,
+      "days": 10
+    },
+    {
+      "year": 2015,
+      "days": 10
+    },
+    {
+      "year": 2016,
+      "days": 10
+    }
+  ]
+}

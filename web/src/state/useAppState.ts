@@ -1,23 +1,37 @@
-/**
- * React binding for the URL-synced app state.
- * The URL is the source of truth: back/forward buttons stay consistent.
- */
-import { useCallback, useEffect, useState } from "react";
-import { parseAppState, writeStateToUrl, type AppState } from "./urlState";
+import { useCallback, useEffect, useState } from 'react';
+import { buildHash, parseHash, type AppState, type View } from './urlState';
+import type { Mode } from '../contract/types';
 
-export function useAppState(): [AppState, (next: AppState) => void] {
-  const [state, setState] = useState<AppState>(() => parseAppState(window.location.search));
+export function useAppState(): {
+  state: AppState;
+  setView: (view: View) => void;
+  setMode: (mode: Mode) => void;
+  setAoi: (aoi: string) => void;
+  setDate: (date: string | null) => void;
+} {
+  const [state, setState] = useState<AppState>(() =>
+    typeof window === 'undefined' ? parseHash('') : parseHash(window.location.hash),
+  );
 
   useEffect(() => {
-    const onPop = (): void => setState(parseAppState(window.location.search));
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
+    const onHash = () => setState(parseHash(window.location.hash));
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  const update = useCallback((next: AppState) => {
+  const commit = useCallback((next: AppState) => {
     setState(next);
-    writeStateToUrl(next);
+    const hash = buildHash(next);
+    if (typeof window !== 'undefined' && window.location.hash !== hash) {
+      window.history.replaceState(null, '', hash);
+    }
   }, []);
 
-  return [state, update];
+  return {
+    state,
+    setView: (view: View) => commit({ ...state, view }),
+    setMode: (mode: Mode) => commit({ ...state, mode }),
+    setAoi: (aoi: string) => commit({ ...state, aoi }),
+    setDate: (date: string | null) => commit({ ...state, date }),
+  };
 }

@@ -1,56 +1,58 @@
 {
   "meta": {
     "source": "mock",
-    "generated_at": "2026-10-04T00:00:00Z",
+    "generated_at": "2026-10-05T00:00:00Z",
     "region": {
       "bbox": [
-        88,
-        20,
-        93,
-        27
+        60.0,
+        5.0,
+        93.0,
+        36.0
       ]
     },
     "cell_km": 5.5,
     "min_confidence": 50,
     "date_range": [
-      "2003-01-01",
-      "2026-09-30"
-    ]
+      "2010-01-01",
+      "2016-12-31"
+    ],
+    "params_hash": "b516d1ea6176"
   },
   "overlap": {
-    "start": "2012-01-01",
-    "end": "2026-09-30"
+    "years": [
+      2012,
+      2013,
+      2014,
+      2015,
+      2016
+    ],
+    "n_days": 1808
   },
   "raw": {
-    "pearson": 0.9936,
-    "spearman": 0.9696,
-    "ratio": 2.118
+    "pearson": 0.9919,
+    "spearman": 0.9904,
+    "ratio": 0.3556
   },
   "harmonized": {
     "pearson": 0.997,
-    "spearman": 0.9846,
-    "ratio": 1.1421
+    "spearman": 0.9964,
+    "ratio": 0.9225
   },
   "cell_sweep": [
     {
       "cell_km": 5.5,
-      "raw_pearson": 0.9936,
-      "harmonized_pearson": 0.997
+      "raw_correlation": 0.9919,
+      "harmonized_correlation": 0.997
     },
     {
-      "cell_km": 11,
-      "raw_pearson": 0.9936,
-      "harmonized_pearson": 0.9969
+      "cell_km": 11.0,
+      "raw_correlation": 0.9919,
+      "harmonized_correlation": 0.9966
     },
     {
-      "cell_km": 16.5,
-      "raw_pearson": 0.9936,
-      "harmonized_pearson": 0.9968
-    },
-    {
-      "cell_km": 22,
-      "raw_pearson": 0.9936,
-      "harmonized_pearson": 0.9968
+      "cell_km": 22.0,
+      "raw_correlation": 0.9919,
+      "harmonized_correlation": 0.9958
     }
   ]
 }

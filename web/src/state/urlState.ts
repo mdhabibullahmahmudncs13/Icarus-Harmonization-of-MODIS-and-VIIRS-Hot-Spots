@@ -1,49 +1,65 @@
-/**
- * App state: mode (raw | harmonized) and selected date, synced to the URL
- * query string (F1 acceptance). Parsing and serializing are pure so they
- * can be unit-tested without a browser.
- */
+import type { Mode } from '../contract/types';
 
-export type Mode = "raw" | "harmonized";
+export type View =
+  | 'overview'
+  | 'calendar'
+  | 'map'
+  | 'anomalies'
+  | 'critical'
+  | 'validation'
+  | 'methods'
+  | 'offline';
+
+export const VIEWS: View[] = [
+  'overview',
+  'calendar',
+  'map',
+  'anomalies',
+  'critical',
+  'validation',
+  'methods',
+  'offline',
+];
 
 export interface AppState {
+  view: View;
   mode: Mode;
-  /** Selected date, ISO (YYYY-MM-DD), or null when nothing is selected. */
+  aoi: string;
   date: string | null;
 }
 
-export const DEFAULT_STATE: AppState = { mode: "raw", date: null };
+export const DEFAULT_STATE: AppState = {
+  view: 'overview',
+  mode: 'harmonized',
+  aoi: 'BGD',
+  date: null,
+};
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-export function parseMode(value: string | null | undefined): Mode {
-  return value === "harmonized" ? "harmonized" : "raw";
+function isView(value: string): value is View {
+  return (VIEWS as string[]).includes(value);
 }
 
-/** Parse `?mode=...&date=...` into app state. Unknown values fall back to defaults. */
-export function parseAppState(search: string): AppState {
-  const params = new URLSearchParams(search);
-  const date = params.get("date");
+/** Parse a location hash such as "#calendar?mode=raw&aoi=BGD". */
+export function parseHash(hash: string): AppState {
+  const raw = hash.startsWith('#') ? hash.slice(1) : hash;
+  if (!raw) return { ...DEFAULT_STATE };
+  const [path, query = ''] = raw.split('?');
+  const params = new URLSearchParams(query);
+  const mode = params.get('mode');
+  const date = params.get('date');
   return {
-    mode: parseMode(params.get("mode")),
-    date: date !== null && ISO_DATE.test(date) ? date : null,
+    view: isView(path) ? path : DEFAULT_STATE.view,
+    mode: mode === 'raw' || mode === 'harmonized' ? mode : DEFAULT_STATE.mode,
+    aoi: params.get('aoi') ?? DEFAULT_STATE.aoi,
+    date: date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null,
   };
 }
 
-/** Serialize app state into a query string, always including mode. */
-export function serializeAppState(state: AppState): string {
+/** Serialise app state back to a location hash. */
+export function buildHash(state: AppState): string {
   const params = new URLSearchParams();
-  params.set("mode", state.mode);
-  if (state.date !== null) params.set("date", state.date);
-  return `?${params.toString()}`;
-}
-
-/** Push state to the browser history so the URL always matches the app. */
-export function writeStateToUrl(
-  state: AppState,
-  loc: Location = window.location,
-  history: History = window.history,
-): void {
-  const query = serializeAppState(state);
-  history.pushState(null, "", `${loc.pathname}${query}${loc.hash}`);
+  params.set('mode', state.mode);
+  params.set('aoi', state.aoi);
+  if (state.date) params.set('date', state.date);
+  return `#${state.view}?${params.toString()}`;
 }

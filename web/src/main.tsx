@@ -1,22 +1,14 @@
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { App } from './App';
+import './styles/tokens.css';
+import './styles/app.css';
 
-// Self-hosted fonts, bundled locally — no CDN, no remote fonts (DESIGN.md §4.5).
-import "@fontsource-variable/fraunces";
-import "@fontsource-variable/inter";
-import "@fontsource/jetbrains-mono/400.css";
-import "@fontsource/jetbrains-mono/500.css";
-import "@fontsource/jetbrains-mono/700.css";
+const el = document.getElementById('root');
+if (!el) throw new Error('#root not found');
 
-import "./styles/tokens.css";
-import "./styles/app.css";
-import App from "./App";
-
-const root = document.getElementById("root");
-if (root === null) throw new Error("missing #root element");
-
-createRoot(root).render(
-  <StrictMode>
+createRoot(el).render(
+  <React.StrictMode>
     <App />
-  </StrictMode>,
+  </React.StrictMode>,
 );

@@ -1,0 +1,53 @@
+{
+  "meta": {
+    "source": "mock",
+    "generated_at": "2026-10-05T00:00:00Z",
+    "region": {
+      "bbox": [
+        60.0,
+        5.0,
+        93.0,
+        36.0
+      ]
+    },
+    "cell_km": 5.5,
+    "min_confidence": 50,
+    "date_range": [
+      "2010-01-01",
+      "2016-12-31"
+    ],
+    "params_hash": "b516d1ea6176"
+  },
+  "presets": [
+    {
+      "id": "BGD",
+      "name": "Bangladesh",
+      "bbox": [
+        88.0,
+        20.0,
+        93.0,
+        27.0
+      ]
+    },
+    {
+      "id": "IND-C",
+      "name": "Central India",
+      "bbox": [
+        75.0,
+        18.0,
+        82.0,
+        25.0
+      ]
+    },
+    {
+      "id": "NPL",
+      "name": "Nepal Terai",
+      "bbox": [
+        80.0,
+        26.0,
+        88.0,
+        31.0
+      ]
+    }
+  ]
+}

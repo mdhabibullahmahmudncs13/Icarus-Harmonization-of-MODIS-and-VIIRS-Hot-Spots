@@ -1,9 +1,0 @@
-node_modules/
-dist/
-public/mock/
-playwright-report/
-test-results/
-package-lock.json
-
-# One-time generator inputs (minified data, not source)
-scripts/data/

@@ -1,29 +1,43 @@
 {
   "meta": {
     "source": "mock",
-    "generated_at": "2026-10-04T00:00:00Z",
+    "generated_at": "2026-10-05T00:00:00Z",
     "region": {
       "bbox": [
-        88,
-        20,
-        93,
-        27
+        60.0,
+        5.0,
+        93.0,
+        36.0
       ]
     },
     "cell_km": 5.5,
     "min_confidence": 50,
     "date_range": [
-      "2003-01-01",
-      "2026-09-30"
-    ]
+      "2010-01-01",
+      "2016-12-31"
+    ],
+    "params_hash": "b516d1ea6176"
   },
-  "date": "2024-03-15",
-  "value": 55,
-  "percentile": 36.9,
-  "baseline_window": 7,
+  "query": {
+    "date": "2016-04-07",
+    "aoi": "BGD"
+  },
+  "value": 125,
+  "percentile": 0.9954,
+  "flag": "extreme",
+  "baseline_window": 15,
   "doy_range": [
-    68,
-    82
+    83,
+    113
   ],
-  "years_used": 24
+  "years_used": [
+    2010,
+    2011,
+    2012,
+    2013,
+    2014,
+    2015,
+    2016
+  ],
+  "reason": null
 }

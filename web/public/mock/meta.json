@@ -1,46 +1,52 @@
 {
   "meta": {
     "source": "mock",
-    "generated_at": "2026-10-04T00:00:00Z",
+    "generated_at": "2026-10-05T00:00:00Z",
     "region": {
       "bbox": [
-        88,
-        20,
-        93,
-        27
+        60.0,
+        5.0,
+        93.0,
+        36.0
       ]
     },
     "cell_km": 5.5,
     "min_confidence": 50,
     "date_range": [
-      "2003-01-01",
-      "2026-09-30"
-    ]
+      "2010-01-01",
+      "2016-12-31"
+    ],
+    "params_hash": "b516d1ea6176"
   },
   "sensors": [
     {
-      "product": "MODIS C6.1 hotspots",
+      "product": "MODIS_SP",
       "family": "MODIS",
-      "start": "2003-01-01",
-      "end": "2026-09-30"
+      "start": "2010-01-01",
+      "end": "2016-12-31"
     },
     {
-      "product": "VIIRS 375 m Suomi-NPP",
+      "product": "VIIRS_NOAA20_SP",
       "family": "VIIRS",
-      "start": "2012-01-01",
-      "end": "2026-11-01"
+      "start": "2012-01-20",
+      "end": "2016-12-31"
     },
     {
-      "product": "VIIRS 375 m NOAA-20",
+      "product": "VIIRS_SNPP_SP",
       "family": "VIIRS",
-      "start": "2017-01-01",
-      "end": null
-    },
-    {
-      "product": "VIIRS 375 m NOAA-21",
-      "family": "VIIRS",
-      "start": "2024-01-01",
-      "end": null
+      "start": "2012-01-20",
+      "end": "2018-12-31"
     }
+  ],
+  "years": {
+    "start": 2010,
+    "end": 2016
+  },
+  "streams": [
+    "MOD_T",
+    "MOD_A",
+    "VIIRS_SNPP",
+    "VIIRS_N20",
+    "VIIRS_N21"
   ]
 }

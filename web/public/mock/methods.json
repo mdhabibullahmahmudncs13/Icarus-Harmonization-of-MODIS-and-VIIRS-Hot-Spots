@@ -1,55 +1,57 @@
 {
   "meta": {
     "source": "mock",
-    "generated_at": "2026-10-04T00:00:00Z",
+    "generated_at": "2026-10-05T00:00:00Z",
     "region": {
       "bbox": [
-        88,
-        20,
-        93,
-        27
+        60.0,
+        5.0,
+        93.0,
+        36.0
       ]
     },
     "cell_km": 5.5,
     "min_confidence": 50,
     "date_range": [
-      "2003-01-01",
-      "2026-09-30"
-    ]
+      "2010-01-01",
+      "2016-12-31"
+    ],
+    "params_hash": "b516d1ea6176"
   },
   "cell_km": 5.5,
   "min_confidence": 50,
   "confidence_mapping": {
-    "l": 25,
-    "n": 60,
-    "h": 90
+    "low": 25,
+    "nominal": 60,
+    "high": 90
   },
-  "collapse_rule": "Detections are assigned to 5.5 km grid cells by their coordinates, with longitude steps scaled by cos(latitude) so cells stay close to the stated size (an approximation, not a geodesic). Within each cell and calendar day all detections collapse to one cell-day. The harmonized daily count is the number of distinct cell-days detected by any sensor that day; the raw daily count is the number of detections.",
+  "collapse_rule": "harmonized = distinct 5.5 km cell-days per day; a cell is one row",
   "notices": [
-    "Suomi-NPP VIIRS data ends 1 Nov 2026; NASA stops serving it after that date.",
-    "MODIS is being retired; prefer VIIRS on NOAA-20 and NOAA-21 for continuity.",
-    "Sensor epoch dates are placeholders pending verification against FIRMS docs."
+    "Mock data: not evidence, not an observation, not used in the demo video.",
+    "Cell size 5.5 km; harmonized series is distinct cell-days per day.",
+    "Confidence filter >= 50 after mapping VIIRS low/nominal/high."
   ],
   "datasets": [
     {
       "id": "FIRMS_MODIS",
-      "product": "MODIS C6.1 hotspots",
-      "url": "https://firms.modaps.eosdis.nasa.gov/"
+      "product": "MODIS_SP",
+      "sensor": "MODIS C6.1 (Terra + Aqua), 1 km",
+      "used_for": "Raw + harmonized MODIS series",
+      "url": "https://firms.modaps.eosdis.nasa.gov/api/area/"
     },
     {
       "id": "FIRMS_VIIRS_NOAA20",
-      "product": "VIIRS 375 m NOAA-20",
-      "url": "https://firms.modaps.eosdis.nasa.gov/"
-    },
-    {
-      "id": "FIRMS_VIIRS_NOAA21",
-      "product": "VIIRS 375 m NOAA-21",
-      "url": "https://firms.modaps.eosdis.nasa.gov/"
+      "product": "VIIRS_NOAA20_SP",
+      "sensor": "VIIRS 375 m, NOAA-20",
+      "used_for": "Raw + harmonized VIIRS series",
+      "url": "https://firms.modaps.eosdis.nasa.gov/api/area/"
     },
     {
       "id": "FIRMS_VIIRS_SNPP",
-      "product": "VIIRS 375 m Suomi-NPP",
-      "url": "https://firms.modaps.eosdis.nasa.gov/"
+      "product": "VIIRS_SNPP_SP",
+      "sensor": "VIIRS 375 m, Suomi-NPP",
+      "used_for": "Overlap validation only",
+      "url": "https://firms.modaps.eosdis.nasa.gov/api/area/"
     }
   ]
 }
