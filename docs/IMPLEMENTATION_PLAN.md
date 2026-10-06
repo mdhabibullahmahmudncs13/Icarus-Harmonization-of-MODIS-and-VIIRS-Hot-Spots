@@ -250,6 +250,72 @@ and `make golden` restores the file byte-for-byte.
 
 **Exit:** contract tests pass; the frontend can run with `VITE_DATA=api`.
 
+### 5.1 Phase 3 status
+
+Artifacts:
+
+| Artifact | Path | Purpose |
+|----------|------|---------|
+| Routes | `src/api/main.py` | Nine payloads under `/api/v1`, unversioned aliases kept |
+| Data tier | `src/api/dataset.py` | Cache-then-fixture resolution, `OFFLINE=1` forces the fixture |
+| Payload builders | `src/compute/export.py` | The contract JSON, shared with the static export |
+| AOI presets | `src/aoi_presets.json` | One preset list for the API and the mock generator |
+| Contract tests | `tests/test_api.py`, `tests/test_export.py` | Every payload against `$defs` |
+
+Run and verify:
+
+```bash
+python3 -m pytest tests/test_api.py tests/test_export.py -q
+python3 -m pytest -q
+OFFLINE=1 python3 -m uvicorn src.api.main:app --port 8000
+```
+
+Status:
+
+- [x] All nine contract payloads served under `/api/v1`
+- [x] Every response validated against `$defs` (not a second, disagreeing alias)
+- [x] `params_hash` on every payload, identical across one request's payloads
+- [x] Truthful `meta.source`; `OFFLINE=1` forces the fixture tier
+- [x] No network tier: the suite answers with sockets blocked
+- [x] 422 on a malformed window/bbox; 404 outside the data range
+- [x] The frontend runs against the API (`VITE_DATA=api`) — verified in a browser
+- [ ] DuckDB queries — the data tier still reads parquet through pandas
+- [ ] `POST` bodies: the analysis endpoints accept POST, but the geometry body
+      `docs/ApplicationFlow.md` describes is not implemented (query params only)
+- [ ] Coverage/`source` per bin (`docs/TESTING.md` §9) — needs the S7 stage
+
+**The defect this phase fixed.** The API served pre-migration payload shapes
+(`rows`, `raw_pearson`, `h`/`l`/`n`, `overlap.{start,end}`, no `params_hash`)
+while the contract, the mock generator and the frontend's own types agreed on
+the `$defs` shapes. Two schema definition families existed — `$defs` and a
+draft-07 `definitions` alias — so `tests/test_api.py` validated the API against
+one and `tests/test_contract.py` validated the mock against the other, and both
+suites passed over payloads that could not interoperate. The alias is removed,
+the builders emit the contract, and every test now validates against `$defs`.
+
+**No schema change was needed for the season window.** `$defs/criticalPeriod`
+already admitted `window: null` (its `start_bin` is bounded to 1-46, so no zero
+window exists), which is what the mock generator emits and the frontend types
+allow. The first implementation of `build_critical_period` invented a zero
+window and failed validation; it now emits `null` with
+`insufficient_activity: true`, matching the contract. The only change to
+`docs/contract.schema.json` is the removal of the `definitions` alias.
+
+Verified this session: `make lint` clean; 201 tests pass. `OFFLINE=1` uvicorn
+served all nine `/api/v1` routes plus `/api/meta`, each validated against
+`$defs` with a format checker; one request yields one `params_hash`. Built with
+`VITE_DATA=api`, the app loaded in headless Chromium and its own
+`ApiDataSource` fetched `/api/meta` and the eight `/api/v1` payloads, all 200,
+with the source badge reading `fixture`; every request went to the local app or
+the local API and no third-party host was contacted. Validation rendered
+Pearson 0.844 raw vs 0.953 harmonized (ratio 4.19 -> 1.33), the critical period
+onset bin 4 / peak 11 / mass 87%, and the anomaly panel reported `not scored`
+with its reason. No console errors or page errors.
+
+**Found, not fixed:** the app still shows its static "Mock data" banner when the
+source badge says `fixture`. That is the Phase 1 mock-banner/release-guard item
+(§3.3) and it is now a live inconsistency rather than a latent one.
+
 ---
 
 ## 6. Phase 4 — Swap mock for real data

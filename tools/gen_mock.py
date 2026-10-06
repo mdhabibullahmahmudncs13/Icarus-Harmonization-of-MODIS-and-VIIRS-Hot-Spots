@@ -56,11 +56,13 @@ BLOB_CENTERS = [
 ]
 BLOB_RADIUS_DEG = 0.30
 
-# AOI presets, inside the pilot extent
+# AOI presets, inside the pilot extent. Read from the shared JSON that the
+# API's /api/v1/aoi payload also uses, so the mock and the API cannot drift
+# (docs/IMPLEMENTATION_PLAN.md §5).
+PRESETS_PATH = Path(__file__).resolve().parents[1] / "src" / "aoi_presets.json"
 PRESETS = [
-    ("BGD", "Bangladesh", [88.0, 20.0, 93.0, 27.0]),
-    ("IND-C", "Central India", [75.0, 18.0, 82.0, 25.0]),
-    ("NPL", "Nepal Terai", [80.0, 26.0, 88.0, 31.0]),
+    (str(entry["id"]), str(entry["name"]), [float(v) for v in entry["bbox"]])
+    for entry in json.loads(PRESETS_PATH.read_text())["presets"]
 ]
 
 DATASETS = [

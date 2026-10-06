@@ -1,0 +1,8 @@
+{
+  "_comment": "AOI presets offered by the picker. Single source of truth: read by src/compute/export.py (the /api/v1/aoi payload) and by tools/gen_mock.py (the Phase 0 aoi.json mock), so the API and the mock cannot disagree. All presets sit inside the pilot extent documented in docs/PARAMETERS.md.",
+  "presets": [
+    { "id": "BGD", "name": "Bangladesh", "bbox": [88.0, 20.0, 93.0, 27.0] },
+    { "id": "IND-C", "name": "Central India", "bbox": [75.0, 18.0, 82.0, 25.0] },
+    { "id": "NPL", "name": "Nepal Terai", "bbox": [80.0, 26.0, 88.0, 31.0] }
+  ]
+}

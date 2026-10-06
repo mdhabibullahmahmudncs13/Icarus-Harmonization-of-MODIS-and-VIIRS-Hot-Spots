@@ -2,9 +2,13 @@
 
 Every response is validated against the real contract schema
 (``docs/contract.schema.json``, exported from the frontend's zod types), so a
-backend payload and a mock file are held to the same shape. The endpoints are
-called through FastAPI's ASGI test client, so routing, query parsing and
-status codes are exercised, not the builder functions in isolation.
+backend payload and a mock file are held to the same shape, and the API is
+called through FastAPI's ASGI test client so routing, query parsing and status
+codes are exercised — not the builder functions in isolation.
+
+The nine payloads the frontend's ``ApiDataSource`` requests are covered here,
+under the ``/api/v1`` prefix it actually calls. The unversioned ``/api`` alias
+is covered too, so the earlier path cannot rot.
 """
 
 from __future__ import annotations
@@ -27,20 +31,58 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = json.loads((REPO_ROOT / "docs" / "contract.schema.json").read_text())
 MOCK_DIR = REPO_ROOT / "web" / "public" / "mock"
 
-#: The seven endpoints and the contract definition each one must satisfy.
+#: Every versioned route, the contract definition it must satisfy, its query
+#: parameters, and the Phase 0 mock file that must carry the same shape.
+#: ``mock`` is the acronym's file name, which is not always the payload name.
 ENDPOINTS = {
-    "meta": {},
-    "series": {},
-    "cells": {},
-    "baseline": {},
-    "anomaly": {"date": "2019-06-01"},
-    "validation": {},
-    "methods": {},
+    "meta": {"path": "/api/v1/meta", "definition": "metaResponse", "params": {}, "mock": "meta"},
+    "series": {"path": "/api/v1/series", "definition": "series", "params": {}, "mock": "series"},
+    "cells": {"path": "/api/v1/cells", "definition": "cells", "params": {}, "mock": "cells"},
+    "baseline": {
+        "path": "/api/v1/baseline",
+        "definition": "baseline",
+        "params": {},
+        "mock": "baseline",
+    },
+    "anomalies": {
+        "path": "/api/v1/anomalies",
+        "definition": "anomalies",
+        "params": {"date": "2019-06-01"},
+        "mock": "anomaly",
+    },
+    "critical-period": {
+        "path": "/api/v1/critical-period",
+        "definition": "criticalPeriod",
+        "params": {},
+        "mock": "critical-period",
+    },
+    "validation": {
+        "path": "/api/v1/validation",
+        "definition": "validation",
+        "params": {},
+        "mock": "validation",
+    },
+    "methods": {"path": "/api/v1/methods", "definition": "methods", "params": {}, "mock": "methods"},
+    "aoi": {"path": "/api/v1/aoi", "definition": "aoi", "params": {}, "mock": "aoi"},
+}
+
+#: The unversioned alias each payload keeps answering on.
+LEGACY_PATHS = {
+    "meta": "/api/meta",
+    "series": "/api/series",
+    "cells": "/api/cells",
+    "baseline": "/api/baseline",
+    "anomalies": "/api/anomaly",
+    "validation": "/api/validation",
+    "methods": "/api/methods",
 }
 
 
-def assert_matches(endpoint: str, payload: dict) -> None:
-    jsonschema.validate(payload, CONTRACT["definitions"][endpoint])
+def assert_matches(definition: str, payload: dict) -> None:
+    defs = CONTRACT["$defs"]
+    jsonschema.Draft202012Validator(
+        {"$ref": f"#/$defs/{definition}", "$defs": defs}
+    ).validate(payload)
 
 
 @pytest.fixture(autouse=True)
@@ -75,22 +117,52 @@ def test_health(client: TestClient):
     assert response.json() == {"status": "ok"}
 
 
-@pytest.mark.parametrize("endpoint,params", sorted(ENDPOINTS.items()))
-def test_endpoint_matches_the_contract(client: TestClient, endpoint: str, params: dict):
-    response = client.get(f"/api/{endpoint}", params=params)
+@pytest.mark.parametrize("name", sorted(ENDPOINTS))
+def test_versioned_endpoint_matches_the_contract(client: TestClient, name: str):
+    endpoint = ENDPOINTS[name]
+    response = client.get(endpoint["path"], params=endpoint["params"])
     assert response.status_code == 200, response.text
-    assert_matches(endpoint, response.json())
+    assert_matches(endpoint["definition"], response.json())
+
+
+@pytest.mark.parametrize("name", sorted(LEGACY_PATHS))
+def test_unversioned_alias_still_answers(client: TestClient, name: str):
+    endpoint = ENDPOINTS[name]
+    params = endpoint["params"]
+    response = client.get(LEGACY_PATHS[name], params=params)
+    assert response.status_code == 200, response.text
+    assert_matches(endpoint["definition"], response.json())
+
+
+def test_analysis_endpoints_accept_post_as_the_docs_say(client: TestClient):
+    """docs/ApplicationFlow.md §4 and DEPLOYMENT.md document POST; honour it."""
+    for name in ("series", "cells", "baseline", "anomalies", "critical-period", "validation"):
+        endpoint = ENDPOINTS[name]
+        response = client.post(endpoint["path"], params=endpoint["params"])
+        assert response.status_code == 200, f"{endpoint['path']}: {response.text}"
+        assert_matches(endpoint["definition"], response.json())
 
 
 def test_every_response_carries_the_meta_block(client: TestClient):
-    for endpoint, params in ENDPOINTS.items():
-        payload = client.get(f"/api/{endpoint}", params=params).json()
-        assert "meta" in payload, endpoint
+    for endpoint in ENDPOINTS.values():
+        payload = client.get(endpoint["path"], params=endpoint["params"]).json()
+        assert "meta" in payload
         assert payload["meta"]["source"] in {"mock", "live", "cache", "fixture"}
+        assert len(payload["meta"]["params_hash"]) >= 8
+
+
+def test_one_request_yields_one_params_hash(client: TestClient):
+    """Same parameters must hash the same across every payload, or the id
+    cannot be used to match a payload against a cached response."""
+    hashes = {
+        client.get(endpoint["path"], params=endpoint["params"]).json()["meta"]["params_hash"]
+        for endpoint in ENDPOINTS.values()
+    }
+    assert len(hashes) == 1, hashes
 
 
 def test_meta_reports_the_fixture_source_and_the_region(client: TestClient):
-    meta = client.get("/api/meta").json()
+    meta = client.get("/api/v1/meta").json()
     # OFFLINE=1 forces the fixture tier.
     assert meta["meta"]["source"] == "fixture"
     assert meta["meta"]["region"]["bbox"] == [88.0, 20.0, 93.0, 27.0]
@@ -100,14 +172,19 @@ def test_meta_reports_the_fixture_source_and_the_region(client: TestClient):
         "VIIRS_NOAA20_SP",
         "VIIRS_NOAA21_SP",
     }
+    assert meta["streams"]
 
 
-def test_mock_files_and_api_responses_share_one_schema():
-    """The same JSON Schema holds for the frontend mocks and the API."""
-    for endpoint in ENDPOINTS:
-        mock = MOCK_DIR / f"{endpoint}.json"
+def test_mock_files_and_api_responses_share_one_schema(client: TestClient):
+    """The same JSON Schema holds for the frontend mocks and the API.
+
+    This is the test that fails when the API and the frozen contract drift
+    apart, which is exactly the Phase 3 defect it was written to catch.
+    """
+    for endpoint in ENDPOINTS.values():
+        mock = MOCK_DIR / f"{endpoint['mock']}.json"
         assert mock.exists(), f"missing mock file {mock}"
-        assert_matches(endpoint, json.loads(mock.read_text()))
+        assert_matches(endpoint["definition"], json.loads(mock.read_text()))
 
 
 # --------------------------------------------------------------------------
@@ -116,7 +193,7 @@ def test_mock_files_and_api_responses_share_one_schema():
 
 
 def test_series_rows_are_internally_consistent(client: TestClient):
-    rows = client.get("/api/series").json()["rows"]
+    rows = client.get("/api/v1/series").json()["series"]
     assert rows
     for row in rows[:50]:
         # Raw counts partition by sensor, so the total is the exact sum.
@@ -129,8 +206,8 @@ def test_series_rows_are_internally_consistent(client: TestClient):
 
 
 def test_methods_cites_every_dataset_with_a_url(client: TestClient):
-    payload = client.get("/api/methods").json()
-    assert payload["confidence_mapping"] == {"l": 25.0, "n": 60.0, "h": 90.0}
+    payload = client.get("/api/v1/methods").json()
+    assert payload["confidence_mapping"] == {"low": 25, "nominal": 60, "high": 90}
     ids = {d["id"] for d in payload["datasets"]}
     assert ids == {
         "FIRMS_MODIS_SP",
@@ -142,9 +219,23 @@ def test_methods_cites_every_dataset_with_a_url(client: TestClient):
 
 
 def test_validation_shows_harmonization_beating_raw(client: TestClient):
-    payload = client.get("/api/validation").json()
+    payload = client.get("/api/v1/validation").json()
     assert payload["harmonized"]["pearson"] > payload["raw"]["pearson"]
     assert payload["cell_sweep"]
+    assert set(payload["overlap"]) == {"years", "n_days"}
+
+
+def test_critical_period_lands_in_the_season(client: TestClient):
+    payload = client.get("/api/v1/critical-period").json()
+    assert payload["insufficient_activity"] is False
+    assert 1 <= payload["onset_bin"] <= payload["peak_bin"] <= payload["end_bin"] <= 46
+    assert 0.0 < payload["window"]["mass"] <= 1.0
+
+
+def test_aoi_lists_the_presets(client: TestClient):
+    payload = client.get("/api/v1/aoi").json()
+    assert {"BGD", "IND-C", "NPL"} <= {p["id"] for p in payload["presets"]}
+    assert all(len(p["bbox"]) == 4 for p in payload["presets"])
 
 
 # --------------------------------------------------------------------------
@@ -153,29 +244,42 @@ def test_validation_shows_harmonization_beating_raw(client: TestClient):
 
 
 def test_cells_window_narrows_the_answer(client: TestClient):
-    everything = client.get("/api/cells").json()
-    windowed = client.get("/api/cells", params={"start": "2019-02-01", "end": "2019-02-28"}).json()
-    assert windowed["rows"], "the February window should still contain fires"
-    assert sum(r["raw"] for r in windowed["rows"]) < sum(r["raw"] for r in everything["rows"])
+    everything = client.get("/api/v1/cells").json()
+    windowed = client.get(
+        "/api/v1/cells", params={"start": "2019-02-01", "end": "2019-02-28"}
+    ).json()
+    assert windowed["cells"], "the February window should still contain fires"
+    assert sum(r["raw"] for r in windowed["cells"]) < sum(r["raw"] for r in everything["cells"])
     assert windowed["meta"]["date_range"] == ["2019-01-01", "2020-12-31"]
+    assert windowed["window"] == {"start": "2019-02-01", "end": "2019-02-28"}
 
 
 def test_cells_rejects_a_reversed_window(client: TestClient):
-    response = client.get("/api/cells", params={"start": "2019-06-30", "end": "2019-06-01"})
+    response = client.get("/api/v1/cells", params={"start": "2019-06-30", "end": "2019-06-01"})
     assert response.status_code == 422
 
 
 def test_anomaly_answers_for_the_requested_day(client: TestClient):
-    payload = client.get("/api/anomaly", params={"date": "2019-06-01"}).json()
-    assert payload["date"] == "2019-06-01"
+    payload = client.get("/api/v1/anomalies", params={"date": "2019-06-01"}).json()
+    assert payload["query"]["date"] == "2019-06-01"
     assert 0.0 <= payload["percentile"] <= 100.0
-    assert payload["years_used"] >= 1
+    # The reference sample is other years' same-season days, so 2020 only:
+    # a year never judges itself.
+    assert payload["years_used"] == [2020]
+    assert payload["flag"] == "not_scored"
+    assert payload["reason"] == "insufficient_reference_years"
+
+
+def test_anomaly_defaults_to_the_last_day_in_the_data(client: TestClient):
+    """The frontend requests the anomalies view with no date."""
+    payload = client.get("/api/v1/anomalies").json()
+    assert payload["query"]["date"] == "2020-12-31"
 
 
 def test_anomaly_answers_for_a_quiet_day_with_a_real_zero(client: TestClient):
     """A day with no detections is a zero count, not a missing day."""
-    payload = client.get("/api/anomaly", params={"date": "2019-01-01"}).json()
-    assert payload["date"] == "2019-01-01"
+    payload = client.get("/api/v1/anomalies", params={"date": "2019-01-01"}).json()
+    assert payload["query"]["date"] == "2019-01-01"
     assert payload["value"] >= 0.0
 
 
@@ -185,21 +289,22 @@ def test_anomaly_outside_the_range_is_404(client: TestClient):
     assert "outside the dataset range" in response.json()["detail"]
 
 
-def test_anomaly_requires_a_date(client: TestClient):
+def test_anomaly_requires_a_date_on_the_legacy_path(client: TestClient):
     assert client.get("/api/anomaly").status_code == 422
     assert client.get("/api/anomaly", params={"date": "not-a-date"}).status_code == 422
 
 
 def test_anomaly_accepts_a_bbox(client: TestClient):
     payload = client.get(
-        "/api/anomaly", params={"date": "2019-06-01", "bbox": "88,20,93,27"}
+        "/api/v1/anomalies", params={"date": "2019-06-01", "bbox": "88,20,93,27"}
     ).json()
-    assert_matches("anomaly", payload)
+    assert_matches("anomalies", payload)
+    assert payload["query"]["aoi"] == "88,20,93,27"
 
 
 def test_anomaly_rejects_a_malformed_bbox(client: TestClient):
     for bad in ("88,20,93", "a,b,c,d", "93,20,88,27"):
-        response = client.get("/api/anomaly", params={"date": "2019-06-01", "bbox": bad})
+        response = client.get("/api/v1/anomalies", params={"date": "2019-06-01", "bbox": bad})
         assert response.status_code == 422, bad
 
 
@@ -223,7 +328,7 @@ def test_cache_is_served_when_present(client: TestClient, tmp_path, fixture_fram
     _write_cache(tmp_path, fixture_frame)
     dataset_module.reset_dataset_cache()
 
-    meta = client.get("/api/meta").json()
+    meta = client.get("/api/v1/meta").json()
     assert meta["meta"]["source"] == "cache"
     assert meta["meta"]["date_range"] == ["2019-01-01", "2019-04-30"]
 
@@ -240,7 +345,7 @@ def test_offline_forces_the_fixture_even_with_a_cache(
     dataset_module.reset_dataset_cache()
 
     # Both tiers exist and hold the same bytes; OFFLINE must pick the fixture.
-    assert client.get("/api/meta").json()["meta"]["source"] == "fixture"
+    assert client.get("/api/v1/meta").json()["meta"]["source"] == "fixture"
 
 
 def test_fixture_is_served_when_there_is_no_cache(client: TestClient, tmp_path, monkeypatch):
@@ -248,14 +353,14 @@ def test_fixture_is_served_when_there_is_no_cache(client: TestClient, tmp_path, 
     monkeypatch.setattr(safe, "CACHE_DIR", tmp_path / "empty")
     monkeypatch.setattr(safe, "FIXTURE_DIR", REPO_ROOT / "demo_fixtures")
     dataset_module.reset_dataset_cache()
-    assert client.get("/api/meta").json()["meta"]["source"] == "fixture"
+    assert client.get("/api/v1/meta").json()["meta"]["source"] == "fixture"
 
 
 def test_missing_cache_and_fixture_is_a_503(client: TestClient, tmp_path, monkeypatch):
     monkeypatch.setattr(safe, "CACHE_DIR", tmp_path / "empty")
     monkeypatch.setattr(safe, "FIXTURE_DIR", tmp_path / "empty")
     dataset_module.reset_dataset_cache()
-    response = client.get("/api/meta")
+    response = client.get("/api/v1/meta")
     assert response.status_code == 503
     assert "no detections to serve" in response.json()["detail"]
 
@@ -273,6 +378,6 @@ def test_endpoints_work_with_all_network_blocked(client: TestClient, monkeypatch
 
     monkeypatch.setattr(socket.socket, "connect", blocked)
     monkeypatch.setattr(socket, "create_connection", blocked)
-    for endpoint, params in ENDPOINTS.items():
-        response = client.get(f"/api/{endpoint}", params=params)
-        assert response.status_code == 200, endpoint
+    for endpoint in ENDPOINTS.values():
+        response = client.get(endpoint["path"], params=endpoint["params"])
+        assert response.status_code == 200, endpoint["path"]

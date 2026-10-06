@@ -105,13 +105,13 @@ def test_harmonized_correlation_exceeds_raw_correlation_on_noisy_data():
     assert report.raw.pearson > 0.5, "the sensors should still agree in direction"
 
 
-def test_cell_sweep_leaves_raw_pearson_constant_and_varies_only_harmonized():
+def test_cell_sweep_leaves_raw_correlation_constant_and_varies_only_harmonized():
     detections = synthetic_detections()
     report = validate_overlap(detections, cell_km=5.5, cell_sizes=(5.5, 11.0, 22.0))
     assert [row["cell_km"] for row in report.cell_sweep] == [5.5, 11.0, 22.0]
-    raw_values = {row["raw_pearson"] for row in report.cell_sweep}
+    raw_values = {row["raw_correlation"] for row in report.cell_sweep}
     assert len(raw_values) == 1, "raw counts do not depend on the grid"
-    assert all(row["harmonized_pearson"] > 0.9 for row in report.cell_sweep)
+    assert all(row["harmonized_correlation"] > 0.9 for row in report.cell_sweep)
 
 
 def test_validate_overlap_rejects_an_empty_detection_set():
@@ -124,5 +124,9 @@ def test_validate_report_serializes_to_the_contract_shape():
     payload = report.as_dict()
     assert set(payload) == {"overlap", "raw", "harmonized", "cell_sweep"}
     assert set(payload["raw"]) == {"pearson", "spearman", "ratio"}
-    assert set(payload["overlap"]) == {"start", "end"}
-    assert payload["overlap"]["start"] <= payload["overlap"]["end"]
+    # The contract's overlap block reports the years it spans and its length;
+    # the start/end dates stay on the report object for callers that want them.
+    assert set(payload["overlap"]) == {"years", "n_days"}
+    assert payload["overlap"]["n_days"] == len(synthetic_detections(days=60)["acq_date"].unique())
+    assert payload["overlap"]["years"] == [2015]
+    assert set(payload["cell_sweep"][0]) == {"cell_km", "raw_correlation", "harmonized_correlation"}

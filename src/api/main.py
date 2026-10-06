@@ -6,21 +6,30 @@ the exported static files are the same shapes and both satisfy
 :mod:`src.api.dataset`); it never calls NASA, and ``OFFLINE=1`` makes it
 serve the committed fixture.
 
-Endpoints (all ``GET``, all carrying the shared ``meta`` block):
+Endpoints, all carrying the shared ``meta`` block. Every payload is served
+under the versioned ``/api/v1`` prefix the contract specifies (and the
+frontend's ``VITE_DATA=api`` mode calls); the unversioned path is kept as an
+alias so earlier callers keep working.
 
 * ``/health``
-* ``/api/meta``
-* ``/api/series``
-* ``/api/cells?start&end``
-* ``/api/baseline``
-* ``/api/anomaly?date&bbox``
-* ``/api/validation``
-* ``/api/methods``
+* ``/api/v1/meta`` (alias ``/api/meta``)
+* ``/api/v1/series`` (alias ``/api/series``)
+* ``/api/v1/cells?start&end`` (alias ``/api/cells``)
+* ``/api/v1/baseline`` (alias ``/api/baseline``)
+* ``/api/v1/anomalies?date&bbox&aoi`` (alias ``/api/anomaly?date``)
+* ``/api/v1/critical-period?aoi``
+* ``/api/v1/validation`` (alias ``/api/validation``)
+* ``/api/v1/methods`` (alias ``/api/methods``)
+* ``/api/v1/aoi``
+
+Per ``docs/ApplicationFlow.md`` the analysis endpoints also accept ``POST``;
+the geometry-carrying body described there is not implemented yet, so the
+query parameters are the only inputs and a POST without query parameters is
+answered for the default AOI.
 """
 
 from __future__ import annotations
 
-import math
 from collections.abc import Mapping
 from datetime import date as DateType
 from typing import Annotated, Any
@@ -112,6 +121,7 @@ def health() -> dict[str, str]:
 
 
 @app.get("/api/meta")
+@app.get("/api/v1/meta")
 def meta() -> Mapping[str, Any]:
     """Region, parameters and sensor epochs."""
     dataset = _dataset()
@@ -121,6 +131,8 @@ def meta() -> Mapping[str, Any]:
 
 
 @app.get("/api/series")
+@app.get("/api/v1/series")
+@app.post("/api/v1/series")
 def series() -> Mapping[str, Any]:
     """Daily raw and harmonized counts, one row per day."""
     dataset = _dataset()
@@ -130,6 +142,8 @@ def series() -> Mapping[str, Any]:
 
 
 @app.get("/api/cells")
+@app.get("/api/v1/cells")
+@app.post("/api/v1/cells")
 def cells(
     start: Annotated[DateType | None, Query(description="ISO date, inclusive")] = None,
     end: Annotated[DateType | None, Query(description="ISO date, inclusive")] = None,
@@ -148,6 +162,8 @@ def cells(
 
 
 @app.get("/api/baseline")
+@app.get("/api/v1/baseline")
+@app.post("/api/v1/baseline")
 def baseline() -> Mapping[str, Any]:
     """Seasonal baseline: day-of-year percentiles of the harmonized series."""
     dataset = _dataset()
@@ -156,44 +172,92 @@ def baseline() -> Mapping[str, Any]:
     )
 
 
-@app.get("/api/anomaly")
-def anomaly(
-    date: Annotated[DateType, Query(description="ISO date to judge")],
-    bbox: Annotated[str | None, Query(description="west,south,east,north")] = None,
+def _anomaly_payload(
+    dataset: Dataset,
+    *,
+    date: DateType | None,
+    bbox: str | None,
+    aoi: str,
 ) -> Mapping[str, Any]:
-    """Rank one date against its day-of-year baseline."""
-    dataset = _dataset()
+    """Rank one date (or the last day in the data) against its season."""
     series = dataset.series
     if bbox is not None:
         frame = _within(dataset.detections, _parse_bbox(bbox))
         series = _continuous(harmonize.harmonized_series(frame))
+        aoi = bbox
 
-    stamp = pd.Timestamp(date)
     if series.empty:
         raise HTTPException(status_code=404, detail="no detections in the requested area")
+    stamp = pd.Timestamp(date) if date is not None else series.index.max()
     low, high = series.index.min(), series.index.max()
     if stamp < low or stamp > high:
         raise HTTPException(
             status_code=404,
             detail=(
-                f"{date.isoformat()} is outside the dataset range "
+                f"{stamp.date().isoformat()} is outside the dataset range "
                 f"{low.date().isoformat()}..{high.date().isoformat()}"
             ),
         )
-
-    payload = export.build_anomaly(
-        series, date_=stamp, source=dataset.source, generated_at=dataset.generated_at
+    return export.build_anomaly(
+        series,
+        date_=stamp,
+        aoi=aoi,
+        source=dataset.source,
+        generated_at=dataset.generated_at,
     )
-    if not (math.isfinite(payload["value"]) and math.isfinite(payload["percentile"])):
-        # The contract carries real numbers only; never emit NaN.
-        raise HTTPException(
-            status_code=503,
-            detail="the baseline window is too thin to rank this date",
-        )
-    return payload
+
+
+@app.get("/api/anomaly")
+def anomaly(
+    date: Annotated[DateType, Query(description="ISO date to judge")],
+    bbox: Annotated[str | None, Query(description="west,south,east,north")] = None,
+    aoi: Annotated[str, Query(description="preset id the request is for")] = "BGD",
+) -> Mapping[str, Any]:
+    """Rank one date against its day-of-year baseline."""
+    return _anomaly_payload(_dataset(), date=date, bbox=bbox, aoi=aoi)
+
+
+@app.get("/api/v1/anomalies")
+@app.post("/api/v1/anomalies")
+def anomalies(
+    date: Annotated[
+        DateType | None, Query(description="ISO date to judge; defaults to the last day")
+    ] = None,
+    bbox: Annotated[str | None, Query(description="west,south,east,north")] = None,
+    aoi: Annotated[str, Query(description="preset id the request is for")] = "BGD",
+) -> Mapping[str, Any]:
+    """The frontend's anomalies view: the requested date, or the latest day."""
+    return _anomaly_payload(_dataset(), date=date, bbox=bbox, aoi=aoi)
+
+
+@app.get("/api/critical-period")
+@app.get("/api/v1/critical-period")
+@app.post("/api/v1/critical-period")
+def critical_period(
+    aoi: Annotated[str, Query(description="preset id the request is for")] = "BGD",
+) -> Mapping[str, Any]:
+    """Onset, peak, end and window mass of the burning season."""
+    dataset = _dataset()
+    return export.build_critical_period(
+        dataset.series, aoi=aoi, source=dataset.source, generated_at=dataset.generated_at
+    )
+
+
+@app.get("/api/aoi")
+@app.get("/api/v1/aoi")
+def aoi() -> Mapping[str, Any]:
+    """The preset AOIs the picker offers."""
+    dataset = _dataset()
+    return export.build_aoi(
+        source=dataset.source,
+        generated_at=dataset.generated_at,
+        date_range=export.detections_date_range(dataset.detections),
+    )
 
 
 @app.get("/api/validation")
+@app.get("/api/v1/validation")
+@app.post("/api/v1/validation")
 def validation() -> Mapping[str, Any]:
     """Overlap-period agreement, raw against harmonized."""
     dataset = _dataset()
@@ -206,10 +270,19 @@ def validation() -> Mapping[str, Any]:
 
 
 @app.get("/api/methods")
+@app.get("/api/v1/methods")
+@app.post("/api/v1/methods")
 def methods() -> Mapping[str, Any]:
     """Method text, confidence mapping and dataset citations."""
     dataset = _dataset()
-    return export.build_methods(source=dataset.source, generated_at=dataset.generated_at)
+    # The dataset's own date range, so one request yields one params_hash
+    # across all nine payloads and two payloads can be matched against each
+    # other (docs/ApplicationFlow.md: same inputs + same hash => same output).
+    return export.build_methods(
+        source=dataset.source,
+        generated_at=dataset.generated_at,
+        date_range=export.detections_date_range(dataset.detections),
+    )
 
 
 __all__ = ["ALLOWED_ORIGINS", "app"]

@@ -47,12 +47,14 @@ class ValidationReport:
     raw: Correlation
     harmonized: Correlation
     cell_sweep: list[dict[str, float]] = field(default_factory=list)
+    #: Calendar years the overlap covers, and how many distinct days it holds.
+    overlap_years: tuple[int, ...] = ()
+    overlap_days: int = 0
 
     def as_dict(self) -> Mapping[str, object]:
         """Contract payload (``GET /api/validation``) without the meta block."""
-        start, end = self.overlap
         return {
-            "overlap": {"start": start.isoformat(), "end": end.isoformat()},
+            "overlap": {"years": list(self.overlap_years), "n_days": int(self.overlap_days)},
             "raw": self.raw.as_dict(),
             "harmonized": self.harmonized.as_dict(),
             "cell_sweep": list(self.cell_sweep),
@@ -162,8 +164,8 @@ def validate_overlap(
         sweep.append(
             {
                 "cell_km": float(size),
-                "raw_pearson": raw_correlation.pearson,
-                "harmonized_pearson": stats.pearson,
+                "raw_correlation": raw_correlation.pearson,
+                "harmonized_correlation": stats.pearson,
             }
         )
 
@@ -184,6 +186,8 @@ def validate_overlap(
         raw=raw_correlation,
         harmonized=harmonized_correlation,
         cell_sweep=sweep,
+        overlap_years=tuple(sorted({int(ts.year) for ts in subset["acq_date"]})),
+        overlap_days=int(subset["acq_date"].nunique()),
     )
 
 

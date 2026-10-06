@@ -1,7 +1,9 @@
 {
   "overlap": {
-    "start": "2015-01-01",
-    "end": "2015-02-09"
+    "years": [
+      2015
+    ],
+    "n_days": 40
   },
   "raw": {
     "pearson": 1.0,
@@ -16,23 +18,23 @@
   "cell_sweep": [
     {
       "cell_km": 5.5,
-      "raw_pearson": 1.0,
-      "harmonized_pearson": 1.0
+      "raw_correlation": 1.0,
+      "harmonized_correlation": 1.0
     },
     {
       "cell_km": 11.0,
-      "raw_pearson": 1.0,
-      "harmonized_pearson": 1.0
+      "raw_correlation": 1.0,
+      "harmonized_correlation": 1.0
     },
     {
       "cell_km": 16.5,
-      "raw_pearson": 1.0,
-      "harmonized_pearson": 1.0
+      "raw_correlation": 1.0,
+      "harmonized_correlation": 1.0
     },
     {
       "cell_km": 22.0,
-      "raw_pearson": 1.0,
-      "harmonized_pearson": 1.0
+      "raw_correlation": 1.0,
+      "harmonized_correlation": 1.0
     }
   ]
 }

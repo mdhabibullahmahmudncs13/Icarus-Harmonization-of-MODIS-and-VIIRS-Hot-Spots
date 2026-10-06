@@ -30,6 +30,24 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   number that moves in the pipeline now fails the suite until the goldens are
   deliberately regenerated with `make golden`.
 
+### Changed
+
+- The API now serves the frozen contract: all nine payloads under `/api/v1`
+  (`meta`, `series`, `cells`, `baseline`, `anomalies`, `critical-period`,
+  `validation`, `methods`, `aoi`), each carrying `params_hash`. The unversioned
+  `/api/*` paths remain as aliases and the analysis endpoints also accept POST,
+  as `docs/ApplicationFlow.md` and `docs/DEPLOYMENT.md` describe.
+
+### Fixed
+
+- The API had been serving pre-migration payload shapes (`rows`,
+  `raw_pearson`, `h`/`l`/`n`, `overlap.{start,end}`, no `params_hash`) that
+  neither the mock payloads nor the frontend's types used. The draft-07
+  `definitions` alias in `docs/contract.schema.json` let two suite halves
+  validate against two disagreeing definitions, which hid it; the alias is
+  removed and every test validates against `$defs`. The frontend now runs
+  against the API with `VITE_DATA=api`.
+
 ### Notes
 
 - Baseline derived from `DOCS/Icarus_Project_Build_Specification.docx` v1.0.
