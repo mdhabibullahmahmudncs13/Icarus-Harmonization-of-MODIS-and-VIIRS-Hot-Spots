@@ -152,8 +152,12 @@ Status against the F1–F6 milestones:
 - [x] **F6** keyboard shortcuts (1–8, R/H, T, P, Ctrl/Cmd+B, Esc), loading/empty/error states, dark default
 - [x] Release guard — `npm run build:release` fails when the build would run on
       non-evidence data (§3.3)
-- [ ] No-third-party-request check is still manual (verified through the browser's
-      network log, `docs/IMPLEMENTATION_PLAN.md` §5.1), not an automated Playwright test
+- [x] No-third-party-request check — `web/e2e/no-third-party.spec.ts` (Playwright)
+      blocks and records every host that is not the preview server, then still
+      exercises the shell and the mode toggle; it replaces the manual read of
+      the browser's network log. A canary run confirmed the interception
+      catches an injected external request. Run with:
+      `cd web && ./node_modules/.bin/vite build && ./node_modules/.bin/playwright test`
 
 **Source-accurate banner.** The non-evidence banner used to say "Mock data" for
 any source that was not evidence, including the `fixture` tier. Each source now

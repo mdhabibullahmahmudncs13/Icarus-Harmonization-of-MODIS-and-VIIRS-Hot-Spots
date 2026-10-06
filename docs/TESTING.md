@@ -140,6 +140,11 @@ Output: synthetic `det.parquet` matching the normalized detection schema.
 1. **Full pipeline** on synthetic data from S0-input fixture through S9.
 2. **Offline frontend:** block all external hosts; the app must load and work,
    and the offline cold start must succeed from the service worker.
+   The external-host half is automated: `web/e2e/no-third-party.spec.ts`
+   (`cd web && ./node_modules/.bin/vite build && ./node_modules/.bin/playwright test`)
+   aborts and records every non-preview request while the shell and the mode
+   toggle are exercised, and fails if one was attempted. The service-worker
+   cold start remains a manual run until Phase 5 wires the worker in.
 3. **Toggle/verification:** the views respond to the selected mode without a
    refetch.
 
