@@ -23,9 +23,11 @@ technique as Apple's scroll-through product pages, and the mechanic the
 rather than as a pre-rendered clip chain, so the page needs no render backend,
 no API key and no third-party host.
 
-- `src/globe.ts` — the scene: Earth shader (day/night terminator, ocean sun
-  glint, atmosphere rim), starfield, the pilot-region marker, and the scroll
-  keyframes.
+- `src/globe.ts` — the scene: Earth shader (day/night terminator, warm sunset
+  band, ocean sun glint, cloud weather and shadow, atmosphere rim), a separate
+  drifting cloud shell, starfield, the pilot-region marker, and the scroll
+  keyframes. The day map is saturated and brightened in-shader so the globe
+  reads vivid rather than muddy.
 - `src/main.ts` — wiring: scroll → camera, the route rail, reveal animations,
   reduced-motion, and the WebGL fallback.
 - `src/styles.css` — layout and theme, using the same tokens as the app.
@@ -47,6 +49,7 @@ locally so the page makes no external request (the same property
 |---|---|
 | `earth-blue-marble.jpg` | NASA Blue Marble, daytime true colour |
 | `earth-night.jpg` | NASA Black Marble, city lights |
+| `earth-clouds.jpg` | NASA Blue Marble cloud composite, used as the cloud shell |
 | `earth-topology.png` | NASA/GEBCO relief, used as a light bump |
 | `earth-water.png` | ocean mask, used for the sun glint |
 

@@ -7,13 +7,15 @@ import * as THREE from 'three';
  * path — implemented with a live Three.js globe rather than a pre-rendered
  * video chain, so the page needs no render backend and no third-party host.
  *
- * The textures are NASA imagery (Blue Marble day, Black Marble night, GEBCO
- * relief, ocean mask), downscaled and served from `public/earth/`.
+ * The textures are NASA imagery (Blue Marble day, Black Marble night, the
+ * Blue Marble cloud composite, GEBCO relief, ocean mask), downscaled and
+ * served from `public/earth/`.
  */
 
 const EARTH_TEXTURES = {
   day: '/earth/earth-blue-marble.jpg',
   night: '/earth/earth-night.jpg',
+  clouds: '/earth/earth-clouds.jpg',
   relief: '/earth/earth-topology.png',
   water: '/earth/earth-water.png',
 };
@@ -21,8 +23,12 @@ const EARTH_TEXTURES = {
 /** Centre of the pilot region (the API's default bbox: 20–27°N, 88–93°E). */
 export const PILOT_REGION = { lat: 23.5, lon: 90.5, label: 'Pilot region' };
 
-/** Direction *toward* the sun, in world space. Fixed so the terminator is stable. */
-const SUN_DIRECTION = new THREE.Vector3(-0.55, 0.38, 0.84).normalize();
+/**
+ * Direction *toward* the sun, in world space. Fixed so the terminator is
+ * stable. Kept a touch behind the hero camera so the face we land on reads
+ * bright and open rather than half-swamped in shadow.
+ */
+const SUN_DIRECTION = new THREE.Vector3(-0.36, 0.30, 0.88).normalize();
 
 /** Let the sun sit a touch off the camera axis so the globe reads as lit, not flat. */
 const sunLightDir = SUN_DIRECTION.clone();
@@ -76,6 +82,7 @@ const EARTH_VERTEX = /* glsl */ `
 const EARTH_FRAGMENT = /* glsl */ `
   uniform sampler2D uDay;
   uniform sampler2D uNight;
+  uniform sampler2D uClouds;
   uniform sampler2D uRelief;
   uniform sampler2D uWater;
   uniform vec3 uSunDir;
@@ -91,30 +98,95 @@ const EARTH_FRAGMENT = /* glsl */ `
 
     // Day/night terminator: a soft band rather than a hard line.
     float sun = dot(n, uSunDir);
-    float dayMix = smoothstep(-0.14, 0.30, sun);
+    float dayMix = smoothstep(-0.20, 0.30, sun);
     float diffuse = clamp(sun, 0.0, 1.0);
 
     vec3 day = texture2D(uDay, vUv).rgb;
     vec3 night = texture2D(uNight, vUv).rgb;
+    float clouds = texture2D(uClouds, vUv).r;
     float relief = texture2D(uRelief, vUv).r;
     float water = texture2D(uWater, vUv).r;
 
+    // Push saturation and brightness so the globe reads vivid, not muddy.
+    float luma = dot(day, vec3(0.299, 0.587, 0.114));
+    day = mix(vec3(luma), day, 1.24) * 1.12;
     // Cheap relief: the day map already carries shading; nudge it for texture.
-    day *= mix(0.93, 1.07, relief);
+    day *= mix(0.94, 1.06, relief);
 
-    vec3 lit = day * (0.10 + 1.0 * diffuse);
+    vec3 lit = day * (0.22 + 0.92 * diffuse);
 
-    // Sun glint, oceans only.
+    // Warm sunset band hugging the terminator.
+    float term = smoothstep(-0.24, 0.06, sun) * (1.0 - smoothstep(0.04, 0.42, sun));
+    lit += vec3(1.0, 0.46, 0.18) * term * 0.24;
+
+    // Ocean sun glint: tight, bright, water only.
     vec3 halfVec = normalize(viewDir + uSunDir);
-    float spec = pow(max(dot(n, halfVec), 0.0), 62.0) * water * diffuse;
-    lit += vec3(1.0, 0.97, 0.9) * spec * 0.85;
+    float spec = pow(max(dot(n, halfVec), 0.0), 150.0) * water * diffuse;
+    lit += vec3(1.0, 0.96, 0.88) * spec * 1.15;
 
-    // Atmosphere rim on the lit limb.
+    // Weather: clouds catch the sun and shade the sea beneath them.
+    float cloudLit = smoothstep(0.05, 0.92, clouds) * (0.30 + 0.85 * diffuse);
+    lit = mix(lit, vec3(1.0, 0.99, 0.97) * (0.55 + 0.85 * diffuse), cloudLit * 0.72);
+    // Soft cloud shadow on the surface.
+    lit *= 1.0 - smoothstep(0.25, 1.0, clouds) * 0.22 * diffuse;
+
+    // Night side: city lights lifted out of pure black, plus a cool earthshine.
+    vec3 nightCol = night * uNightGain;
+    nightCol += vec3(0.022, 0.038, 0.075);
+    nightCol += vec3(0.05, 0.09, 0.17) * pow(1.0 - diffuse, 1.6);
+    nightCol *= 0.9 + 0.35 * clouds;
+
+    // Atmospheric rim on the lit limb.
     float rim = pow(clamp(1.0 - max(dot(n, viewDir), 0.0), 0.0, 1.0), 3.0);
-    vec3 atmosphere = vec3(0.34, 0.58, 1.0) * rim * (0.28 + 0.72 * dayMix);
+    vec3 atmosphere = vec3(0.38, 0.64, 1.0) * rim * (0.38 + 0.62 * dayMix);
 
-    vec3 colour = mix(night * uNightGain, lit, dayMix) + atmosphere;
+    vec3 colour = mix(nightCol, lit, dayMix) + atmosphere;
     gl_FragColor = vec4(colour, 1.0);
+
+    #include <colorspace_fragment>
+  }
+`;
+
+const CLOUD_VERTEX = /* glsl */ `
+  varying vec2 vUv;
+  varying vec3 vNormalW;
+  varying vec3 vPosW;
+  void main() {
+    vUv = uv;
+    vNormalW = normalize(mat3(modelMatrix) * normal);
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    vPosW = worldPosition.xyz;
+    gl_Position = projectionMatrix * viewMatrix * worldPosition;
+  }
+`;
+
+const CLOUD_FRAGMENT = /* glsl */ `
+  uniform sampler2D uClouds;
+  uniform vec3 uSunDir;
+  uniform float uOpacity;
+
+  varying vec2 vUv;
+  varying vec3 vNormalW;
+  varying vec3 vPosW;
+
+  void main() {
+    vec3 n = normalize(vNormalW);
+    vec3 viewDir = normalize(cameraPosition - vPosW);
+    float sun = dot(n, uSunDir);
+    float dayMix = smoothstep(-0.28, 0.34, sun);
+
+    float cloud = texture2D(uClouds, vUv).r;
+    cloud = smoothstep(0.16, 0.92, cloud);
+    if (cloud <= 0.004) discard;
+
+    float lit = 0.30 + 0.82 * clamp(sun, 0.0, 1.0);
+    vec3 colour = vec3(1.0, 0.985, 0.97) * lit;
+
+    // Thin the cloud shell toward the limb so the globe keeps a clean edge.
+    float facing = clamp(dot(n, viewDir), 0.0, 1.0);
+    float alpha = cloud * uOpacity * mix(0.16, 1.0, dayMix) * pow(facing, 0.55);
+
+    gl_FragColor = vec4(colour, alpha);
 
     #include <colorspace_fragment>
   }
@@ -142,9 +214,9 @@ const ATMOSPHERE_FRAGMENT = /* glsl */ `
   void main() {
     vec3 n = normalize(vNormalW);
     vec3 viewDir = normalize(cameraPosition - vPosW);
-    float rim = pow(clamp(1.0 - abs(dot(n, viewDir)), 0.0, 1.0), 2.4);
+    float rim = pow(clamp(1.0 - abs(dot(n, viewDir)), 0.0, 1.0), 2.2);
     float sun = clamp(dot(n, uSunDir), 0.0, 1.0);
-    float alpha = rim * (0.18 + 1.0 * sun) * uIntensity;
+    float alpha = rim * (0.22 + 1.0 * sun) * uIntensity;
     gl_FragColor = vec4(uColor, alpha);
 
     #include <colorspace_fragment>
@@ -226,9 +298,11 @@ export function createGlobe(canvas: HTMLCanvasElement): GlobeInternals {
 
   const dayMap = load(EARTH_TEXTURES.day, true);
   const nightMap = load(EARTH_TEXTURES.night, true);
+  const cloudMap = load(EARTH_TEXTURES.clouds, false);
   const reliefMap = load(EARTH_TEXTURES.relief, false);
   const waterMap = load(EARTH_TEXTURES.water, false);
   dayMap.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  cloudMap.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
   const earthGroup = new THREE.Group();
   scene.add(earthGroup);
@@ -236,10 +310,11 @@ export function createGlobe(canvas: HTMLCanvasElement): GlobeInternals {
   const earthUniforms: Record<string, THREE.IUniform> = {
     uDay: { value: dayMap },
     uNight: { value: nightMap },
+    uClouds: { value: cloudMap },
     uRelief: { value: reliefMap },
     uWater: { value: waterMap },
     uSunDir: { value: sunLightDir.clone() },
-    uNightGain: { value: 1.35 },
+    uNightGain: { value: 1.45 },
   };
 
   const earth = new THREE.Mesh(
@@ -252,13 +327,31 @@ export function createGlobe(canvas: HTMLCanvasElement): GlobeInternals {
   );
   earthGroup.add(earth);
 
+  // Clouds ride just above the surface on their own sphere, so they can drift.
+  const cloudUniforms: Record<string, THREE.IUniform> = {
+    uClouds: { value: cloudMap },
+    uSunDir: { value: sunLightDir.clone() },
+    uOpacity: { value: 0.9 },
+  };
+  const clouds = new THREE.Mesh(
+    new THREE.SphereGeometry(1.012, 96, 64),
+    new THREE.ShaderMaterial({
+      uniforms: cloudUniforms,
+      vertexShader: CLOUD_VERTEX,
+      fragmentShader: CLOUD_FRAGMENT,
+      transparent: true,
+      depthWrite: false,
+    }),
+  );
+  earthGroup.add(clouds);
+
   const atmosphere = new THREE.Mesh(
     new THREE.SphereGeometry(1.035, 96, 64),
     new THREE.ShaderMaterial({
       uniforms: {
         uSunDir: { value: sunLightDir.clone() },
         uColor: { value: new THREE.Color(0x7fb2ff) },
-        uIntensity: { value: 1.15 },
+        uIntensity: { value: 1.25 },
       },
       vertexShader: ATMOSPHERE_VERTEX,
       fragmentShader: ATMOSPHERE_FRAGMENT,
@@ -271,7 +364,8 @@ export function createGlobe(canvas: HTMLCanvasElement): GlobeInternals {
   earthGroup.add(atmosphere);
 
   // --- pilot-region marker (a child, so it rotates with the globe) ---------
-  const markerLocal = latLonToVector3(PILOT_REGION.lat, PILOT_REGION.lon, 1.004);
+  // Sits above the cloud shell so it never gets buried by a storm.
+  const markerLocal = latLonToVector3(PILOT_REGION.lat, PILOT_REGION.lon, 1.026);
   const markerNormal = markerLocal.clone().normalize();
 
   const marker = new THREE.Group();
@@ -419,6 +513,8 @@ export function createGlobe(canvas: HTMLCanvasElement): GlobeInternals {
 
     const spin = smoothProgress * SCROLL_SPIN + (reducedMotion ? 0 : elapsed * 0.012);
     earthGroup.rotation.y += (baseYaw + spin - earthGroup.rotation.y) * (reducedMotion ? 1 : 0.1);
+    // Clouds drift a touch faster than the ground, so the sky feels alive.
+    clouds.rotation.y = reducedMotion ? 0 : elapsed * 0.006;
 
     if (!reducedMotion) {
       const pulseT = (elapsed % 2.2) / 2.2;
@@ -427,7 +523,7 @@ export function createGlobe(canvas: HTMLCanvasElement): GlobeInternals {
       pulseMaterial.opacity = 0.5 * (1 - pulseT);
       starUniforms['uTime'].value = elapsed;
       stars.rotation.y = elapsed * 0.008 + smoothProgress * 0.25;
-      atmosphere.scale.setScalar(1 + Math.sin(elapsed * 0.5) * 0.004);
+      atmosphere.scale.setScalar(1 + Math.sin(elapsed * 0.5) * 0.006);
     } else {
       pulseMaterial.opacity = 0.4;
       pulse.scale.setScalar(1.2);
@@ -475,10 +571,12 @@ export function createGlobe(canvas: HTMLCanvasElement): GlobeInternals {
       running = false;
       renderer.dispose();
       earth.geometry.dispose();
+      clouds.geometry.dispose();
       atmosphere.geometry.dispose();
       starGeometry.dispose();
       dayMap.dispose();
       nightMap.dispose();
+      cloudMap.dispose();
       reliefMap.dispose();
       waterMap.dispose();
     },
