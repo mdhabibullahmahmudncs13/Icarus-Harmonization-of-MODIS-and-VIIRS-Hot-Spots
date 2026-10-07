@@ -50,15 +50,15 @@ swapping mock for real changes one variable — not the app.
 | Artifact | Path | Purpose |
 |----------|------|---------|
 | Contract schema | `docs/contract.schema.json` | Frozen JSON Schema (draft 2020-12), one `$defs` entry per payload |
-| Mock generator | `tools/gen_mock.py` | Deterministic, stdlib-only generator; `--check` validates without writing |
+| Mock generator | `tools/gen_mock.py` | Deterministic generator; reuses `src.compute` for its statistics; `--check` validates and fails on drift |
 | Mock payloads | `web/public/mock/*.json` | Nine payloads consumed by the frontend |
 | Contract test | `tests/test_contract.py` | Validates every payload against the schema and asserts it is labelled `mock` |
 
 Regenerate and verify:
 
 ```bash
-python3 tools/gen_mock.py --out web/public/mock
-python3 tools/gen_mock.py --check
+python -m tools.gen_mock --out web/public/mock
+python -m tools.gen_mock --check
 python3 -m pytest tests/test_contract.py -q
 ```
 

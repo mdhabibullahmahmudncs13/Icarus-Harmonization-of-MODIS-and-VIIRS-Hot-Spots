@@ -7,9 +7,13 @@ aggregated, so the series, cells, baseline and calendar always agree.
 
 The mock is NEVER evidence: every payload carries meta.source = "mock".
 
+The statistics it reports (percentiles, correlations, the critical period) come
+from :mod:`src.compute` rather than a second copy here, so the mock and the
+pipeline cannot disagree about how a number is defined.
+
 Usage:
-    python3 tools/gen_mock.py --out web/public/mock
-    python3 tools/gen_mock.py --check          # regenerate and validate only
+    python -m tools.gen_mock --out web/public/mock
+    python -m tools.gen_mock --check          # validate + fail if the files drift
 
 Determinism: fixed seed, fixed generated_at, fixed iteration order -> identical
 bytes on every run.
@@ -25,6 +29,9 @@ import random
 import sys
 from datetime import date, timedelta
 from pathlib import Path
+
+from src.compute import critical_period, pearson, percentile, spearman
+from src.compute.coverage import MODIS_SOURCE
 
 # --- fixed configuration (mirrors config/params.yaml defaults) -------------
 SEED = 20260101
@@ -124,7 +131,7 @@ def attach_coverage(daily: list[dict]) -> None:
     """
     for row in daily:
         row["coverage"] = 1.0
-        row["source"] = "MODIS"
+        row["source"] = MODIS_SOURCE
 
 
 def seasonal(doy: int) -> float:
@@ -233,51 +240,17 @@ def simulate() -> dict:
     }
 
 
-# --- statistics ------------------------------------------------------------
-def pearson(xs: list[float], ys: list[float]) -> float | None:
-    n = len(xs)
-    if n < 2:
-        return None
-    mx, my = sum(xs) / n, sum(ys) / n
-    sxx = sum((x - mx) ** 2 for x in xs)
-    syy = sum((y - my) ** 2 for y in ys)
-    if sxx == 0 or syy == 0:
-        return None
-    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
-    return sxy / math.sqrt(sxx * syy)
+def percentile_row(vals: list[float], q: float) -> float:
+    """The shared percentile with the committed payload's whole-number spelling.
 
-
-def ranks(vals: list[float]) -> list[float]:
-    order = sorted(range(len(vals)), key=lambda i: vals[i])
-    out = [0.0] * len(vals)
-    i = 0
-    while i < len(order):
-        j = i
-        while j + 1 < len(order) and vals[order[j + 1]] == vals[order[i]]:
-            j += 1
-        avg = (i + j) / 2.0
-        for k in range(i, j + 1):
-            out[order[k]] = avg
-        i = j + 1
-    return out
-
-
-def spearman(xs: list[float], ys: list[float]) -> float | None:
-    return pearson(ranks(xs), ranks(ys))
-
-
-def percentile(vals: list[float], q: float) -> float:
-    if not vals:
-        return 0.0
-    s = sorted(vals)
-    if len(s) == 1:
-        return s[0]
-    pos = q * (len(s) - 1)
-    lo = math.floor(pos)
-    hi = math.ceil(pos)
-    if lo == hi:
-        return s[lo]
-    return s[lo] + (s[hi] - s[lo]) * (pos - lo)
+    :func:`src.compute.percentile` returns a float, but a percentile that lands
+    exactly on a sample value was always written as an integer in the committed
+    mock. Converting only that case keeps these payloads byte-stable while the
+    interpolation itself stays in one place.
+    """
+    value = percentile(vals, q)
+    pos = q * (len(vals) - 1)
+    return int(value) if pos == int(pos) else value
 
 
 def meta() -> dict:
@@ -338,11 +311,11 @@ def build_payloads(sim: dict) -> dict[str, dict]:
         baseline_rows.append(
             {
                 "doy": doy,
-                "p05": round(percentile(vals, 0.05), 2),
-                "p25": round(percentile(vals, 0.25), 2),
-                "p50": round(percentile(vals, 0.50), 2),
-                "p75": round(percentile(vals, 0.75), 2),
-                "p95": round(percentile(vals, 0.95), 2),
+                "p05": round(percentile_row(vals, 0.05), 2),
+                "p25": round(percentile_row(vals, 0.25), 2),
+                "p50": round(percentile_row(vals, 0.50), 2),
+                "p75": round(percentile_row(vals, 0.75), 2),
+                "p95": round(percentile_row(vals, 0.95), 2),
             }
         )
     baseline = {"meta": meta(), "window_days": 15, "years_used": years_used, "baseline": baseline_rows}
@@ -381,36 +354,16 @@ def build_payloads(sim: dict) -> dict[str, dict]:
         "reason": reason,
     }
 
-    # critical period from 8-day bins of harmonized activity
-    bins = [0] * 46
-    for i, d in enumerate(days):
-        b = min((d.timetuple().tm_yday - 1) // 8 + 1, 46)
-        bins[b - 1] += daily[i]["harm_total"]
-    total = sum(bins)
-    if total == 0:
-        critical = {
-            "meta": meta(), "aoi": "BGD", "insufficient_activity": True,
-            "onset_bin": None, "peak_bin": None, "end_bin": None, "window": None,
-            "year_timing_deviation": [],
-        }
-    else:
-        cum, onset, end = 0.0, None, None
-        for i, v in enumerate(bins):
-            cum += v
-            if onset is None and cum / total >= 0.10:
-                onset = i + 1
-            if end is None and cum / total >= 0.90:
-                end = i + 1
-        peak = max(range(46), key=lambda i: bins[i]) + 1
-        mass = sum(bins[max(onset - 2, 0):end + 1]) / total
-        critical = {
-            "meta": meta(), "aoi": "BGD", "insufficient_activity": False,
-            "onset_bin": onset, "peak_bin": peak, "end_bin": end,
-            "window": {"start_bin": max(onset - 1, 1), "end_bin": min(end + 1, 46), "mass": round(mass, 4)},
-            "year_timing_deviation": [
-                {"year": y, "days": round(seasonal(90 + y % 7 - 3) * 30 - 20)} for y in years_used
-            ],
-        }
+    # critical period from the shared seasonal profile: same 8-day bins, onset
+    # and end at 10% / 90% of the profile, peak at the argmax (src.compute.season).
+    critical = {
+        "meta": meta(),
+        "aoi": "BGD",
+        **critical_period(daily),
+        "year_timing_deviation": [
+            {"year": y, "days": round(seasonal(90 + y % 7 - 3) * 30 - 20)} for y in years_used
+        ],
+    }
 
     # validation over the overlap years (both sensors present)
     overlap_idx = [i for i, d in enumerate(days) if d >= VIIRS_START]
@@ -526,11 +479,26 @@ def validate(payloads: dict[str, dict], schema_path: Path) -> list[str]:
     return errors
 
 
+def serialize(payload: dict) -> str:
+    """The one on-disk spelling of a payload, so writes and checks agree."""
+    return json.dumps(payload, indent=2, sort_keys=False) + "\n"
+
+
+def drifted_files(payloads: dict[str, dict], out: Path) -> list[str]:
+    """Paths under ``out`` that differ from a fresh generation."""
+    return [
+        str(out / f"{name}.json")
+        for name, payload in payloads.items()
+        if not (out / f"{name}.json").exists()
+        or (out / f"{name}.json").read_text() != serialize(payload)
+    ]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", default="web/public/mock", help="output directory")
     ap.add_argument("--schema", default="docs/contract.schema.json")
-    ap.add_argument("--check", action="store_true", help="validate without writing")
+    ap.add_argument("--check", action="store_true", help="validate and fail if the committed payloads drift")
     args = ap.parse_args()
 
     sim = simulate()
@@ -543,11 +511,18 @@ def main() -> int:
             print("  " + e, file=sys.stderr)
         return 1
 
-    if not args.check:
-        out = Path(args.out)
+    out = Path(args.out)
+    if args.check:
+        drifted = drifted_files(payloads, out)
+        if drifted:
+            print("MOCK DRIFT (regenerate with --out):", file=sys.stderr)
+            for path in drifted:
+                print("  " + path, file=sys.stderr)
+            return 1
+    else:
         out.mkdir(parents=True, exist_ok=True)
         for name, payload in payloads.items():
-            (out / f"{name}.json").write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n")
+            (out / f"{name}.json").write_text(serialize(payload))
 
     # summary
     daily = payloads["series"]["series"]
