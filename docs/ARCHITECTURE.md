@@ -1,9 +1,9 @@
 # Architecture
 
-How the system is structured to be built. `DOCS/SYSTEM_ARCHITECTURE.md` is the
+How the system is structured to be built. `docs/SYSTEM_ARCHITECTURE.md` is the
 high-level baseline; this document is the builder's view — module map, data flow,
 sequence, and decision records. Design basis:
-`DOCS/Icarus_Project_Build_Specification.docx`.
+`docs/Icarus_Project_Build_Specification.docx`.
 
 ---
 

@@ -90,7 +90,7 @@ def _d(value: str) -> date:
 
 # Product table. Dates are the project's own contract values; confirm each
 # against https://firms.modaps.eosdis.nasa.gov/api/data_availability/ before
-# the demo rather than trusting this table (see docs/DATA.md).
+# the demo rather than trusting this table (see docs/DATA_DICTIONARY.md).
 PRODUCTS: dict[str, FirmsProduct] = {
     p.source: p
     for p in (

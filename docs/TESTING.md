@@ -2,7 +2,7 @@
 
 Verification asks *did we build the software to spec?* Validation asks *is the
 harmonized calendar a better description of burning than the raw record?* This
-document covers both. Peak requirements: `DOCS/TRD.md`, `docs/PARAMETERS.md`.
+document covers both. Peak requirements: `docs/TRD.md`, `docs/PARAMETERS.md`.
 
 ---
 

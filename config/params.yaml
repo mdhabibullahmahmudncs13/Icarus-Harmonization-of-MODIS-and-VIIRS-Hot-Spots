@@ -1,0 +1,45 @@
+# Project Icarus — single source of every tunable value.
+#
+# The hash of this file is stored with every derived artifact, so changing any
+# value invalidates downstream outputs by design and keeps results reproducible.
+# Defaults and their meaning are documented in docs/PARAMETERS.md; the algorithm
+# each one feeds is in docs/TRD.md §5.
+grid:
+  K: 20            # cells per degree -> Δ = 1/K = 0.05°
+quality:
+  c_min: 30        # minimum MODIS confidence (0-100)
+  modis_allowed_types: [0]   # MODIS hot-spot types kept (null also allowed)
+  viirs_classes: [n, h]      # allowed VIIRS confidence classes
+mask:
+  fine_K: 200      # fine grid cells per degree for the static mask (~550 m)
+  min_days: 16     # distinct-date threshold for the static mask
+bins:
+  bin_days: 8      # temporal bin width; yields 46 bins/year
+calibration:
+  reference_family: [MOD_T, MOD_A]   # MODIS family used as the calibration target
+  viirs_primary: VIIRS_SNPP          # primary VIIRS stream
+  viirs_extra: [VIIRS_N20, VIIRS_N21]  # extra VIIRS streams (ingested, not default)
+  tile_deg: 1      # calibration tile size in degrees (20 × 20 cells)
+  kappa: 50        # pseudo-count for calibration shrinkage
+  min_overlap_bins_per_year: 30   # minimum overlap bins for a year to count
+  min_overlap_years: 5            # minimum overlap years for calibration to apply
+  bootstrap_B: 200          # bootstrap resample draws
+  bootstrap_seed: 20260101  # bootstrap random seed (determinism)
+coverage:
+  cov_min: 0.75           # minimum coverage fraction (6 of 8 days)
+  zero_detection_rule: true   # zero detections => stream unavailable that day
+anomaly:
+  scale: 1000             # anomaly scale constant in ln(1 + 1000·D)
+  min_reference: 8        # minimum reference years per bin
+  sigma_floor: 0.1        # minimum σ for the anomaly z-score
+  smoothing: [0.25, 0.5, 0.25]   # circular smoothing weights
+  z_elevated: 2.0         # elevated anomaly threshold
+  z_extreme: 3.0          # extreme anomaly threshold
+season:
+  window_mass: 0.80       # critical-period mass threshold
+  onset: 0.10             # onset cumulative fraction
+  end: 0.90               # end cumulative fraction
+  min_mean_density: 1.0e-5   # minimum mean density to detect a season
+api:
+  max_aoi_cells: 100000   # max cells per AOI request
+  request_timeout_s: 30   # API request timeout (seconds)

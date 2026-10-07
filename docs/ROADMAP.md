@@ -2,7 +2,7 @@
 
 How Project Icarus gets built, in order, with the deliverable and the MVP cut for
 each work package. Derived from
-`DOCS/Icarus_Project_Build_Specification.docx` §13.
+`docs/Icarus_Project_Build_Specification.docx` §13.
 
 Guiding order: **reproducible data first, then the pipeline, then the API, then
 the frontend, then offline hardening and submission.** The harmonization result —

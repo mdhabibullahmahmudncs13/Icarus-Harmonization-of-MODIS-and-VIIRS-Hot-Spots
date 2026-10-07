@@ -1,4 +1,4 @@
-"""S8 multiplicative calibration (docs/TRD.md §5.6, docs/METHODS.md).
+"""S8 multiplicative calibration (docs/TRD.md §5.6).
 
 VIIRS is finer and detects more, smaller fires than MODIS, so an uncalibrated
 VIIRS cell-day count is not comparable to a MODIS one. Calibration scales VIIRS

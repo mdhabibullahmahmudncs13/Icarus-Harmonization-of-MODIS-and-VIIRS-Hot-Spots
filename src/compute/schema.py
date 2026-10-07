@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 MODIS = "MODIS"
 VIIRS = "VIIRS"
 
-#: VIIRS confidence classes -> numeric, per docs/METHODS.md. Single source of
+#: VIIRS confidence classes -> numeric, per docs/TRD.md §5.1. Single source of
 #: truth: the same mapping is reported in the methods payload for the UI.
 VIIRS_CONFIDENCE_MAP: dict[str, float] = {
     "l": 25.0,
@@ -224,7 +224,7 @@ def quality_filter(
 ) -> list[Detection]:
     """S2: keep only detections that pass the confidence / type rules.
 
-    Rules (docs/METHODS.md, config/params.yaml ``quality``):
+    Rules (docs/TRD.md §5.1, config/params.yaml ``quality``):
 
     * MODIS rows: ``conf_num >= c_min`` and ``hs_type`` in
       :data:`MODIS_ALLOWED_TYPES` (``None`` passes).

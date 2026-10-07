@@ -1,7 +1,7 @@
 # Project Icarus — System Architecture
 
 **Version:** 1.0 · **Date:** 05 October 2026 · **Status:** Baseline
-**Related:** `DOCS/PRD.md`, `DOCS/TRD.md`, `DOCS/Icarus_Project_Build_Specification.docx`
+**Related:** `docs/PRD.md`, `docs/TRD.md`, `docs/Icarus_Project_Build_Specification.docx`
 
 ---
 

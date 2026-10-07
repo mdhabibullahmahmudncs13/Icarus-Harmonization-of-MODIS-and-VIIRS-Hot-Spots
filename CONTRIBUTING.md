@@ -65,7 +65,7 @@ Icarus/
     Dockerfile compose.yaml
 ```
 
-Full background: `DOCS/PRD.md`, `DOCS/TRD.md`, `DOCS/SYSTEM_ARCHITECTURE.md`.
+Full background: `docs/PRD.md`, `docs/TRD.md`, `docs/SYSTEM_ARCHITECTURE.md`.
 
 ---
 
@@ -163,7 +163,8 @@ downstream outputs by design.
 
 This repo is agent-friendly. When using one:
 
-- Record the tool and the key prompts in `docs/AI_USE.md`.
+- Record the tool and any notable prompts in the pull-request description, and
+  note installed agent skills so they stay visible in review.
 - Keep agents inside `src/`, `web/`, and `docs/` — never let them touch `data/`.
 - Require them to run `make lint` and `make test` and to report real results.
 - The harmonization method, parameters, and statistics are the team's own and

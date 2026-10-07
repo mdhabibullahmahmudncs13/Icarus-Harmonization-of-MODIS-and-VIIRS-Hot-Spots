@@ -15,9 +15,9 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 ### Added
 
 - Documentation baseline for the build-specification design:
-  - `DOCS/PRD.md` — product requirements.
-  - `DOCS/TRD.md` — technical requirements.
-  - `DOCS/SYSTEM_ARCHITECTURE.md` — system architecture baseline.
+  - `docs/PRD.md` — product requirements.
+  - `docs/TRD.md` — technical requirements.
+  - `docs/SYSTEM_ARCHITECTURE.md` — system architecture baseline.
   - `docs/ARCHITECTURE.md` — builder's architecture (module map, sequence, ADRs).
   - `docs/PARAMETERS.md` — full parameter registry.
   - `docs/DATA_DICTIONARY.md` — datasets, schemas, derived tables.
@@ -176,7 +176,7 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Notes
 
-- Baseline derived from `DOCS/Icarus_Project_Build_Specification.docx` v1.0.
+- Baseline derived from `docs/Icarus_Project_Build_Specification.docx` v1.0.
 - Numeric targets and dependency versions that are still open are marked
   "TBD — needs decision" rather than guessed.
 
@@ -186,7 +186,7 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Added
 
-- `DOCS/Icarus_Project_Build_Specification.docx` v1.0 — the comprehensive build
+- `docs/Icarus_Project_Build_Specification.docx` v1.0 — the comprehensive build
   specification (objectives, architecture, data sources, harmonization
   algorithms, calibration, anomaly detection, API, storage, validation plan,
   security, and risk register).

@@ -5,7 +5,7 @@ observed, harmonized MODIS and harmonized VIIRS track each other more
 closely than the raw counts do. Raw counts inflate because VIIRS sees more
 and smaller fires; collapsing to cell-days removes that.
 
-Deterministic, network-free, no LLM. ``docs/METHODS.md`` describes the
+Deterministic, network-free, no LLM. ``docs/TRD.md`` §5 describes the
 estimators; this module computes them.
 """
 

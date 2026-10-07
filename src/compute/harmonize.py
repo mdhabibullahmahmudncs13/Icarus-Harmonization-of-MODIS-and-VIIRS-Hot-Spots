@@ -18,7 +18,7 @@ Detections are snapped by latitude and longitude onto uniform steps:
 This is an approximation, not a geodesic: a single reference latitude keeps
 the grid a clean partition and cells near the stated size over one region,
 but cells shrink in the east-west direction away from that latitude. Chosen
-for Bangladesh (centre ~23.5 N) and documented in ``docs/METHODS.md``.
+for Bangladesh (centre ~23.5 N) and documented in ``docs/TRD.md`` §5.3.
 """
 
 from __future__ import annotations

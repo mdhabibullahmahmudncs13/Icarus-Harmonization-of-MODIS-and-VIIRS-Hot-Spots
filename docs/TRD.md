@@ -1,7 +1,7 @@
 # Project Icarus — Technical Requirements Document (TRD)
 
 **Version:** 1.0 · **Date:** 05 October 2026 · **Status:** Baseline for implementation
-**Related:** `DOCS/PRD.md`, `DOCS/SYSTEM_ARCHITECTURE.md`, `DOCS/Icarus_Project_Build_Specification.docx`
+**Related:** `docs/PRD.md`, `docs/SYSTEM_ARCHITECTURE.md`, `docs/Icarus_Project_Build_Specification.docx`
 
 ---
 
