@@ -13,7 +13,7 @@
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%230a0c11'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23c4f43a'/%3E%3C/svg%3E"
     />
-    <link rel="stylesheet" href="/src/styles.css" />
+    <link rel="stylesheet" href="/src/landing/styles.css" />
   </head>
   <body>
     <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
@@ -31,7 +31,7 @@
         <a href="#how">How it works</a>
         <a href="#result">Result</a>
       </nav>
-      <a class="btn btn--primary btn--sm" data-app-link href="http://localhost:5174/">
+      <a class="btn btn--primary btn--sm" data-app-link href="/">
         Open the live app
         <span class="btn__arrow" aria-hidden="true">→</span>
       </a>
@@ -55,16 +55,13 @@
               in the burning.
             </p>
             <div class="actions">
-              <a class="btn btn--primary btn--lg" data-app-link href="http://localhost:5174/">
+              <a class="btn btn--primary btn--lg" data-app-link href="/">
                 Open the live app
                 <span class="btn__arrow" aria-hidden="true">→</span>
               </a>
               <a class="btn btn--ghost btn--lg" href="#problem">See how it works</a>
             </div>
-            <p class="hint">
-              Opens <code>localhost:5174</code> — the interactive calendar, map and
-              validation panels.
-            </p>
+            <p class="hint">The interactive calendar, map and validation panels.</p>
             <p class="scroll-cue" aria-hidden="true">
               <span class="scroll-cue__line"></span>
               Scroll to fly the globe
@@ -270,12 +267,12 @@
               requests.
             </p>
             <div class="actions actions--center">
-              <a class="btn btn--primary btn--lg" data-app-link href="http://localhost:5174/">
+              <a class="btn btn--primary btn--lg" data-app-link href="/">
                 Open the live app
                 <span class="btn__arrow" aria-hidden="true">→</span>
               </a>
             </div>
-            <p class="hint">Opens <code>http://localhost:5174/</code></p>
+            <p class="hint">Opens the app.</p>
           </div>
         </div>
       </section>
@@ -287,6 +284,6 @@
       <span>Deterministic code performs the science; no model sits in the data path.</span>
     </footer>
 
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/landing/main.ts"></script>
   </body>
 </html>

@@ -39,9 +39,3 @@ jobs:
       - name: web — unit tests
         run: npm test
         working-directory: web
-      - name: landing — install
-        run: npm ci
-        working-directory: landing
-      - name: landing — build
-        run: npm run build
-        working-directory: landing

@@ -24,6 +24,20 @@ All inputs are NASA open data, fetched through the FIRMS API
 **Attribution.** NASA FIRMS / LANCE / EOSDIS and NASA LAADS DAAC. FIRMS data
 are free and open; cite them and the algorithm papers in §3.
 
+**Landing-page globe imagery.** The landing page renders a live Earth from NASA
+imagery, downscaled and committed to `web/public/earth/` so the page makes no
+third-party request (`web/e2e/no-third-party.spec.ts` guards it). These images
+are the one dataset redistributed here — public domain, no attribution
+required, credited anyway:
+
+| File | Source |
+|------|--------|
+| `earth-blue-marble.jpg` | NASA Blue Marble, daytime true colour |
+| `earth-night.jpg` | NASA Black Marble, city lights |
+| `earth-clouds.jpg` | NASA Blue Marble cloud composite (cloud shell) |
+| `earth-topology.png` | NASA/GEBCO relief (light bump) |
+| `earth-water.png` | ocean mask (sun glint) |
+
 **Known limitations carried from the data itself.**
 
 - VIIRS detects more, smaller fires at 375 m than MODIS does at 1 km, so raw

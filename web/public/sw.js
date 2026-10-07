@@ -1,9 +1,9 @@
 /* Icarus service worker — docs/IMPLEMENTATION_PLAN.md §7 (offline hardening).
  *
- * Hand-rolled rather than Workbox: the app is one shell, a handful of JSON
- * payloads and hashed assets, so the whole worker is smaller than its config
- * would be. Same-origin only — a third-party request is never fetched here,
- * let alone cached.
+ * Hand-rolled rather than Workbox: two shells (the app and the landing page),
+ * a handful of JSON payloads and hashed assets, so the whole worker is smaller
+ * than its config would be. Same-origin only — a third-party request is never
+ * fetched here, let alone cached.
  *
  * Strategy:
  *   navigations   network-first, cached shell as the offline fallback
@@ -16,7 +16,8 @@
 const VERSION = 'v1';
 const SHELL_CACHE = `icarus-shell-${VERSION}`;
 const DATA_CACHE = `icarus-data-${VERSION}`;
-const PRECACHE = ['/', '/index.html'];
+// Every navigable document, so either one cold-starts offline.
+const PRECACHE = ['/', '/index.html', '/landing.html'];
 
 // Cache API lookups that must not fail on transport metadata:
 // the preview server answers with `Vary: Origin` and (for compressed
@@ -105,19 +106,20 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     // Online stays current; the precached shell is what makes a cold start
-    // with the network off succeed.
+    // with the network off succeed. Keyed by the page's own path: there are two
+    // navigable documents, and filing both under `/index.html` would let a
+    // landing visit overwrite the app shell (and serve the app offline).
+    const key = url.pathname;
     event.respondWith(
       fetch(request)
         .then((response) => {
           const copy = response.clone();
-          void caches
-            .open(SHELL_CACHE)
-            .then((cache) => putNormalized(cache, '/index.html', copy));
+          void caches.open(SHELL_CACHE).then((cache) => putNormalized(cache, key, copy));
           return response;
         })
         .catch(() =>
           caches
-            .match('/index.html', MATCH_OPTIONS)
+            .match(key, MATCH_OPTIONS)
             .then((cached) => cached || caches.match('/', MATCH_OPTIONS)),
         ),
     );

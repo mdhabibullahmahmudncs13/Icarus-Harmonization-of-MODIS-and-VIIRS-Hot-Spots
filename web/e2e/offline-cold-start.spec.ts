@@ -52,4 +52,11 @@ test('cold start with the network off is served by the service worker', async ({
   await raw.click();
   await expect(raw).toHaveAttribute('aria-pressed', 'true');
   await expect(harmonized).toHaveAttribute('aria-pressed', 'false');
+
+  // The landing page is the second navigable document. Offline it must serve
+  // the landing, not fall back to the app shell it shares the worker with
+  // (`#world` is the landing's canvas; the app has no such element).
+  await page.goto('/landing.html');
+  await expect(page.locator('#world')).toBeAttached();
+  expect(await page.locator('h1').innerText()).toContain('Two sensors');
 });

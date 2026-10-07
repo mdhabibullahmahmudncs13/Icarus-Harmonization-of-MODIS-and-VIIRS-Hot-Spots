@@ -86,8 +86,7 @@ src/
   demo.py        # deterministic synthetic detections for the offline fixture
 tools/           # gen_mock.py, gen_golden.py, experiments.py
 tests/           # unit, property, golden, contract
-web/             # React app (src/, public/, tests/, e2e/)
-landing/         # static landing page
+web/             # the frontend: app at `/`, landing at `/landing.html`, one Vite build
 config/params.yaml   # every tunable value
 data/            # git-ignored: raw/ + derived/ + reference/
 ```

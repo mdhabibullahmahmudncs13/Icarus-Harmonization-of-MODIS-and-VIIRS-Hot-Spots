@@ -24,7 +24,12 @@ export default defineConfig(({ command, mode }) => {
   return {
     plugins: [react()],
     server: { port: 5174 },
-    build: { target: 'es2022' },
+    build: {
+      target: 'es2022',
+      // Two entries, one build: the app at `/` and the landing page at
+      // `/landing.html`.
+      rollupOptions: { input: { main: 'index.html', landing: 'landing.html' } },
+    },
     test: {
       environment: 'node',
       include: ['tests/**/*.test.ts'],

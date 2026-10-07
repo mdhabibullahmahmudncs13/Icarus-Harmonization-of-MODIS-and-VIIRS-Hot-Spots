@@ -22,11 +22,6 @@ web/node_modules/
 web/dist/
 web/.vite/
 
-# Node (for the landing page)
-landing/node_modules/
-landing/dist/
-landing/.vite/
-
 # Playwright artifacts
 web/test-results/
 web/playwright-report/

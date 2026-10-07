@@ -108,6 +108,11 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Changed
 
+- Merged the two frontends into one. `landing/` is gone: its page is now a
+  second entry in `web/` (`/landing.html`), built by the same Vite project and
+  served from the same origin as the app, so there is one `npm install`, one
+  build and one deploy. Its Earth textures moved to `web/public/earth/` and the
+  page's call to action now points at `/` instead of a separate dev server.
 - Consolidated five overlapping documents into two, so each fact has one home.
   `docs/ARCHITECTURE.md` now carries the structural and runtime view (absorbing
   `SYSTEM_ARCHITECTURE.md` and `ApplicationFlow.md`), and `docs/FLOWS.md` the
