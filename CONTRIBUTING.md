@@ -43,29 +43,13 @@ npm run test                # unit tests
 
 ## 3. Repository layout
 
-```
-Icarus/
-  README.md            # quick start, offline demo steps
-  Makefile             # data | pipeline | api | web | test | lint | demo
-  config/
-    params.yaml        # ALL tunable parameters (see docs/PARAMETERS.md)
-  data/                # git-ignored except reference/
-  src/
-    core/              # pure functions: grid, bins, coverage, calib, anomaly, season
-    pipeline/          # s0_acquire.py ... s9_harmonize.py, cli.py
-    api/               # main.py, models.py, aoi.py, queries.py
-    sql/               # .sql shared by the API and (stretch) the browser
-  web/
-    src/ public/ sw/ tests/
-  tests/
-    unit/ property/ golden/ e2e/
-  docs/
-    ARCHITECTURE.md DEPLOYMENT.md TESTING.md PARAMETERS.md DATA_DICTIONARY.md
-  docker/
-    Dockerfile compose.yaml
-```
+The module-by-module tree is `docs/ARCHITECTURE.md` §3. At the root:
 
-Full background: `docs/PRD.md`, `docs/TRD.md`, `docs/SYSTEM_ARCHITECTURE.md`.
+- `README.md` — quick start and the offline demo steps.
+- `config/params.yaml` — every tunable value (`docs/PARAMETERS.md`).
+- `data/` — git-ignored except `reference/`.
+
+Full background: `docs/PRD.md`, `docs/TRD.md`, `docs/ARCHITECTURE.md`.
 
 ---
 

@@ -258,9 +258,12 @@ no number from it is evidence.
 | `Esc` | Close the drawer |
 | `?` | Show the shortcut list |
 
+This is the single keyboard map (`docs/FLOWS.md` refers here).
+
 - Hover transitions 120–150ms ease-out; respect `prefers-reduced-motion`.
 - Changing a view updates the hash (`#calendar`) and swaps the main column.
-- Focus ring: 2px `--accent` outline with 2px offset.
+- Focus order: rail → mode control → main content → overlay.
+- Focus ring: 2px `--accent` outline with 2px offset; focus is always visible.
 - Every shortcut has a visible button or menu equivalent.
 
 ---

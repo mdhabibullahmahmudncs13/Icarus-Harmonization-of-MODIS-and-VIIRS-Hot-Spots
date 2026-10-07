@@ -2,7 +2,7 @@
 
 How to build, run, and operate Project Icarus, including the offline field demo.
 The system is a single read-only FastAPI service plus a static frontend, backed
-by a pre-fetched Parquet cache. See `docs/SYSTEM_ARCHITECTURE.md` for the design.
+by a pre-fetched Parquet cache. See `docs/ARCHITECTURE.md` for the design.
 
 ---
 

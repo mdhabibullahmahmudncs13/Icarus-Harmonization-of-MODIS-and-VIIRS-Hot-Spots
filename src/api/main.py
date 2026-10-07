@@ -22,7 +22,7 @@ alias so earlier callers keep working.
 * ``/api/v1/methods`` (alias ``/api/methods``)
 * ``/api/v1/aoi``
 
-Per ``docs/ApplicationFlow.md`` the analysis endpoints also accept ``POST``:
+Per ``docs/ARCHITECTURE.md`` §6 the analysis endpoints also accept ``POST``:
 ``aoi``, ``date`` and ``bbox`` in the body override the query parameters, and
 ``metric``/``view`` are validated (``metric=density`` is served by the series
 payload and refused elsewhere). The ``aoi`` field takes a preset id or the AOI
@@ -163,7 +163,7 @@ class AoiBody(BaseModel):
 
 
 class AnalysisRequest(BaseModel):
-    """The optional JSON body ``docs/ApplicationFlow.md`` §4 describes.
+    """The optional JSON body ``docs/ARCHITECTURE.md`` §6 describes.
 
     ``aoi`` (a preset id or the ``{type: "preset", id}`` object), ``date`` and
     ``bbox`` are honoured and take precedence over the query parameters.
@@ -274,7 +274,7 @@ def series(body: AnalysisRequest | None = None) -> Mapping[str, Any]:
     """Daily raw and harmonized counts, one row per day.
 
     ``metric=density`` (the default the startup flow in
-    ``docs/ApplicationFlow.md`` §3 asks for) serves the same counts divided by
+    ``docs/ARCHITECTURE.md`` §7 asks for) serves the same counts divided by
     the region's grid-cell count; anything else is ``cell_days``.
     """
     _resolve(body, allow_density=True)
@@ -440,7 +440,7 @@ def methods() -> Mapping[str, Any]:
     dataset = _dataset()
     # The dataset's own date range, so one request yields one params_hash
     # across all nine payloads and two payloads can be matched against each
-    # other (docs/ApplicationFlow.md: same inputs + same hash => same output).
+    # other (docs/ARCHITECTURE.md §13: same inputs + same hash => same output).
     return export.build_methods(
         source=dataset.source,
         generated_at=dataset.generated_at,

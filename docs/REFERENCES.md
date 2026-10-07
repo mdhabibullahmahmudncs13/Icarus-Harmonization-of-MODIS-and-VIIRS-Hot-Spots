@@ -46,7 +46,7 @@ are free and open; cite them and the algorithm papers in §3.
   `docs/PRD.md`).
 - **No LLM touches a number.** If a language model is ever added, it only
   retrieves, orchestrates or explains; it never issues its own query and
-  cannot alter a payload (`docs/SYSTEM_ARCHITECTURE.md`).
+  cannot alter a payload (`docs/ARCHITECTURE.md`).
 - **The validation report is computed, not narrated.** Every value in
   `docs/VALIDATION.md` comes from `src/validate/experiments.py`, run by
   `python -m tools.experiments`, and is guarded by `tests/test_experiments.py`.

@@ -143,7 +143,7 @@ def test_root_meta_alias_answers_as_the_spec_calls_it(client: TestClient):
 
 
 def test_analysis_endpoints_accept_post_as_the_docs_say(client: TestClient):
-    """docs/ApplicationFlow.md §4 and DEPLOYMENT.md document POST; honour it."""
+    """docs/ARCHITECTURE.md §6 and DEPLOYMENT.md document POST; honour it."""
     for name in ("series", "cells", "baseline", "anomalies", "critical-period", "validation"):
         endpoint = ENDPOINTS[name]
         response = client.post(endpoint["path"], params=endpoint["params"])
@@ -354,7 +354,7 @@ def test_errors_carry_a_code_a_message_and_a_field(client, request_args, status,
 
 
 # --------------------------------------------------------------------------
-# POST bodies (docs/ApplicationFlow.md §4)
+# POST bodies (docs/ARCHITECTURE.md §6)
 # --------------------------------------------------------------------------
 
 
@@ -423,7 +423,7 @@ def test_post_body_rejects_an_unknown_aoi_with_its_field(client: TestClient):
 
 
 def test_post_body_serves_the_density_metric_on_the_series(client: TestClient):
-    """docs/ApplicationFlow.md §3 defaults to density; the series honours it."""
+    """docs/ARCHITECTURE.md §7 defaults to density; the series honours it."""
     response = client.post("/api/v1/series", json={"metric": "density"})
     assert response.status_code == 200, response.text
     payload = response.json()

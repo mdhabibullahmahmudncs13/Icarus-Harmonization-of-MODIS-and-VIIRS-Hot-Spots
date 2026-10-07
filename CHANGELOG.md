@@ -17,8 +17,8 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Documentation baseline for the build-specification design:
   - `docs/PRD.md` — product requirements.
   - `docs/TRD.md` — technical requirements.
-  - `docs/SYSTEM_ARCHITECTURE.md` — system architecture baseline.
-  - `docs/ARCHITECTURE.md` — builder's architecture (module map, sequence, ADRs).
+  - `docs/ARCHITECTURE.md` — architecture: module map, runtime, interfaces, ADRs.
+  - `docs/FLOWS.md` — screens, navigation, and user journeys.
   - `docs/PARAMETERS.md` — full parameter registry.
   - `docs/DATA_DICTIONARY.md` — datasets, schemas, derived tables.
   - `docs/TESTING.md` — verification and validation strategy.
@@ -108,6 +108,13 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Changed
 
+- Consolidated five overlapping documents into two, so each fact has one home.
+  `docs/ARCHITECTURE.md` now carries the structural and runtime view (absorbing
+  `SYSTEM_ARCHITECTURE.md` and `ApplicationFlow.md`), and `docs/FLOWS.md` the
+  screens and journeys (absorbing `ScreenFlow.md` and `UserFlow.md`). The
+  keyboard map lives only in `docs/DESIGN.md`, and the module map now matches
+  the code (`src/acquire`, `src/compute`, `src/api`, `src/validate`) instead of
+  the never-built `src/core` and `src/pipeline`.
 - E8 external validation now runs instead of reporting a limitation. MODIS
   **MCD64A1 v061** burned area (500 m, monthly, HDF4) is fetched through
   `earthaccess` with an Earthdata Login token and regridded to 0.25° by the new
@@ -139,7 +146,7 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   (`meta`, `series`, `cells`, `baseline`, `anomalies`, `critical-period`,
   `validation`, `methods`, `aoi`), each carrying `params_hash`. The unversioned
   `/api/*` paths remain as aliases and the analysis endpoints also accept POST,
-  as `docs/ApplicationFlow.md` and `docs/DEPLOYMENT.md` describe.
+  as `docs/ARCHITECTURE.md` §6 and `docs/DEPLOYMENT.md` describe.
 
 ### Fixed
 

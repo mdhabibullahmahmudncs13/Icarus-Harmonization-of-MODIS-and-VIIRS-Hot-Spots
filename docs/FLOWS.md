@@ -1,12 +1,23 @@
-# Screen Flow
+# Flows
 
-Every screen, how you reach it, and what it shows in each state. Visual tokens
-and components are in `docs/DESIGN.md`; journeys in `docs/UserFlow.md`; runtime
-behaviour in `docs/ApplicationFlow.md`.
+Screens, navigation, and user journeys. The visual system and the keyboard map
+are in `docs/DESIGN.md`; structure and runtime in `docs/ARCHITECTURE.md`;
+requirements in `docs/PRD.md`.
 
 ---
 
-## 1. Screen inventory
+## 1. Personas
+
+| ID | Persona | Wants to answer | Time budget |
+|----|---------|-----------------|-------------|
+| P1 | Emergency responder / planner | "Is this period normal or elevated, and when does the season peak?" | seconds |
+| P2 | Air-quality / environmental analyst | "How has this region trended, and is today unusual for the season?" | minutes |
+| P3 | Reviewer / judge | "Is NASA data used correctly and is the result reproducible?" | seconds–minutes |
+| P4 | Field user | "Does it still work with no network?" | seconds |
+
+---
+
+## 2. Screen inventory
 
 | # | Screen | Hash | Purpose |
 |---|--------|------|---------|
@@ -21,11 +32,11 @@ behaviour in `docs/ApplicationFlow.md`.
 
 Global chrome on every screen: the **rail** (brand, search, Raw | Harmonized
 mode, nav, theme switch, status footer), the **source badge**, and the
-**keyboard hint**.
+**keyboard hint** (the shortcut list is in `docs/DESIGN.md` §7).
 
 ---
 
-## 2. Navigation map
+## 3. Navigation map
 
 ```
                       ┌───────────────────────────────┐
@@ -56,9 +67,15 @@ mode, nav, theme switch, status footer), the **source badge**, and the
 Navigation is linear via the rail; the URL hash is the source of truth, so any
 screen is deep-linkable and the back button works.
 
+Deep links:
+
+- `#calendar?year=2019&mode=harmonized` — shareable view state.
+- `#anomalies?aoi=BGD&date=2019-03-01`
+- Unknown hashes fall back to `#overview` with a non-blocking notice.
+
 ---
 
-## 3. Screen detail
+## 4. Screen detail
 
 ### Screen 0 — Overview
 
@@ -115,9 +132,7 @@ screen is deep-linkable and the back button works.
 
 ---
 
-## 4. Per-screen states
-
-Every data screen implements the same five states:
+## 5. States on every screen
 
 | State | What shows |
 |-------|------------|
@@ -129,7 +144,7 @@ Every data screen implements the same five states:
 
 ---
 
-## 5. Overlay flows
+## 6. Overlay flows
 
 | Overlay | Trigger | Close |
 |---------|---------|-------|
@@ -140,26 +155,113 @@ Every data screen implements the same five states:
 
 ---
 
-## 6. Keyboard navigation
+## 7. Journeys
 
-| Keys | Action |
-|------|--------|
-| `1`–`8` | Jump to a screen by rail position |
-| `Ctrl/Cmd + B` | Collapse / expand the rail |
-| `Ctrl/Cmd + K` | Focus search |
-| `R` / `H` | Switch mode to Raw / Harmonized |
-| `←` / `→` | Move the selected date/bin (Calendar, Anomalies) |
-| `P` | Open Provenance |
-| `T` | Toggle theme |
-| `?` | Shortcut help |
-| `Esc` | Close overlay / dismiss |
+### Journey 1 — Region overview (default path)
 
-Focus order: rail → mode control → main content → overlay. Focus is always
-visible (2px accent ring, 2px offset).
+**Persona:** P1. **Goal:** judge whether the current season is normal.
+
+```
+Open app
+  -> Overview screen loads (Rail + hero series chart)
+  -> select preset region (Rail > region)
+  -> hero series renders raw vs harmonized
+  -> user presses H (or toggles mode) -> the false step collapses
+  -> scroll to Calendar -> scan the current year row
+  -> Success: the user can say "this season is normal / elevated"
+```
+
+The mode flip redraws both series from the same payload — no refetch — and the
+calendar heatmap is derived client-side from it. **Failure paths:** no data →
+empty state naming the reason; offline with no cache → offline notice and a link
+to the Offline screen.
+
+### Journey 2 — Anomaly check
+
+**Persona:** P2. **Goal:** "Is this unusual?"
+
+```
+Anomalies screen
+  -> pick date + area (or accept the current selection)
+  -> POST /api/v1/anomalies
+  -> read z-score, percentile, flag (Normal | Elevated | Extreme | Not scored)
+  -> open Provenance drawer (P) to see the JSON and the baseline window
+```
+
+"Not scored" is a first-class outcome with a reason (low coverage, insufficient
+reference years) — never a silent zero — and it states the baseline window and
+the years used.
+
+### Journey 3 — Season window (critical period)
+
+**Persona:** P1 / P2. **Goal:** when to expect readiness.
+
+```
+Critical period screen
+  -> POST /api/v1/critical-period
+  -> read onset bin, peak bin, end bin, window mass
+  -> cross-check the Calendar highlight for the same window
+```
+
+Below the density floor the screen reports "insufficient activity" and shows no
+window.
+
+### Journey 4 — Custom area of interest
+
+**Persona:** P2. **Goal:** study a non-preset area.
+
+```
+Map screen
+  -> draw a polygon
+  -> client validates (closed ring, >= 4 points, within extent, <= 100,000 cells)
+  -> submit -> series / anomalies / critical-period re-run for the polygon
+  -> invalid input returns a structured error naming the field
+```
+
+### Journey 5 — Verify the method
+
+**Persona:** P3. **Goal:** trust the result.
+
+```
+Methods screen (from the Rail's Reference group)
+  -> read cell size, confidence filter, collapse rule
+  -> Validation screen -> raw vs harmonized correlations on the overlap
+  -> any chart -> Provenance drawer -> dataset names, versions, retrieval dates,
+     parameter hash, the exact JSON behind the view
+```
+
+Every number on screen must lead here. Mock/fixture data is labelled at the point
+of display and in the drawer.
+
+### Journey 6 — Prepare for and use offline
+
+**Persona:** P4. **Goal:** work with no network.
+
+```
+Offline screen
+  -> choose area + layers
+  -> see size estimate -> start download -> progress -> per-layer "last updated"
+  -> Success: cold start with the network off serves the app shell and data
+```
+
+Exit criterion: after a full device reload with the network disabled, the
+Overview renders and the mode toggle still responds.
 
 ---
 
-## 7. Responsive behaviour
+## 8. Cross-cutting interactions
+
+| Interaction | Applies to | Rule |
+|-------------|------------|------|
+| Mode toggle (`R` / `H`) | every data view | Global; never triggers a refetch. |
+| Source badge | every figure | Shows `mock` / `fixture` / `cache` / `live`. |
+| Provenance drawer (`P`) | every figure | Opens the JSON behind the current view. |
+| Parameter hash | footer + drawer | Ties the view to a configuration. |
+| Keyboard | all screens | Every shortcut has a visible alternative. |
+
+---
+
+## 9. Responsive behaviour
 
 | Width | Shell |
 |-------|-------|
@@ -171,8 +273,18 @@ The mode control stays reachable at every width.
 
 ---
 
-## 8. Deep links
+## 10. Success signals
 
-- `#calendar?year=2019&mode=harmonized` — shareable view state.
-- `#anomalies?aoi=BGD&date=2019-03-01`
-- Unknown hashes fall back to `#overview` with a non-blocking notice.
+- P1 reaches a normal/elevated judgement in under 30 seconds.
+- P2 completes an anomaly check and can name the baseline window used.
+- P3 can trace any number to a dataset, a version, and a parameter hash.
+- P4 completes a cold start with the network off.
+- The mode toggle measurably removes the sensor step, every time.
+
+---
+
+## 11. Non-goals
+
+- Real-time alerting or push notifications.
+- Fire-spread or emissions modelling.
+- Multi-user accounts, sharing, or collaboration.

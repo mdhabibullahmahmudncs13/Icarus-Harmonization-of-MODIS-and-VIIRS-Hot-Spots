@@ -4,8 +4,7 @@
 **Approach:** build the frontend against mock data first, freeze the JSON
 contract, then build compute, then the API, then swap mock for real data, then
 harden offline. See `docs/ROADMAP.md` for the spec's work breakdown and
-`docs/DESIGN.md`, `docs/ScreenFlow.md`, `docs/ApplicationFlow.md`,
-`docs/UserFlow.md` for the frontend definition.
+`docs/DESIGN.md` and `docs/FLOWS.md` for the frontend definition.
 
 **Rule:** the killer demo comes first. A single **Raw | Harmonized** toggle must
 visibly collapse the false sensor step. Everything else supports that moment.
@@ -36,7 +35,7 @@ swapping mock for real changes one variable — not the app.
 
 - Define the contract for: `meta`, `series`, `cells`, `baseline`, `anomaly`,
   `critical-period`, `validation`, `methods`, `aoi` (see
-  `docs/ApplicationFlow.md` §4).
+  `docs/ARCHITECTURE.md` §6).
 - Every payload includes `meta.source` (`mock | fixture | cache | live`) and the
   parameter hash.
 - Mock generator: seed PRNG, generate **cell-day records first**, then
@@ -78,7 +77,7 @@ sensor transition and the harmonized series does not.
 
 ## 3. Phase 1 — Frontend on mock data *(make ready the frontend)*
 
-Build the shell and every screen from `docs/ScreenFlow.md` and `docs/DESIGN.md`,
+Build the shell and every screen from `docs/FLOWS.md` and `docs/DESIGN.md`,
 running entirely on mock data with no network.
 
 ### 3.1 Milestones
@@ -95,7 +94,7 @@ running entirely on mock data with no network.
 ### 3.2 Screens to deliver
 
 Overview, Calendar, Map, Anomalies, Critical period, Validation, Methods,
-Offline (see `docs/ScreenFlow.md` §1).
+Offline (see `docs/FLOWS.md` §2).
 
 ### 3.3 Frontend acceptance checks
 
@@ -183,7 +182,7 @@ eight views, and the console is clean.
 
 1. Normalize MODIS/VIIRS to one schema; map VIIRS l/n/h to numeric via a single
    documented constant.
-2. Grid assignment and cell-day collapse (`docs/ARCHITECTURE.md` §2).
+2. Grid assignment and cell-day collapse (`docs/ARCHITECTURE.md` §3).
 3. Raw and harmonized series; seasonal baseline (day-of-year percentiles).
 4. Anomaly rank; overlap validation and cell-size sweep.
 5. Tests: unit at edges, property (idempotence, row-order invariance,
