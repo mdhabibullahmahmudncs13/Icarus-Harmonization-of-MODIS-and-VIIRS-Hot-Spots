@@ -12,11 +12,36 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      # The dependency list lives in the Makefile (`DEPS`). CI installs through
+      # the same documented target a developer uses, so the two cannot drift.
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install duckdb pandas pyarrow requests fastapi uvicorn jsonschema pytest ruff
+          python -m pip install --upgrade pip uv
+          make venv
       - name: Lint
         run: make lint
       - name: Test
         run: make test
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: web — install
+        run: npm ci
+        working-directory: web
+      - name: web — build
+        run: npm run build
+        working-directory: web
+      - name: web — unit tests
+        run: npm test
+        working-directory: web
+      - name: landing — install
+        run: npm ci
+        working-directory: landing
+      - name: landing — build
+        run: npm run build
+        working-directory: landing
