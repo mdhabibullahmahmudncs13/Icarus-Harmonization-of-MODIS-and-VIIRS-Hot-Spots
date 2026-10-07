@@ -43,7 +43,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.api.dataset import Dataset, NoDataError, get_dataset
+from src.api.dataset import Dataset, NoDataError, _continuous, get_dataset
 from src.compute import export, harmonize
 
 #: Origins that may call the API during development: the Vite dev server and
@@ -244,15 +244,6 @@ def _within(frame: pd.DataFrame, bbox: tuple[float, float, float, float]) -> pd.
         & (frame["latitude"] >= south)
         & (frame["latitude"] <= north)
     ]
-
-
-def _continuous(series: pd.Series) -> pd.Series:
-    """Reindex a daily series onto every day between its ends, filling 0."""
-    if series.empty:
-        return series
-    index = pd.date_range(series.index.min(), series.index.max(), freq="D")
-    index.name = "date"
-    return series.reindex(index, fill_value=0)
 
 
 # --------------------------------------------------------------------------

@@ -11,9 +11,8 @@ from collections import defaultdict
 from collections.abc import Iterable
 
 from .baseline import doy
-from .series_util import bin_of_doy
+from .series_util import BIN_DAYS, bin_of_doy
 
-BIN_DAYS = 8
 ONSET = 0.10
 END = 0.90
 MIN_MEAN_DENSITY = 1e-5
