@@ -1,4 +1,4 @@
-Project Icarus
+**Project Icarus**
 
 Harmonizing MODIS and VIIRS Active-Fire Hot Spots
 
