@@ -378,6 +378,9 @@ body::before {
   font: 600 13px var(--font);
   cursor: pointer;
   white-space: nowrap;
+  /* A link styled as a button is still a link: no underline, so it reads as
+     the button next to it rather than as a piece of body text. */
+  text-decoration: none;
   transition:
     background var(--dur-fast) var(--ease),
     transform var(--dur-fast) var(--ease),
@@ -446,6 +449,12 @@ body::before {
   padding: 0 5px;
   line-height: 15px;
   opacity: 0.7;
+}
+
+.btn__count {
+  font-family: var(--mono);
+  font-size: 11px;
+  opacity: 0.65;
 }
 
 .region-chip {

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Dataset } from './contract/types';
-import { getDataSource } from './data/DataSource';
+import { getDataSource, apiBase } from './data/DataSource';
 import { aggregateToBins } from './lib/series';
+import { recordCount } from './lib/export';
 import { useAppState } from './state/useAppState';
 import { VIEWS, type View } from './state/urlState';
 import { Rail } from './components/Rail';
@@ -17,6 +18,7 @@ import {
   ValidationCard,
 } from './components/panels';
 import { ProvenanceDrawer } from './components/ProvenanceDrawer';
+import { ExportButton } from './components/ExportButton';
 import { HelpDialog, KeyboardHint, LoadingSkeleton, MockBanner, RenderBoundary } from './components/shared';
 import { Icon } from './components/Icon';
 
@@ -61,6 +63,8 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [overlay, setOverlay] = useState<Overlay>(null);
+  // Null on the mock tier, which has no export route.
+  const base = apiBase();
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -193,6 +197,15 @@ export function App() {
                 <Icon name="area" size={15} />
                 <b>{formatBbox(data.meta.meta.region.bbox)}</b>
               </span>
+            ) : null}
+            {base && data ? (
+              <ExportButton
+                base={base}
+                aoi={state.aoi}
+                start={data.meta.meta.date_range[0]}
+                end={data.meta.meta.date_range[1]}
+                count={recordCount(data.series.series)}
+              />
             ) : null}
             <button
               type="button"

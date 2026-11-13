@@ -69,13 +69,21 @@ function serviceWorkerVersion(): Plugin {
 export default defineConfig(({ command, mode }) => {
   // ``loadEnv`` merges .env files with the prefixed process-environment
   // entries, which is the same value ``import.meta.env.VITE_DATA`` will see.
-  const env = loadEnv(mode, '.', 'VITE_');
+  //
+  // The env files live at the repository root, one level up from ``web/``,
+  // and Vite only looks in the project root by default. Without ``envDir``
+  // the root ``.env`` was never read, so ``VITE_DATA=api`` there had no
+  // effect and every build silently ran on the mock tier.
+  const env = loadEnv(mode, '..', 'VITE_');
   const dataMode = env.VITE_DATA ?? 'mock';
   if (command === 'build') {
     assertReleaseDataSource(dataMode, mode === 'release');
   }
 
   return {
+    // The same directory ``loadEnv`` reads, so ``import.meta.env`` and the
+    // check above agree on which tier the build is.
+    envDir: '..',
     plugins: [react(), serviceWorkerVersion()],
     server: { port: 5174 },
     build: {

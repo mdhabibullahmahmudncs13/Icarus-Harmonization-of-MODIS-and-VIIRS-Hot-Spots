@@ -253,6 +253,27 @@ There is no download manager here: the worker caches what the page used, so
 "prepare for offline" means loading the app while online, then checking the
 Offline screen that the cache is populated.
 
+### Journey 7 — Take the records away
+
+**Persona:** P2. **Goal:** get the hotspot records behind the view.
+
+```
+Load the app (api tier)
+  -> the Export CSV button shows how many records the export will hold
+  -> click it -> the browser downloads icarus_hotspots_<start>_<end>.csv
+  -> Success: a spreadsheet opens with one row per detection
+```
+
+Exit criterion: the downloaded file has a header row and one row per
+detection, with the acquisition date, time, position, sensor family,
+satellite, confidence, FRP and grid cell of each.
+
+The rows are the raw observations, not the harmonized cell-days: a hotspot is
+what the satellite saw, and the cell-day count is what the app derived from
+them. The button states the record count because the whole record for a large
+area is tens of megabytes, and a download that size should be one the user
+agreed to.
+
 ---
 
 ## 8. Cross-cutting interactions
@@ -262,6 +283,7 @@ Offline screen that the cache is populated.
 | Mode toggle (`R` / `H`) | every data view | Global; never triggers a refetch. |
 | Source badge | every figure | Shows `mock` / `fixture` / `cache` / `live`. |
 | Provenance drawer (`P`) | every figure | Opens the JSON behind the current view. |
+| Export CSV | every data view (api tier only) | Downloads the hotspot records behind the view, with the record count on the button. |
 | Parameter hash | footer + drawer | Ties the view to a configuration. |
 | Keyboard | all screens | Every shortcut has a visible alternative. |
 

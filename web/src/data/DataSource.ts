@@ -135,3 +135,16 @@ export function getDataSource(): DataSource {
   if (mode === 'api') return new ApiDataSource(import.meta.env.VITE_API_BASE ?? '/api/v1');
   return new MockDataSource();
 }
+
+/**
+ * The API's base address, or `null` when the app is not on the API tier.
+ *
+ * The CSV export is served by the API, so the button needs the base to build
+ * its link. The mock tier has nine static payloads and no export route, so it
+ * has no base and no button.
+ */
+export function apiBase(): string | null {
+  const mode = import.meta.env.VITE_DATA ?? 'mock';
+  if (mode !== 'api') return null;
+  return import.meta.env.VITE_API_BASE ?? '/api/v1';
+}

@@ -128,10 +128,26 @@ Each task ends with the suite re-run: `make lint`, `make test`, `npm test`,
 
 ## 5. What is still open
 
-Only two things, and neither is code:
+Two things that are not code:
 
 1. **A real device and a fallback video** — the automated cold start passes,
    but AC-3 wants the demo recorded on hardware.
 2. **`LICENSE` and the root `README.md`** — restore before release; the
    Apache-2.0 intent is stated but the files are not there.
+
+And three gaps against the challenge statement, which are code:
+
+3. **Polygon drawing for a custom AOI** (FR-16). The API half-supports it —
+   `_resolve` accepts a bbox and refuses polygon objects — but the frontend
+   can only pick a preset, and `AppState` has no bbox field.
+4. **Monthly and annual aggregation.** The pipeline bins cell-days into
+   46 eight-day bins and never aggregates them up, though the statement asks
+   for seasonal and annual comparisons.
+5. **Global extent.** The statement says "global", but only the Bangladesh
+   bbox is cached, so the `IND-C` and `NPL` presets have no data at the API
+   tier.
+
+The CSV export (FR-22) was the fourth gap and is now built: `GET
+/api/v1/export` serves the filtered hotspot records as CSV, and the frontend
+offers the download with its record count on the button.
 

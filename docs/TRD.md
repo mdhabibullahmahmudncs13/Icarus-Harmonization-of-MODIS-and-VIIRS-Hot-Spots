@@ -233,6 +233,7 @@ Read-only, versioned under `/api/v1`, UTF-8 JSON. Analysis endpoints use POST (l
 | POST | `/api/v1/anomalies` | Anomaly scores for AOI | params_hash, anomalies[] |
 | POST | `/api/v1/critical-period` | Critical fire period | params_hash, onset_bin, peak_bin, end_bin, window |
 | GET | `/api/v1/aoi` | List preset AOIs | id, name, geometry (GeoJSON) |
+| GET | `/api/v1/export` | The filtered hotspot records, as CSV | `text/csv`: acq_date, acq_time, latitude, longitude, sensor_family, satellite, confidence_num, frp, cell_id, source_product |
 
 ### 6.1 AOI Object
 

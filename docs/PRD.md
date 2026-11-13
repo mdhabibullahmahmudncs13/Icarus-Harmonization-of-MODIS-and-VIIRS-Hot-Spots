@@ -104,6 +104,7 @@ Priority: **M** = must, **S** = should, **C** = could.
 | FR-19 | Frontend provides a "Download for offline" screen with size estimate, progress, and per-layer last-updated timestamps. | C |
 | FR-20 | Low-coverage and modelled bins are visually distinct (hatching, outline) and never coloured as zero activity. | M |
 | FR-21 | System supports display of UTC and local acquisition time for seasonal alignment. | C |
+| FR-22 | API exports the filtered hotspot records as CSV, one row per detection, and the frontend offers the download with its record count. | M |
 
 **FR-19 is reclassified from M to C.** The offline story is the service worker
 (`web/public/sw.js`): it precaches the app shell and the payloads the page
@@ -111,6 +112,15 @@ actually used, and the offline screen reports that cache state. A download
 manager with size estimates, progress bars and per-layer timestamps describes
 a different product — one where the user chooses what to download — and is
 later work. The requirement is kept, at C, so it is not silently lost.
+
+**FR-22 is the record download, and it is not FR-19.** FR-19 is about caching
+the app for offline use. FR-22 is about getting the data out of the app: the
+hotspot records behind the view, as CSV, one row per detection with the
+satellite that saw it. The export serves the *raw* observations, not the
+harmonized cell-days — a hotspot is what the satellite saw, and the cell-day
+count is a derived product. The button states the record count, because the
+whole record for a large area is tens of megabytes and a download that size
+should be something the user agreed to.
 
 ---
 

@@ -15,7 +15,8 @@ export type IconName =
   | 'chevron-left'
   | 'chevron-right'
   | 'refresh'
-  | 'area';
+  | 'area'
+  | 'download';
 
 const PATHS: Record<IconName, string> = {
   overview: 'M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z',
@@ -37,6 +38,7 @@ const PATHS: Record<IconName, string> = {
   'chevron-right': 'm10 6 6 6-6 6',
   refresh: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4',
   area: 'M4 6h6v6H4V6Zm10 0h6v6h-6V6ZM4 15h6v4H4v-4Zm10 0h6v4h-6v-4Z',
+  download: 'M12 4v10m0 0 4-4m-4 4-4-4M5 18h14',
 };
 
 export function Icon({ name, size = 17 }: { name: IconName; size?: number }) {

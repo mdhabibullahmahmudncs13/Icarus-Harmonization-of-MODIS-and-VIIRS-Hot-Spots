@@ -46,7 +46,13 @@ Environment variables (names only — never commit values):
 | `VITE_DATA` | `mock` | frontend build | `mock` (bundled payloads) or `api` (live backend) |
 | `VITE_API_BASE` | `/api/v1` | frontend build | Where the API lives, when `VITE_DATA=api` |
 
-Copy `.env.example` to `.env` for local runs; `.env` is git-ignored. The API
+Copy `.env.example` to `.env` for local runs; `.env` is git-ignored. The `.env`
+lives at the repository root, and Vite reads it from there (`web/vite.config.ts`
+sets `envDir: '..'`), so `VITE_DATA=api` in the root `.env` reaches the
+frontend build. A shell variable of the same name still wins, which is how the
+Playwright suite forces the mock tier.
+
+The API
 reads no other environment variable: there is no `DATA_DIR`, `LOG_LEVEL` or
 `DUCKDB_MEMORY`, and the cache always lives in `cache/` (the fixture in
 `demo_fixtures/`).

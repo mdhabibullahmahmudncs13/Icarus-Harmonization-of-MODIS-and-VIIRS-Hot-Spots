@@ -147,6 +147,14 @@ Analysis endpoints also accept `POST` because AOI geometries can be large; the
 optional body carries `aoi`, `date`, and `bbox`, which take precedence over the
 query parameters.
 
+**The one non-JSON boundary** is `GET /api/v1/export`, which answers `text/csv`:
+the hotspot records behind the view, one row per detection, with the satellite
+that saw each one. It takes the same `aoi`, `bbox`, `start` and `end` as every
+other endpoint, so what comes out is what the screen showed. The rows are the
+raw observations, not the harmonized cell-days — a hotspot is what the
+satellite saw; the cell-day count is a derived product. The response is sorted
+by date and position, so two runs over the same data produce the same bytes.
+
 ---
 
 ## 7. Data source, startup, and runtime state

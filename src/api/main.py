@@ -18,6 +18,7 @@ alias so earlier callers keep working.
 * ``/api/v1/baseline`` (alias ``/api/baseline``)
 * ``/api/v1/anomalies?date&bbox&aoi`` (alias ``/api/anomaly?date``)
 * ``/api/v1/critical-period?aoi``
+* ``/api/v1/export?start&end&aoi`` — the filtered hotspot records as CSV
 * ``/api/v1/validation`` (alias ``/api/validation``)
 * ``/api/v1/methods`` (alias ``/api/methods``)
 * ``/api/v1/aoi``
@@ -41,7 +42,7 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from src.api.dataset import Dataset, NoDataError, _continuous, get_dataset
@@ -529,6 +530,41 @@ def critical_period(
         bbox=area,
         source=dataset.source,
         generated_at=dataset.generated_at,
+    )
+
+
+@app.get("/api/export")
+@app.get("/api/v1/export")
+def export_csv(
+    start: Annotated[DateType | None, Query(description="ISO date, inclusive")] = None,
+    end: Annotated[DateType | None, Query(description="ISO date, inclusive")] = None,
+    aoi: Annotated[str, Query(description="preset id the request is for")] = "BGD",
+    bbox: Annotated[str | None, Query(description="west,south,east,north")] = None,
+) -> Response:
+    """The filtered hotspot records, as CSV.
+
+    The challenge asks for the records behind the view to be downloadable, so
+    this serves the observations themselves — one row per detection, with the
+    original satellite named — rather than the derived cell-days the calendar
+    shows. The date window and the area are the same ones the other
+    endpoints take, so what comes out is what the screen showed.
+    """
+    _, _, area = _resolve(None, aoi=aoi, bbox=bbox)
+    if start is not None and end is not None and start > end:
+        fail(422, "invalid_window", "start must not be after end", "start")
+    dataset = _dataset()
+    text = export.build_csv(
+        _within(dataset.detections, area),
+        start=start,
+        end=end,
+    )
+    stamp = f"{start or 'all'}_{end or 'all'}".replace(":", "-")
+    return Response(
+        content=text,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="icarus_hotspots_{stamp}.csv"'
+        },
     )
 
 

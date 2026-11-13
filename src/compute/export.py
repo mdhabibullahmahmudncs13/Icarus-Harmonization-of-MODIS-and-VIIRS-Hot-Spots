@@ -567,6 +567,91 @@ def build_validation(
     return {"meta": build_meta(**kwargs), **report.as_dict()}
 
 
+#: The columns the CSV export carries, in order. The first eight are the
+#: hotspot record itself — the thing the challenge asks to be downloadable;
+#: the rest identify the harmonization the row went through.
+CSV_COLUMNS = (
+    "acq_date",
+    "acq_time",
+    "latitude",
+    "longitude",
+    "sensor_family",
+    "satellite",
+    "confidence_num",
+    "frp",
+    "cell_id",
+    "source_product",
+)
+
+
+def build_csv(
+    detections: pd.DataFrame,
+    *,
+    start: date | None = None,
+    end: date | None = None,
+) -> str:
+    """The filtered hotspot records as CSV text.
+
+    One row per detection, in the columns :data:`CSV_COLUMNS`. The rows are
+    the *raw* observations — a hotspot is what the satellite saw — so the
+    export is the honest record; the harmonized cell-days are what the
+    calendar shows, and they are a derived product, not a list of fires.
+
+    The header is the same on every tier: a column the data does not carry
+    (the demo fixture has no acquisition time or satellite) is written empty
+    rather than dropped, so a downloaded file always has the same shape.
+
+    Sorted by date and position so two runs over the same data produce the
+    same bytes.
+    """
+    frame = detections
+    if "acq_date" in frame.columns:
+        dates = pd.to_datetime(frame["acq_date"], errors="coerce")
+        if start is not None:
+            frame = frame[dates >= pd.Timestamp(start)]
+            dates = dates.loc[frame.index]
+        if end is not None:
+            frame = frame[dates <= pd.Timestamp(end)]
+    if frame.empty:
+        return ",".join(CSV_COLUMNS) + "\n"
+
+    out = pd.DataFrame(index=frame.index)
+    out["acq_date"] = pd.to_datetime(frame["acq_date"], errors="coerce").dt.strftime("%Y-%m-%d")
+    out["acq_time"] = _acq_time(frame)
+    out["latitude"] = frame.get("latitude", "")
+    out["longitude"] = frame.get("longitude", "")
+    out["sensor_family"] = _sensor_family(frame)
+    out["satellite"] = frame.get("satellite", "")
+    out["confidence_num"] = frame.get("confidence_num", "")
+    out["frp"] = frame.get("frp", "")
+    out["cell_id"] = frame.get("cell_id", "")
+    out["source_product"] = frame.get("source_product", "")
+    out = out[list(CSV_COLUMNS)].sort_values(
+        [c for c in ("acq_date", "latitude", "longitude") if c in out.columns]
+    )
+    return out.to_csv(index=False, lineterminator="\n")
+
+
+def _acq_time(frame: pd.DataFrame) -> pd.Series:
+    """The acquisition time as ``HHMM``, empty where the data has none."""
+    if "acq_time" not in frame.columns:
+        return pd.Series("", index=frame.index, dtype="object")
+    times = frame["acq_time"].astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
+    return times.str.zfill(4)
+
+
+def _sensor_family(frame: pd.DataFrame) -> pd.Series:
+    """MODIS or VIIRS per row, worked out from whatever the frame names."""
+    if "sensor_family" in frame.columns:
+        return frame["sensor_family"]
+    columns = [c for c in ("instrument", "satellite", "source_product") if c in frame.columns]
+    if not columns:
+        return pd.Series("", index=frame.index, dtype="object")
+    return frame[columns].apply(
+        lambda row: schema.infer_family(*row), axis=1
+    )
+
+
 def build_methods(
     *,
     bbox: tuple[float, float, float, float] = BANGLADESH_BBOX,
@@ -625,6 +710,7 @@ def build_methods(
 __all__: Iterable[str] = (
     "AOI_PRESETS_PATH",
     "BANGLADESH_BBOX",
+    "CSV_COLUMNS",
     "PRODUCT_STREAMS",
     "SENSOR_LABELS",
     "build_anomaly",
@@ -632,6 +718,7 @@ __all__: Iterable[str] = (
     "build_baseline",
     "build_cells",
     "build_critical_period",
+    "build_csv",
     "build_meta",
     "build_meta_response",
     "build_methods",
