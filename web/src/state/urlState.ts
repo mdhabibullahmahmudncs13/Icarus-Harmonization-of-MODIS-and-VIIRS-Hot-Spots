@@ -1,4 +1,5 @@
 import type { Mode } from '../contract/types';
+import { CUSTOM_AOI, parseRing, type Ring } from '../lib/polygon';
 
 export type View =
   | 'overview'
@@ -26,6 +27,8 @@ export interface AppState {
   mode: Mode;
   aoi: string;
   date: string | null;
+  /** The drawn area, when the user has drawn one. */
+  polygon: Ring | null;
 }
 
 export const DEFAULT_STATE: AppState = {
@@ -33,6 +36,7 @@ export const DEFAULT_STATE: AppState = {
   mode: 'harmonized',
   aoi: 'BGD',
   date: null,
+  polygon: null,
 };
 
 function isView(value: string): value is View {
@@ -47,11 +51,17 @@ export function parseHash(hash: string): AppState {
   const params = new URLSearchParams(query);
   const mode = params.get('mode');
   const date = params.get('date');
+  const polygon = parseRing(params.get('poly'));
+  const aoi = params.get('aoi');
   return {
     view: isView(path) ? path : DEFAULT_STATE.view,
     mode: mode === 'raw' || mode === 'harmonized' ? mode : DEFAULT_STATE.mode,
-    aoi: params.get('aoi') ?? DEFAULT_STATE.aoi,
+    // `custom` is the label of a drawn shape, not an area the API can serve.
+    // A hash that names it without a shape is stale, so it falls back to the
+    // default area rather than asking the API about a region that is not one.
+    aoi: !aoi || (aoi === CUSTOM_AOI && !polygon) ? DEFAULT_STATE.aoi : aoi,
     date: date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null,
+    polygon,
   };
 }
 
@@ -59,8 +69,13 @@ export function parseHash(hash: string): AppState {
 export function buildHash(state: AppState): string {
   const params = new URLSearchParams();
   params.set('mode', state.mode);
-  params.set('aoi', state.aoi);
+  // The drawn shape is the area, and the `poly` parameter carries it, so the
+  // label of a custom area has no place in the hash.
+  if (state.aoi !== CUSTOM_AOI) params.set('aoi', state.aoi);
   if (state.date) params.set('date', state.date);
+  if (state.polygon && state.polygon.length > 0) {
+    params.set('poly', JSON.stringify(state.polygon));
+  }
   return `#${state.view}?${params.toString()}`;
 }
 

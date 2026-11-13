@@ -105,6 +105,25 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   science; no model in the path; synthetic data always labelled) and the method
   bibliography, closing the "documents datasets, AI use, and references" item
   of `docs/IMPLEMENTATION_PLAN.md` §11.
+- `GET /api/v1/export` — the filtered hotspot records as CSV, one row per
+  detection, honouring the area and the window of the request. The frontend
+  offers the download from the page head with the record count on the button,
+  so the size of the file is agreed to before it is fetched. The browser does
+  the download: no blob is built in JavaScript and no file is held in memory.
+- `src/compute/geometry.py` — the polygon geometry the custom AOI needs:
+  point-in-ring by ray casting, self-intersection, ring validation and the
+  cell count a ring holds. `web/src/lib/polygon.ts` carries the same rules on
+  the client, so a shape the UI accepts is a shape the API honours.
+- Polygon drawing for a custom AOI (FR-16, US-4). The API takes the AOI object
+  `docs/TRD.md` §6.1 defines — `{type: "geojson", geometry}` — on every
+  analysis route, and the same ring as a `polygon` query parameter, which is
+  how the frontend sends it. The shape is honoured as a shape: detections are
+  filtered by point-in-ring, and the density is divided by the cells the ring
+  holds rather than by its bounding box. The ring is in the `params_hash`, so
+  two shapes sharing a box do not share a cached payload. The map view draws
+  the shape by clicking its corners; the shape stays a draft until "Use this
+  area", and it travels in the URL hash, so a drawn area is shareable.
+  `web/e2e/area-drawing.spec.ts` drives the whole flow in a browser.
 
 ### Changed
 
@@ -167,7 +186,8 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - The `aoi` field of an analysis POST body now also accepts the AOI object
   `docs/TRD.md` §6.1 defines (`{type: "preset", id}`); the smoke-test body in
   `docs/DEPLOYMENT.md` §8 had been rejected with "Input should be a valid
-  string" before any route ran. Custom geometry is refused with 422
+  string" before any route ran. The `{type: "geojson", geometry}` form is now
+  honoured too (Added above); anything else is refused with 422
   `invalid_request` rather than silently falling back to the default area.
 - `GET /meta` — the root alias `docs/TRD.md` §6 lists and the smoke test in
   `docs/DEPLOYMENT.md` §8 curls; only `/api/meta` and `/api/v1/meta` were

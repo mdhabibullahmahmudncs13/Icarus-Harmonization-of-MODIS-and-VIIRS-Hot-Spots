@@ -7,10 +7,14 @@
  * browser.
  */
 
+import { polygonParam, type Ring } from './polygon';
+
 /** What the export is about: the area, and the window to export. */
 export interface ExportQuery {
   /** Preset id of the area the records come from. */
   aoi?: string;
+  /** The drawn area, when there is one. It wins over the preset. */
+  polygon?: Ring | null;
   /** First day of the window, `YYYY-MM-DD`. */
   start?: string | null;
   /** Last day of the window, `YYYY-MM-DD`. */
@@ -26,7 +30,9 @@ export interface ExportQuery {
  */
 export function exportUrl(base: string, query: ExportQuery): string {
   const params = new URLSearchParams();
-  if (query.aoi) params.set('aoi', query.aoi);
+  const poly = polygonParam(query.polygon ?? null);
+  if (poly) params.set('polygon', poly);
+  else if (query.aoi) params.set('aoi', query.aoi);
   if (query.start) params.set('start', query.start);
   if (query.end) params.set('end', query.end);
   const search = params.toString();

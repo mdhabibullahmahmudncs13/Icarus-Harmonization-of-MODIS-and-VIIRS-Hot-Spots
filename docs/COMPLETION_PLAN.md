@@ -137,17 +137,20 @@ Two things that are not code:
 
 And three gaps against the challenge statement, which are code:
 
-3. **Polygon drawing for a custom AOI** (FR-16). The API half-supports it —
-   `_resolve` accepts a bbox and refuses polygon objects — but the frontend
-   can only pick a preset, and `AppState` has no bbox field.
-4. **Monthly and annual aggregation.** The pipeline bins cell-days into
+3. **Monthly and annual aggregation.** The pipeline bins cell-days into
    46 eight-day bins and never aggregates them up, though the statement asks
    for seasonal and annual comparisons.
-5. **Global extent.** The statement says "global", but only the Bangladesh
+4. **Global extent.** The statement says "global", but only the Bangladesh
    bbox is cached, so the `IND-C` and `NPL` presets have no data at the API
    tier.
 
-The CSV export (FR-22) was the fourth gap and is now built: `GET
+The CSV export (FR-22) was a fifth gap and is now built: `GET
 /api/v1/export` serves the filtered hotspot records as CSV, and the frontend
 offers the download with its record count on the button.
+
+Polygon drawing for a custom AOI (FR-16) is now built too. The API takes a
+ring as the AOI object `docs/TRD.md` §6.1 defines, `src/compute/geometry.py`
+does the point-in-polygon filtering by ray casting, and the map view draws
+the shape with the mouse or by clicking its corners. The shape travels in
+the URL hash, so a drawn area is shareable like any other view.
 

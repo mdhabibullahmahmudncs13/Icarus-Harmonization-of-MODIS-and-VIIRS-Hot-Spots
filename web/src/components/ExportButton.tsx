@@ -1,4 +1,5 @@
 import { exportUrl, formatCount } from '../lib/export';
+import type { Ring } from '../lib/polygon';
 import { Icon } from './Icon';
 
 /**
@@ -16,6 +17,7 @@ import { Icon } from './Icon';
 export function ExportButton({
   base,
   aoi,
+  polygon = null,
   start,
   end,
   count,
@@ -23,7 +25,9 @@ export function ExportButton({
   /** The API's base address. */
   base: string;
   /** Preset id of the area to export. */
-  aoi: string;
+  aoi?: string;
+  /** The drawn area, when there is one. It wins over the preset. */
+  polygon?: Ring | null;
   /** First day of the window, `YYYY-MM-DD`. */
   start?: string | null;
   /** Last day of the window, `YYYY-MM-DD`. */
@@ -31,7 +35,7 @@ export function ExportButton({
   /** How many records the export will hold. */
   count: number;
 }) {
-  const href = exportUrl(base, { aoi, start, end });
+  const href = exportUrl(base, { aoi, polygon, start, end });
   const window = start && end ? `${start} to ${end}` : 'the whole record';
   const size = formatCount(count);
   return (

@@ -41,7 +41,9 @@ Coverage and source labels to distinguish observed, calibrated, and unavailable 
 
 Climatology, anomaly scoring, and critical-period estimates.
 
-Preset or custom areas of interest (AOIs).
+Preset areas of interest, and custom areas drawn on the map.
+
+CSV export of the hotspot records behind the current view.
 
 Read-only JSON API with a shared response contract.
 
@@ -261,7 +263,13 @@ Method and provenance information
 
 AOI-related information
 
+/api/v1/export
+
+The filtered hotspot records as CSV
+
 Exact request parameters and payload shapes are defined by the API implementation and docs/contract.schema.json. Invalid AOIs return structured validation errors. Responses include parameter metadata so results can be traced to the configuration used.
+
+An analysis request may name a preset area (`aoi=BGD`) or a drawn polygon, sent as the `polygon` query parameter or as the AOI object docs/TRD.md §6.1 defines. A polygon is filtered by shape, not by its bounding box, and the density is divided by the cells the shape holds.
 
 Configuration and reproducibility
 

@@ -212,6 +212,11 @@ Cells as polygons shaded by the active mode. The basemap is a NASA Earth image
 bundled with the app, so there is never a third-party tile request. Legend
 shows units and the ramp.
 
+A drawn area shows as a tinted fill with a solid outline and a dot on each
+corner. The card head carries the drawing controls: "Draw an area" to start,
+then the corner count and "Use this area" / "Cancel"; once applied, "Redraw"
+and "Clear". The cursor is a crosshair while drawing.
+
 ### 5.11 Panels
 
 - **Anomaly box:** enters a date/area, returns percentile and baseline window.

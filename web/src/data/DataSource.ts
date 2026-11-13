@@ -1,4 +1,5 @@
 import type { Dataset, SourceKind } from '../contract/types';
+import { polygonParam, type Ring } from '../lib/polygon';
 
 export interface DataSource {
   readonly kind: SourceKind;
@@ -11,6 +12,8 @@ export interface LoadQuery {
   aoi?: string;
   /** The day the anomalies payload ranks against its season. */
   date?: string | null;
+  /** The drawn area, when the user has drawn one. It wins over the preset. */
+  polygon?: Ring | null;
 }
 
 /** The query string for a request, or `''` when there is nothing to say. */
@@ -102,9 +105,13 @@ export class ApiDataSource implements DataSource {
    * The API scopes every payload by the area, and the anomalies payload also
    * by the day (docs/ARCHITECTURE.md §6), so the query goes out on every
    * request that accepts it.
+   *
+   * A drawn area travels in the ``polygon`` parameter, which the API honours
+   * in place of the preset id — the shape is the area, not a box around it.
    */
   async load(q: LoadQuery = {}): Promise<Dataset> {
-    const area = query({ aoi: q.aoi });
+    const poly = polygonParam(q.polygon ?? null);
+    const area = query({ aoi: poly ? undefined : q.aoi, polygon: poly });
     const meta = await getJSON<Dataset['meta']>(
       `${this.base.replace('/v1', '')}/meta${area}`,
       'meta',
@@ -115,7 +122,7 @@ export class ApiDataSource implements DataSource {
         getJSON<Dataset['cells']>(`${this.base}/cells${area}`, 'cells'),
         getJSON<Dataset['baseline']>(`${this.base}/baseline${area}`, 'baseline'),
         getJSON<Dataset['anomaly']>(
-          `${this.base}/anomalies${query({ aoi: q.aoi, date: q.date })}`,
+          `${this.base}/anomalies${query({ aoi: poly ? undefined : q.aoi, date: q.date, polygon: poly })}`,
           'anomaly',
         ),
         getJSON<Dataset['criticalPeriod']>(

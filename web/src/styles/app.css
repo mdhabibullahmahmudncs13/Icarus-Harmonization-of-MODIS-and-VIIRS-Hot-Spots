@@ -1026,6 +1026,11 @@ kbd {
   border-radius: var(--radius-control);
 }
 
+/* While a shape is being drawn the map takes clicks, so it says so. */
+.map--drawing {
+  cursor: crosshair;
+}
+
 .map__cell {
   stroke: rgba(255, 255, 255, 0.12);
   stroke-width: 0.5;
@@ -1051,6 +1056,42 @@ kbd {
 .map__tick {
   fill: var(--text-muted);
   font: 10.5px var(--font);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The drawn area: a wash over the cells, an outline, and its corners. */
+.map__area-fill {
+  fill: var(--accent);
+  fill-opacity: 0.16;
+  stroke: none;
+}
+
+.map__area-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.map__area-point {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+
+/* The drawing controls, in the card head next to the title. */
+.area-drawer {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.area-drawer__count {
+  font: 500 12px var(--font);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 

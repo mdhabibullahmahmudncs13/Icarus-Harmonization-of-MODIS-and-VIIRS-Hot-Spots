@@ -122,12 +122,13 @@ The frontend runs on the Phase 0 mock payloads. Artifacts:
 | App shell | `web/src/App.tsx` |
 | Rail / mode toggle / status | `web/src/components/Rail.tsx`, `ModeToggle.tsx`, `shared.tsx` |
 | Charts | `web/src/components/SeriesChart.tsx`, `CalendarHeatmap.tsx`, `RegionMap.tsx` |
+| Area drawing | `web/src/components/AreaDrawer.tsx`, `web/src/lib/polygon.ts` |
 | Panels | `web/src/components/panels.tsx`, `ProvenanceDrawer.tsx` |
 | Data layer | `web/src/data/DataSource.ts` |
 | State (URL-synced) | `web/src/state/urlState.ts`, `useAppState.ts` |
 | Pure logic | `web/src/lib/series.ts` |
 | Design tokens | `web/src/styles/tokens.css`, `app.css` |
-| Unit tests | `web/tests/series.test.ts`, `urlState.test.ts` |
+| Unit tests | `web/tests/series.test.ts`, `urlState.test.ts`, `polygon.test.ts` |
 
 Build and verify:
 
@@ -145,7 +146,7 @@ Status against the F1–F6 milestones:
 - [x] **F1** shell — rail, brand, mode control, source badge, mock banner, keyboard hint
 - [x] **F2** mode toggle + hero series with a VIIRS-transition marker, URL-synced
 - [x] **F3** calendar heatmap (years x 46 bins, derived client-side from the daily series)
-- [x] **F4** region map — cells shaded by mode, with a legend
+- [x] **F4** region map — cells shaded by mode, with a legend, and polygon drawing for a custom AOI
 - [x] **F5** anomaly, critical-period, validation and methods panels + provenance drawer
 - [x] **F6** keyboard shortcuts (1–8, R/H, T, P, Ctrl/Cmd+B, Esc), loading/empty/error states, dark default
 - [x] **F6** keyboard shortcuts (1–8, R/H, T, P, Ctrl/Cmd+B, Esc), loading/empty/error states, dark default

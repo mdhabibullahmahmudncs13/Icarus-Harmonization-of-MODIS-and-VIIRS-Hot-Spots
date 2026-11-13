@@ -130,6 +130,10 @@ Output: synthetic `det.parquet` matching the normalized detection schema.
     active-cell fraction (`$defs/densityPoint`). The endpoints whose payloads
     have no `metric` field refuse `density` with 422 `unsupported_metric`
     rather than answering in `cell_days`.
+  - A polygon AOI filters by shape, not by box: the detections outside the
+    ring are dropped, the density is divided by the cells the ring holds
+    rather than by its bounding box, and the ring itself is in the
+    `params_hash` — two shapes sharing a box must not share a hash.
 - The schema is the single source of truth; fix shape differences in code, never
   by loosening the schema.
 
@@ -150,6 +154,11 @@ Output: synthetic `det.parquet` matching the normalized detection schema.
    run and the fallback video remain for the demo.
 3. **Toggle/verification:** the views respond to the selected mode without a
    refetch.
+4. **Area drawing:** `web/e2e/area-drawing.spec.ts` clicks three corners on
+   the map, applies the shape, and checks that it reaches the URL hash, that
+   it survives a reload, and that "Clear" removes it. The click-to-lon/lat
+   conversion is the part a unit test cannot reach, so it is exercised in a
+   real browser.
 
 ---
 

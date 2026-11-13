@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { applyChange, buildHash, parseHash, type AppState, type View } from './urlState';
+import { applyChange, buildHash, DEFAULT_STATE, parseHash, type AppState, type View } from './urlState';
 import type { Mode } from '../contract/types';
+import type { Ring } from '../lib/polygon';
+import { CUSTOM_AOI } from '../lib/polygon';
 
 export function useAppState(): {
   state: AppState;
@@ -8,6 +10,7 @@ export function useAppState(): {
   setMode: (mode: Mode) => void;
   setAoi: (aoi: string) => void;
   setDate: (date: string | null) => void;
+  setPolygon: (polygon: Ring | null) => void;
 } {
   const [state, setState] = useState<AppState>(() =>
     typeof window === 'undefined' ? parseHash('') : parseHash(window.location.hash),
@@ -53,7 +56,22 @@ export function useAppState(): {
     state,
     setView: (view: View) => commit({ view }),
     setMode: (mode: Mode) => commit({ mode }),
-    setAoi: (aoi: string) => commit({ aoi }),
     setDate: (date: string | null) => commit({ date }),
+    // A drawn shape replaces the preset area, so picking a preset again clears
+    // it: the two are alternatives, and a stale shape behind a preset would
+    // filter the data the user did not ask for.
+    setAoi: (aoi: string) => commit({ aoi, polygon: null }),
+    // Clearing the shape must leave a usable area behind: `CUSTOM_AOI` is a
+    // label for the drawn shape, not a preset, so the API refuses it with 422
+    // once the polygon is gone.
+    setPolygon: (polygon: Ring | null) =>
+      commit({
+        polygon,
+        aoi: polygon
+          ? CUSTOM_AOI
+          : latest.current.aoi === CUSTOM_AOI
+            ? DEFAULT_STATE.aoi
+            : latest.current.aoi,
+      }),
   };
 }

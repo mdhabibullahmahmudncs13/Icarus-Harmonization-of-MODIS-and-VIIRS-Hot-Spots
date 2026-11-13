@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { useAppState } from '../src/state/useAppState';
-import type { AppState } from '../src/state/urlState';
+import { DEFAULT_STATE, type AppState } from '../src/state/urlState';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -18,6 +18,7 @@ interface Harness {
   setMode: ReturnType<typeof useAppState>['setMode'];
   setAoi: ReturnType<typeof useAppState>['setAoi'];
   setDate: ReturnType<typeof useAppState>['setDate'];
+  setPolygon: ReturnType<typeof useAppState>['setPolygon'];
 }
 
 let root: Root;
@@ -140,5 +141,26 @@ describe('useAppState', () => {
       aoi: 'NPL',
       date: '2019-03-01',
     });
+  });
+
+  it('leaves a usable area behind when a drawn shape is cleared', () => {
+    // The regression this guards: clearing the shape kept the `custom` label,
+    // which is not a preset id — the API answered 422 for every request.
+    const ring: [number, number][] = [
+      [88.2, 23],
+      [88.6, 23],
+      [88.6, 23.3],
+    ];
+    act(() => {
+      harness.setPolygon(ring);
+    });
+    expect(harness.state).toMatchObject({ aoi: 'custom', polygon: ring });
+
+    act(() => {
+      harness.setPolygon(null);
+    });
+    expect(harness.state.polygon).toBeNull();
+    expect(harness.state.aoi).not.toBe('custom');
+    expect(harness.state.aoi).toBe(DEFAULT_STATE.aoi);
   });
 });

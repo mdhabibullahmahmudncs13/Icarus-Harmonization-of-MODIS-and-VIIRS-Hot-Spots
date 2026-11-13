@@ -27,13 +27,14 @@ Per ``docs/ARCHITECTURE.md`` §6 the analysis endpoints also accept ``POST``:
 ``aoi``, ``date`` and ``bbox`` in the body override the query parameters, and
 ``metric``/``view`` are validated (``metric=density`` is served by the series
 payload and refused elsewhere). The ``aoi`` field takes a preset id or the AOI
-object ``docs/TRD.md`` §6.1 defines; custom geometry is expressed with
-``bbox``.
+object ``docs/TRD.md`` §6.1 defines: ``{type: "preset", id}`` for a preset,
+``{type: "geojson", geometry}`` for a drawn polygon.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Mapping
 from datetime import date as DateType
 from typing import Annotated, Any
@@ -46,7 +47,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from src.api.dataset import Dataset, NoDataError, _continuous, get_dataset
-from src.compute import export, harmonize, params
+from src.compute import export, geometry, harmonize, params
 
 #: Origins that may call the API during development: the Vite dev server and
 #: the preview server, both loopback-only. No wildcard, so an offline demo
@@ -74,6 +75,15 @@ PRESET_IDS: frozenset[str] = frozenset(PRESET_BBOX)
 #: constants are the fallback when the file cannot be read.
 MAX_AOI_CELLS = int(params.param(params.PARAMS_PATH, "api", "max_aoi_cells", 100_000))
 REQUEST_TIMEOUT_S = float(params.param(params.PARAMS_PATH, "api", "request_timeout_s", 30))
+
+#: The query parameter a drawn polygon travels in: a JSON list of
+#: ``[lon, lat]`` pairs. A shape has no place in a plain ``bbox``, and this
+#: lets the frontend ask for one with the same GET it uses for everything
+#: else.
+PolygonParam = Annotated[
+    str | None,
+    Query(description="drawn area: a JSON list of [lon, lat] pairs"),
+]
 
 
 class TimeoutMiddleware:
@@ -214,14 +224,70 @@ def _parse_bbox(raw: str) -> tuple[float, float, float, float]:
 class AoiBody(BaseModel):
     """The AOI object ``docs/TRD.md`` §6.1 defines for request bodies.
 
-    ``{type: "preset", id}`` maps onto a preset id. Custom geometry is not a
-    preset: it is expressed with the ``bbox`` field, so anything else is
-    refused rather than silently falling back to the default area.
+    Two forms are honoured, the two the TRD lists:
+
+    * ``{type: "preset", id}`` maps onto a preset id.
+    * ``{type: "geojson", geometry}`` maps onto a drawn polygon.
+
+    Anything else is refused rather than silently falling back to the default
+    area.
     """
 
     type: str
     id: str | None = None
     geometry: dict[str, Any] | None = None
+
+
+def _parse_ring(aoi: AoiBody) -> geometry.Ring:
+    """The polygon an AOI object names, or a 422 saying why it cannot.
+
+    The ring is the first (and only) ring of a GeoJSON polygon: a shape with
+    a hole in it is not something the grid can honour, so a second ring is
+    refused rather than quietly ignored.
+    """
+    if aoi.geometry is None:
+        fail(422, "invalid_aoi", "aoi.geometry is required for a geojson area", "aoi.geometry")
+    shape = aoi.geometry
+    if shape.get("type") != "Polygon":
+        fail(
+            422,
+            "invalid_aoi",
+            f"aoi.geometry.type must be Polygon, got {shape.get('type')!r}",
+            "aoi.geometry.type",
+        )
+    coordinates = shape.get("coordinates")
+    if not isinstance(coordinates, list) or not coordinates:
+        fail(
+            422,
+            "invalid_aoi",
+            "aoi.geometry.coordinates must be a list of rings",
+            "aoi.geometry.coordinates",
+        )
+    if len(coordinates) > 1:
+        fail(
+            422,
+            "invalid_aoi",
+            "a polygon with a hole in it is not supported",
+            "aoi.geometry.coordinates",
+        )
+    positions: list[tuple[float, float]] = []
+    for position in coordinates[0]:
+        if (
+            not isinstance(position, (list, tuple))
+            or len(position) != 2
+            or not all(isinstance(value, (int, float)) for value in position)
+        ):
+            fail(
+                422,
+                "invalid_aoi",
+                "aoi.geometry.coordinates[0] must hold [longitude, latitude] pairs",
+                "aoi.geometry.coordinates[0]",
+            )
+        positions.append((float(position[0]), float(position[1])))
+    try:
+        return geometry.validate_ring(positions)
+    except ValueError as exc:
+        fail(422, "invalid_aoi", str(exc), "aoi.geometry.coordinates[0]")
 
 
 class AnalysisRequest(BaseModel):
@@ -245,38 +311,128 @@ class AnalysisRequest(BaseModel):
     view: str | None = None
 
 
+def _parse_ring(aoi: AoiBody) -> geometry.Ring:
+    """The polygon an AOI object names, or a 422 saying why it cannot.
+
+    The ring is the first (and only) ring of a GeoJSON polygon: a shape with
+    a hole in it is not something the grid can honour, so a second ring is
+    refused rather than quietly ignored.
+    """
+    if aoi.geometry is None:
+        fail(422, "invalid_aoi", "aoi.geometry is required for a geojson area", "aoi.geometry")
+    shape = aoi.geometry
+    if shape.get("type") != "Polygon":
+        fail(
+            422,
+            "invalid_aoi",
+            f"aoi.geometry.type must be Polygon, got {shape.get('type')!r}",
+            "aoi.geometry.type",
+        )
+    coordinates = shape.get("coordinates")
+    if not isinstance(coordinates, list) or not coordinates:
+        fail(
+            422,
+            "invalid_aoi",
+            "aoi.geometry.coordinates must be a list of rings",
+            "aoi.geometry.coordinates",
+        )
+    if len(coordinates) > 1:
+        fail(
+            422,
+            "invalid_aoi",
+            "a polygon with a hole in it is not supported",
+            "aoi.geometry.coordinates",
+        )
+    return _ring_from_positions(coordinates[0], "aoi.geometry.coordinates[0]")
+
+
+def _ring_from_positions(raw: Any, field: str) -> geometry.Ring:
+    """The ring a list of ``[lon, lat]`` pairs names, or a 422 saying why not."""
+    if not isinstance(raw, list):
+        fail(422, "invalid_aoi", f"{field} must be a list of positions", field)
+    positions: list[tuple[float, float]] = []
+    for position in raw:
+        if (
+            not isinstance(position, (list, tuple))
+            or len(position) != 2
+            or not all(isinstance(value, (int, float)) for value in position)
+        ):
+            fail(
+                422,
+                "invalid_aoi",
+                f"{field} must hold [longitude, latitude] pairs",
+                field,
+            )
+        positions.append((float(position[0]), float(position[1])))
+    try:
+        return geometry.validate_ring(positions)
+    except ValueError as exc:
+        fail(422, "invalid_aoi", str(exc), field)
+
+
+def _parse_ring_param(raw: str) -> geometry.Ring:
+    """The ring a ``polygon`` query parameter names, or a 422 saying why not.
+
+    The parameter holds a JSON list of ``[lon, lat]`` pairs, so a drawn
+    shape fits in a query string and the frontend can ask for it with a GET
+    like every other request.
+    """
+    try:
+        decoded = json.loads(raw)
+    except json.JSONDecodeError:
+        fail(422, "invalid_aoi", "polygon must be a JSON list of [lon, lat] pairs", "polygon")
+    if not isinstance(decoded, list):
+        fail(422, "invalid_aoi", "polygon must be a JSON list of [lon, lat] pairs", "polygon")
+    return _ring_from_positions(decoded, "polygon")
+
+
 def _resolve(
     body: AnalysisRequest | None,
     *,
     aoi: str = "BGD",
     date: DateType | None = None,
     bbox: str | None = None,
+    polygon: str | None = None,
     allow_density: bool = False,
-) -> tuple[str, DateType | None, tuple[float, float, float, float]]:
+) -> tuple[str, DateType | None, tuple[float, float, float, float], geometry.Ring | None]:
     """Merge an optional request body over the query parameters.
 
-    Returns the AOI label, the date and the *area* the request is about. The
-    area is the explicit ``bbox`` when one was given, otherwise the bbox of
-    the named preset — so a caller can never ask about a region and get the
-    whole extent back. The label follows the area: a preset request is
-    labelled with the preset id, a custom bbox with the bbox itself.
+    Returns the AOI label, the date, the *area* the request is about and the
+    polygon, if the area is one. The area is the explicit ``bbox`` when one
+    was given, otherwise the bbox of the named preset — so a caller can never
+    ask about a region and get the whole extent back. The label follows the
+    area: a preset request is labelled with the preset id, a custom bbox with
+    the bbox itself.
+
+    A drawn polygon is both: its bounding box is the area (the grid and the
+    map extent work on boxes) and the ring is returned alongside it so the
+    detections can be filtered to the shape and the density divided by the
+    cells the shape holds. It can arrive two ways — as ``polygon`` in the
+    query string, or as the AOI object in the body — and the body wins.
 
     ``allow_density`` marks the endpoints whose payload actually carries a
     ``metric`` field; elsewhere ``metric=density`` is refused rather than
     ignored.
     """
+    ring: geometry.Ring | None = None
+    if polygon is not None:
+        ring = _parse_ring_param(polygon)
     if body is not None:
         if body.aoi is not None:
             if isinstance(body.aoi, AoiBody):
-                if body.aoi.type != "preset" or not body.aoi.id:
+                if body.aoi.type == "geojson":
+                    ring = _parse_ring(body.aoi)
+                    aoi = "custom"
+                elif body.aoi.type == "preset" and body.aoi.id:
+                    aoi = body.aoi.id
+                else:
                     fail(
                         422,
                         "invalid_request",
-                        "aoi must be a preset id or {type: 'preset', id}; "
-                        "custom geometry is expressed with bbox",
+                        "aoi must be a preset id, {type: 'preset', id} or "
+                        "{type: 'geojson', geometry}; a custom box is expressed with bbox",
                         "aoi",
                     )
-                aoi = body.aoi.id
             else:
                 aoi = body.aoi
         if body.date is not None:
@@ -297,28 +453,40 @@ def _resolve(
         if body.view is not None and body.view not in ("raw", "harmonized"):
             fail(422, "invalid_view", "view must be raw or harmonized", "view")
 
+    if ring is not None:
+        # A drawn shape wins over a preset id: the caller drew it.
+        area = geometry.ring_bbox(ring)
+        _check_cell_cap(area, cells=geometry.ring_cell_count(ring))
+        return "custom", date, area, ring
     parsed = _parse_bbox(bbox) if bbox is not None else None
     if parsed is None:
         if aoi not in PRESET_IDS:
             fail(422, "unknown_aoi", f"unknown AOI {aoi!r}; known: {sorted(PRESET_IDS)}", "aoi")
         parsed = PRESET_BBOX[aoi]
         _check_cell_cap(parsed)
-        return aoi, date, parsed
+        return aoi, date, parsed, None
     # An explicit bbox is the area, so it is also the label: the same numbers
     # always read the same way, whatever spacing the caller used.
     _check_cell_cap(parsed)
-    return ",".join(str(value) for value in parsed), date, parsed
+    return ",".join(str(value) for value in parsed), date, parsed, None
 
 
-def _check_cell_cap(area: tuple[float, float, float, float]) -> None:
+def _check_cell_cap(
+    area: tuple[float, float, float, float], *, cells: int | None = None
+) -> None:
     """Refuse an AOI that covers more grid cells than the limit allows.
 
     The cap bounds the work one request can ask for: a huge bbox makes the
     density divisor enormous and the cell table enormous, and the docs promise
     a bound ("max cells per AOI request"). It is checked before any query
     runs, so an over-large area costs nothing.
+
+    ``cells`` is the count to check when the caller already knows it — a
+    polygon holds fewer cells than its bounding box, so the polygon's own
+    count is the honest figure.
     """
-    cells = harmonize.grid_cell_count(area)
+    if cells is None:
+        cells = harmonize.grid_cell_count(area)
     if cells > MAX_AOI_CELLS:
         fail(
             422,
@@ -328,19 +496,32 @@ def _check_cell_cap(area: tuple[float, float, float, float]) -> None:
         )
 
 
-def _within(frame: pd.DataFrame, bbox: tuple[float, float, float, float]) -> pd.DataFrame:
-    """Detections inside ``bbox`` ``[west, south, east, north]``."""
+def _within(
+    frame: pd.DataFrame,
+    bbox: tuple[float, float, float, float],
+    ring: geometry.Ring | None = None,
+) -> pd.DataFrame:
+    """Detections inside ``bbox`` ``[west, south, east, north]``.
+
+    With a ``ring`` the detections are also kept only when they fall inside
+    the drawn shape, so a polygon is honoured as a shape and not as its box.
+    """
     west, south, east, north = bbox
-    return frame[
+    inside = frame[
         (frame["longitude"] >= west)
         & (frame["longitude"] <= east)
         & (frame["latitude"] >= south)
         & (frame["latitude"] <= north)
     ]
+    if ring is None:
+        return inside
+    return geometry.within_ring(inside, ring)
 
 
 def _area_series(
-    dataset: Dataset, area: tuple[float, float, float, float]
+    dataset: Dataset,
+    area: tuple[float, float, float, float],
+    ring: geometry.Ring | None = None,
 ) -> pd.Series:
     """The harmonized daily series inside ``area``, zero-filled.
 
@@ -348,7 +529,7 @@ def _area_series(
     the series is a continuous run of zeros over the dataset's own date range,
     the same rule the rest of the project applies to a day without fire.
     """
-    frame = _within(dataset.detections, area)
+    frame = _within(dataset.detections, area, ring)
     if frame.empty:
         span = export.detections_date_range(dataset.detections)
         days = pd.date_range(span[0], span[1], freq="D", name="date")
@@ -369,16 +550,20 @@ def health() -> dict[str, str]:
 @app.get("/meta")  # docs/TRD.md §6 and the runbook's smoke test call /meta
 @app.get("/api/meta")
 @app.get("/api/v1/meta")
+@app.post("/api/v1/meta")
 def meta(
     aoi: Annotated[str, Query(description="preset id the request is for")] = "BGD",
+    polygon: PolygonParam = None,
+    body: AnalysisRequest | None = None,
 ) -> Mapping[str, Any]:
     """Region, parameters and sensor epochs."""
-    _, _, area = _resolve(None, aoi=aoi)
+    _, _, area, ring = _resolve(body, aoi=aoi, polygon=polygon)
     dataset = _dataset()
-    frame = _within(dataset.detections, area)
+    frame = _within(dataset.detections, area, ring)
     return export.build_meta_response(
         frame,
         bbox=area,
+        polygon=ring,
         # An area with no detections still has a region and a date range: it
         # is described by the dataset's own span rather than refused.
         date_range=export.detections_date_range(dataset.detections),
@@ -390,20 +575,27 @@ def meta(
 @app.get("/api/series")
 @app.get("/api/v1/series")
 @app.post("/api/v1/series")
-def series(body: AnalysisRequest | None = None) -> Mapping[str, Any]:
+def series(
+    polygon: PolygonParam = None,
+    body: AnalysisRequest | None = None,
+) -> Mapping[str, Any]:
     """Daily raw and harmonized counts, one row per day.
 
     ``metric=density`` (the default the startup flow in
     ``docs/ARCHITECTURE.md`` §7 asks for) serves the same counts divided by
     the region's grid-cell count; anything else is ``cell_days``.
     """
-    _, _, area = _resolve(body, allow_density=True)
+    _, _, area, ring = _resolve(body, polygon=polygon, allow_density=True)
     metric = body.metric if body is not None and body.metric is not None else "cell_days"
     dataset = _dataset()
     return export.build_series(
-        _within(dataset.detections, area),
+        _within(dataset.detections, area, ring),
         metric=metric,
         bbox=area,
+        # A polygon divides by the cells the shape holds, not the cells its
+        # box touches: a thin diagonal shape covers far fewer cells.
+        n_cells=geometry.ring_cell_count(ring) if ring is not None else None,
+        polygon=ring,
         # The dataset's span, not the area's: an area with no fire is a run of
         # zeros over the dataset's own dates, not an undatable empty frame.
         date_range=export.detections_date_range(dataset.detections),
@@ -418,18 +610,20 @@ def series(body: AnalysisRequest | None = None) -> Mapping[str, Any]:
 def cells(
     start: Annotated[DateType | None, Query(description="ISO date, inclusive")] = None,
     end: Annotated[DateType | None, Query(description="ISO date, inclusive")] = None,
+    polygon: PolygonParam = None,
     body: AnalysisRequest | None = None,
 ) -> Mapping[str, Any]:
     """Grid cells over a date window, with raw and harmonized counts."""
-    _, _, area = _resolve(body)
+    _, _, area, ring = _resolve(body, polygon=polygon)
     if start is not None and end is not None and start > end:
         fail(422, "invalid_window", "start must not be after end", "start")
     dataset = _dataset()
     return export.build_cells(
-        _within(dataset.detections, area),
+        _within(dataset.detections, area, ring),
         start=start,
         end=end,
         bbox=area,
+        polygon=ring,
         date_range=export.detections_date_range(dataset.detections),
         source=dataset.source,
         generated_at=dataset.generated_at,
@@ -439,13 +633,17 @@ def cells(
 @app.get("/api/baseline")
 @app.get("/api/v1/baseline")
 @app.post("/api/v1/baseline")
-def baseline(body: AnalysisRequest | None = None) -> Mapping[str, Any]:
+def baseline(
+    polygon: PolygonParam = None,
+    body: AnalysisRequest | None = None,
+) -> Mapping[str, Any]:
     """Seasonal baseline: day-of-year percentiles of the harmonized series."""
-    _, _, area = _resolve(body)
+    _, _, area, ring = _resolve(body, polygon=polygon)
     dataset = _dataset()
     return export.build_baseline(
-        _area_series(dataset, area),
+        _area_series(dataset, area, ring),
         bbox=area,
+        polygon=ring,
         source=dataset.source,
         generated_at=dataset.generated_at,
     )
@@ -457,9 +655,10 @@ def _anomaly_payload(
     date: DateType | None,
     area: tuple[float, float, float, float],
     aoi: str,
+    ring: geometry.Ring | None = None,
 ) -> Mapping[str, Any]:
     """Rank one date (or the last day in the data) against its season."""
-    series = _area_series(dataset, area)
+    series = _area_series(dataset, area, ring)
     if series.empty:
         fail(404, "not_found", "no detections in the requested area")
     stamp = pd.Timestamp(date) if date is not None else series.index.max()
@@ -477,6 +676,7 @@ def _anomaly_payload(
         date_=stamp,
         aoi=aoi,
         bbox=area,
+        polygon=ring,
         source=dataset.source,
         generated_at=dataset.generated_at,
     )
@@ -487,12 +687,15 @@ def anomaly(
     date: Annotated[DateType, Query(description="ISO date to judge")],
     bbox: Annotated[str | None, Query(description="west,south,east,north")] = None,
     aoi: Annotated[str, Query(description="preset id the request is for")] = "BGD",
+    polygon: PolygonParam = None,
     body: AnalysisRequest | None = None,
 ) -> Mapping[str, Any]:
     """Rank one date against its day-of-year baseline."""
-    resolved_aoi, resolved_date, area = _resolve(body, aoi=aoi, date=date, bbox=bbox)
+    resolved_aoi, resolved_date, area, ring = _resolve(
+        body, aoi=aoi, date=date, bbox=bbox, polygon=polygon
+    )
     return _anomaly_payload(
-        _dataset(), date=resolved_date, area=area, aoi=resolved_aoi
+        _dataset(), date=resolved_date, area=area, aoi=resolved_aoi, ring=ring
     )
 
 
@@ -504,12 +707,15 @@ def anomalies(
     ] = None,
     bbox: Annotated[str | None, Query(description="west,south,east,north")] = None,
     aoi: Annotated[str, Query(description="preset id the request is for")] = "BGD",
+    polygon: PolygonParam = None,
     body: AnalysisRequest | None = None,
 ) -> Mapping[str, Any]:
     """The frontend's anomalies view: the requested date, or the latest day."""
-    resolved_aoi, resolved_date, area = _resolve(body, aoi=aoi, date=date, bbox=bbox)
+    resolved_aoi, resolved_date, area, ring = _resolve(
+        body, aoi=aoi, date=date, bbox=bbox, polygon=polygon
+    )
     return _anomaly_payload(
-        _dataset(), date=resolved_date, area=area, aoi=resolved_aoi
+        _dataset(), date=resolved_date, area=area, aoi=resolved_aoi, ring=ring
     )
 
 
@@ -518,16 +724,18 @@ def anomalies(
 @app.post("/api/v1/critical-period")
 def critical_period(
     aoi: Annotated[str, Query(description="preset id the request is for")] = "BGD",
+    polygon: PolygonParam = None,
     body: AnalysisRequest | None = None,
 ) -> Mapping[str, Any]:
     """Onset, peak, end and window mass of the burning season."""
-    resolved_aoi, _, area = _resolve(body, aoi=aoi)
+    resolved_aoi, _, area, ring = _resolve(body, aoi=aoi, polygon=polygon)
     dataset = _dataset()
-    series = _area_series(dataset, area)
+    series = _area_series(dataset, area, ring)
     return export.build_critical_period(
         series,
         aoi=resolved_aoi,
         bbox=area,
+        polygon=ring,
         source=dataset.source,
         generated_at=dataset.generated_at,
     )
@@ -535,11 +743,14 @@ def critical_period(
 
 @app.get("/api/export")
 @app.get("/api/v1/export")
+@app.post("/api/v1/export")
 def export_csv(
     start: Annotated[DateType | None, Query(description="ISO date, inclusive")] = None,
     end: Annotated[DateType | None, Query(description="ISO date, inclusive")] = None,
     aoi: Annotated[str, Query(description="preset id the request is for")] = "BGD",
     bbox: Annotated[str | None, Query(description="west,south,east,north")] = None,
+    polygon: PolygonParam = None,
+    body: AnalysisRequest | None = None,
 ) -> Response:
     """The filtered hotspot records, as CSV.
 
@@ -548,13 +759,16 @@ def export_csv(
     original satellite named — rather than the derived cell-days the calendar
     shows. The date window and the area are the same ones the other
     endpoints take, so what comes out is what the screen showed.
+
+    It takes a POST body too, because a drawn polygon can also arrive as the
+    AOI object of ``docs/TRD.md`` §6.1.
     """
-    _, _, area = _resolve(None, aoi=aoi, bbox=bbox)
+    _, _, area, ring = _resolve(body, aoi=aoi, bbox=bbox, polygon=polygon)
     if start is not None and end is not None and start > end:
         fail(422, "invalid_window", "start must not be after end", "start")
     dataset = _dataset()
     text = export.build_csv(
-        _within(dataset.detections, area),
+        _within(dataset.detections, area, ring),
         start=start,
         end=end,
     )
@@ -584,14 +798,18 @@ def aoi() -> Mapping[str, Any]:
 @app.get("/api/validation")
 @app.get("/api/v1/validation")
 @app.post("/api/v1/validation")
-def validation(body: AnalysisRequest | None = None) -> Mapping[str, Any]:
+def validation(
+    polygon: PolygonParam = None,
+    body: AnalysisRequest | None = None,
+) -> Mapping[str, Any]:
     """Overlap-period agreement, raw against harmonized."""
-    _, _, area = _resolve(body)
+    _, _, area, ring = _resolve(body, polygon=polygon)
     dataset = _dataset()
     try:
         return export.build_validation(
-            _within(dataset.detections, area),
+            _within(dataset.detections, area, ring),
             bbox=area,
+            polygon=ring,
             date_range=export.detections_date_range(dataset.detections),
             source=dataset.source,
             generated_at=dataset.generated_at,

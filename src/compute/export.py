@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -124,6 +124,7 @@ def params_hash(
     cell_km: float = harmonize.DEFAULT_CELL_KM,
     min_confidence: float = schema.MIN_CONFIDENCE,
     date_range: tuple[str, str],
+    polygon: Sequence[Sequence[float]] | None = None,
 ) -> str:
     """Stable id for the parameter set a response was produced with.
 
@@ -136,6 +137,11 @@ def params_hash(
     file the docs call the single source of truth actually takes part: change
     a value in it and the id changes, which is what marks derived artifacts
     stale (docs/PARAMETERS.md §3).
+
+    ``polygon`` is the drawn ring, when the area is a shape rather than a box.
+    Two different polygons can share a bounding box, so the box alone would
+    give them the same id and a cached payload for one would be served for
+    the other.
     """
     payload = json.dumps(
         {
@@ -146,6 +152,9 @@ def params_hash(
             "confidence_mapping": dict(schema.confidence_mapping()),
             "collapse": "cell_days",
             "params_file": params.params_file_hash(),
+            "polygon": [[float(v) for v in position] for position in polygon]
+            if polygon is not None
+            else None,
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -212,21 +221,33 @@ def build_meta(
     min_confidence: float = schema.MIN_CONFIDENCE,
     date_range: tuple[str, str],
     generated_at: datetime | None = None,
+    polygon: Sequence[Sequence[float]] | None = None,
 ) -> dict[str, Any]:
     """The ``meta`` block every response carries.
 
     ``params_hash`` is derived here rather than passed in, so it always
     describes the parameters actually used for the payload it sits on.
+
+    ``polygon`` is the drawn ring, when the area is a shape. The contract
+    allows extra keys in ``region``, so the ring is carried alongside the
+    bounding box: the box is the extent, the ring is the shape the user drew.
     """
+    region: dict[str, Any] = {"bbox": [float(v) for v in bbox]}
+    if polygon is not None:
+        region["polygon"] = [[float(v) for v in position] for position in polygon]
     return {
         "source": source,
         "generated_at": _iso_timestamp(generated_at),
-        "region": {"bbox": [float(v) for v in bbox]},
+        "region": region,
         "cell_km": float(cell_km),
         "min_confidence": int(min_confidence),
         "date_range": [date_range[0], date_range[1]],
         "params_hash": params_hash(
-            bbox=bbox, cell_km=cell_km, min_confidence=min_confidence, date_range=date_range
+            bbox=bbox,
+            cell_km=cell_km,
+            min_confidence=min_confidence,
+            date_range=date_range,
+            polygon=polygon,
         ),
     }
 
@@ -323,6 +344,7 @@ def build_series(
     metric: str = "cell_days",
     bbox: tuple[float, float, float, float] = BANGLADESH_BBOX,
     cell_km: float = harmonize.DEFAULT_CELL_KM,
+    n_cells: int | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """``GET /api/v1/series`` payload: daily counts, one row per calendar day.
@@ -341,6 +363,11 @@ def build_series(
     ``bbox`` is the area the counts cover: the caller must pass the same
     region it filtered ``detections`` to, or the density divisor describes a
     different area than the numbers.
+
+    ``n_cells`` overrides the divisor when the area is not a box — a drawn
+    polygon holds fewer cells than its bounding box, so dividing by the box
+    would report a density far too low. The caller passes the polygon's own
+    cell count; without it the divisor is the box's, as before.
 
     ``bin_days`` is 1 because the series is not binned; an 8-day view would be
     a different payload, not a different flag. ``metric`` and ``view`` are
@@ -378,10 +405,12 @@ def build_series(
         row["coverage"] = coverage_value
         row["source"] = source
     if metric == "density":
-        n_cells = harmonize.grid_cell_count(bbox, cell_km=cell_km)
+        divisor = (
+            n_cells if n_cells is not None else harmonize.grid_cell_count(bbox, cell_km=cell_km)
+        )
         for row in rows:
             for column in COUNT_COLUMNS:
-                row[column] = round(float(row[column]) / n_cells, 12)
+                row[column] = round(float(row[column]) / divisor, 12)
     return {
         "meta": build_meta(bbox=bbox, cell_km=cell_km, **kwargs),
         "metric": metric,

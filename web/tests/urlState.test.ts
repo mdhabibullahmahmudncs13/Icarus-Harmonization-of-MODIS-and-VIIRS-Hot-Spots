@@ -12,6 +12,7 @@ describe('parseHash', () => {
       mode: 'raw',
       aoi: 'IND-C',
       date: '2019-03-01',
+      polygon: null,
     });
   });
 
@@ -28,14 +29,59 @@ describe('parseHash', () => {
 
 describe('buildHash', () => {
   it('omits a null date', () => {
-    expect(buildHash({ view: 'map', mode: 'raw', aoi: 'BGD', date: null })).toBe(
+    expect(buildHash({ view: 'map', mode: 'raw', aoi: 'BGD', date: null, polygon: null })).toBe(
       '#map?mode=raw&aoi=BGD',
     );
   });
 
   it('round-trips through parseHash', () => {
-    const state = { view: 'anomalies', mode: 'raw', aoi: 'NPL', date: '2020-02-02' } as const;
+    const state = {
+      view: 'anomalies',
+      mode: 'raw',
+      aoi: 'NPL',
+      date: '2020-02-02',
+      polygon: null,
+    } as const;
     expect(parseHash(buildHash(state))).toEqual(state);
+  });
+
+  it('carries a drawn polygon through the hash', () => {
+    const polygon: [number, number][] = [
+      [88.2, 23],
+      [88.6, 23],
+      [88.6, 23.3],
+    ];
+    const state = { ...DEFAULT_STATE, view: 'map' as const, polygon };
+    expect(parseHash(buildHash(state))).toEqual(state);
+  });
+
+  it('leaves the custom label out of the hash', () => {
+    // The drawn shape is the area; the `poly` parameter carries it, so the
+    // label of a custom area has no place in the hash.
+    const polygon: [number, number][] = [
+      [88.2, 23],
+      [88.6, 23],
+      [88.6, 23.3],
+    ];
+    const state = { ...DEFAULT_STATE, view: 'map' as const, aoi: 'custom', polygon };
+    expect(buildHash(state)).not.toContain('aoi=');
+    expect(parseHash(buildHash(state)).polygon).toEqual(polygon);
+  });
+});
+
+describe('parseHash', () => {
+  it('does not take a stale custom label for an area', () => {
+    // The API refuses `aoi=custom` with 422 — it is a label for a drawn
+    // shape, not a region. A hash that names it without a shape is stale.
+    const parsed = parseHash('#map?mode=raw&aoi=custom');
+    expect(parsed.aoi).toBe(DEFAULT_STATE.aoi);
+    expect(parsed.polygon).toBeNull();
+  });
+
+  it('keeps a custom label when the shape is there', () => {
+    const parsed = parseHash('#map?mode=raw&aoi=custom&poly=[[88.2,23],[88.6,23],[88.6,23.3]]');
+    expect(parsed.aoi).toBe('custom');
+    expect(parsed.polygon).toHaveLength(3);
   });
 });
 

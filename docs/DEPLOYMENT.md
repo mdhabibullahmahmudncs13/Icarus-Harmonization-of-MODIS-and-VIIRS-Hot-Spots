@@ -159,12 +159,25 @@ curl -s localhost:8000/meta
 curl -s -X POST localhost:8000/api/v1/series \
   -H 'content-type: application/json' \
   -d '{"aoi":"BGD","metric":"density"}'
+
+curl -s 'localhost:8000/api/v1/export?aoi=BGD&start=2019-01-01&end=2019-12-31' \
+  | head -3
 ```
 
 Expected: 200 with a `params_hash` present in every body; an unknown AOI
 returns 422 with `{code, message, field}`; an AOI over the cell limit returns
 422 `aoi_too_large`; a request that overruns the timeout returns 503
-`timeout`.
+`timeout`. The export answers `text/csv`, one row per detection.
+
+A drawn area is sent as the `polygon` query parameter — a JSON list of
+`[lon, lat]` pairs:
+
+```bash
+curl -s 'localhost:8000/api/v1/series?polygon=%5B%5B88.2,23.0%5D,%5B88.6,23.0%5D,%5B88.6,23.3%5D%5D'
+```
+
+The same ring may be posted as the AOI object `docs/TRD.md` §6.1 defines:
+`{"aoi": {"type": "geojson", "geometry": {"type": "Polygon", "coordinates": [[[88.2,23.0],[88.6,23.0],[88.6,23.3]]]}}}`. The body wins over the query parameter.
 
 ---
 

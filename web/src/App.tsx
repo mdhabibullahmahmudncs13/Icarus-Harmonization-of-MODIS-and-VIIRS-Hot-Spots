@@ -3,12 +3,14 @@ import type { Dataset } from './contract/types';
 import { getDataSource, apiBase } from './data/DataSource';
 import { aggregateToBins } from './lib/series';
 import { recordCount } from './lib/export';
+import { describeRing, type Ring } from './lib/polygon';
 import { useAppState } from './state/useAppState';
 import { VIEWS, type View } from './state/urlState';
 import { Rail } from './components/Rail';
 import { SeriesChart } from './components/SeriesChart';
 import { CalendarHeatmap } from './components/CalendarHeatmap';
 import { RegionMap } from './components/RegionMap';
+import { AreaDrawer } from './components/AreaDrawer';
 import { BaselineChart } from './components/BaselineChart';
 import {
   AnomalyBox,
@@ -56,13 +58,17 @@ function formatBbox(bbox: [number, number, number, number]): string {
 }
 
 export function App() {
-  const { state, setView, setMode, setAoi, setDate } = useAppState();
+  const { state, setView, setMode, setAoi, setDate, setPolygon } = useAppState();
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [collapsed, setCollapsed] = useState(false);
   const [data, setData] = useState<Dataset | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [overlay, setOverlay] = useState<Overlay>(null);
+  // The shape being drawn, and whether a draw is in progress. The drawn
+  // shape only reaches the state — and so the data — when the user says so.
+  const [draft, setDraft] = useState<Ring | null>(null);
+  const [drawing, setDrawing] = useState(false);
   // Null on the mock tier, which has no export route.
   const base = apiBase();
 
@@ -79,7 +85,7 @@ export function App() {
     let cancelled = false;
     setError(null);
     getDataSource()
-      .load({ aoi: state.aoi, date: state.date })
+      .load({ aoi: state.aoi, date: state.date, polygon: state.polygon })
       .then((d) => !cancelled && setData(d))
       .catch((e: unknown) => !cancelled && setError(e instanceof Error ? e.message : String(e)));
     return () => {
@@ -89,7 +95,7 @@ export function App() {
     // either re-asks for them (docs/FLOWS.md §Journey 1-2). The mode is not
     // here on purpose: it only redraws the payload already loaded
     // (docs/FLOWS.md §Interaction rules).
-  }, [reload, state.aoi, state.date]);
+  }, [reload, state.aoi, state.date, state.polygon]);
 
   const bins = useMemo(
     () => (data ? aggregateToBins(data.series.series, 8) : []),
@@ -166,6 +172,38 @@ export function App() {
   const heading = TITLES[view];
   const closeOverlay = () => setOverlay(null);
 
+  // The drawn shape lives in the draft until the user says "use this area",
+  // so a half-finished shape never changes the data on screen.
+  const startDrawing = useCallback(() => {
+    setDraft(null);
+    setDrawing(true);
+    setView('map');
+  }, [setView]);
+
+  const cancelDrawing = useCallback(() => {
+    setDraft(null);
+    setDrawing(false);
+  }, []);
+
+  const finishDrawing = useCallback(
+    (ring: Ring) => {
+      setPolygon(ring);
+      setDraft(ring);
+      setDrawing(false);
+    },
+    [setPolygon],
+  );
+
+  const clearArea = useCallback(() => {
+    setPolygon(null);
+    setDraft(null);
+    setDrawing(false);
+  }, [setPolygon]);
+
+  const addVertex = useCallback((lon: number, lat: number) => {
+    setDraft((current) => [...(current ?? []), [Number(lon.toFixed(4)), Number(lat.toFixed(4))]]);
+  }, []);
+
   return (
     <div className="shell">
       <Rail
@@ -179,6 +217,7 @@ export function App() {
         onView={setView}
         onMode={setMode}
         onAoi={setAoi}
+        onCustom={startDrawing}
         onTheme={setTheme}
         onCollapse={() => setCollapsed((c) => !c)}
       />
@@ -193,15 +232,27 @@ export function App() {
           </div>
           <div className="page-head__actions">
             {data ? (
-              <span className="region-chip" title="Region bounding box of the loaded dataset">
+              <span
+                className="region-chip"
+                title={
+                  state.polygon
+                    ? 'The drawn area and its bounding box'
+                    : 'Region bounding box of the loaded dataset'
+                }
+              >
                 <Icon name="area" size={15} />
-                <b>{formatBbox(data.meta.meta.region.bbox)}</b>
+                <b>
+                  {state.polygon
+                    ? `${describeRing(state.polygon)} · ${formatBbox(data.meta.meta.region.bbox)}`
+                    : formatBbox(data.meta.meta.region.bbox)}
+                </b>
               </span>
             ) : null}
             {base && data ? (
               <ExportButton
                 base={base}
-                aoi={state.aoi}
+                aoi={state.polygon ? undefined : state.aoi}
+                polygon={state.polygon}
                 start={data.meta.meta.date_range[0]}
                 end={data.meta.meta.date_range[1]}
                 count={recordCount(data.series.series)}
@@ -307,13 +358,29 @@ export function App() {
                 <div className="card__head">
                   <span className="card__title">Region cells</span>
                   <span className="badge badge--outline">{state.mode}</span>
+                  <AreaDrawer
+                    ring={drawing ? draft : state.polygon}
+                    drawing={drawing}
+                    onStart={startDrawing}
+                    onCancel={cancelDrawing}
+                    onClear={clearArea}
+                    onFinish={finishDrawing}
+                  />
                 </div>
                 <div className="card__body">
                   <RegionMap
                     cells={data.cells.cells}
                     mode={state.mode}
                     theme={theme}
+                    polygon={drawing ? draft : state.polygon}
+                    drawing={drawing}
+                    onAddVertex={addVertex}
                   />
+                  <p className="hint">
+                    {drawing
+                      ? 'Click the map to add corners. The shape needs at least three points.'
+                      : 'Draw an area to study one part of the region instead of the whole of it.'}
+                  </p>
                 </div>
               </div>
             )}

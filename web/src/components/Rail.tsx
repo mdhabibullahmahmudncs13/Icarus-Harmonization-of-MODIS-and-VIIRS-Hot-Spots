@@ -30,6 +30,7 @@ export function Rail({
   onView,
   onMode,
   onAoi,
+  onCustom,
   onTheme,
   onCollapse,
 }: {
@@ -43,6 +44,8 @@ export function Rail({
   onView: (v: View) => void;
   onMode: (m: Mode) => void;
   onAoi: (aoi: string) => void;
+  /** Called when the user asks to draw a custom area. */
+  onCustom: () => void;
   onTheme: (t: 'dark' | 'light') => void;
   onCollapse: () => void;
 }) {
@@ -86,7 +89,9 @@ export function Rail({
 
       <ModeToggle mode={mode} onChange={onMode} compact={collapsed} />
 
-      {!collapsed ? <AoiPicker aoi={aoi} presets={presets} onChange={onAoi} /> : null}
+      {!collapsed ? (
+        <AoiPicker aoi={aoi} presets={presets} onChange={onAoi} onCustom={onCustom} />
+      ) : null}
 
       <div className="rail__nav">
         <div className="nav-group">

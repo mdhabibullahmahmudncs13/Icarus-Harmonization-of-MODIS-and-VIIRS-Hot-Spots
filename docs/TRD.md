@@ -244,6 +244,10 @@ Polygon: { "type": "geojson", "geometry": { "type": "Polygon", "coordinates": [[
 
 Validation: ring closed, ≥ 4 positions, within processing extent, no self-intersection, ≤ 100,000 cells. Invalid → HTTP 422 with `{ "code", "message", "field" }`.
 
+A polygon may also be sent as the `polygon` query parameter — a JSON list of
+`[lon, lat]` pairs — on every analysis route, which is how the frontend sends
+one. The body wins over the query parameter when both are given.
+
 ### 6.2 Series Bins
 
 ```

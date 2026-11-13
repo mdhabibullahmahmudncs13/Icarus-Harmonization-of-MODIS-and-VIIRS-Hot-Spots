@@ -191,7 +191,8 @@ button works:
 |-------|--------|-------------|
 | `view` | overview, calendar, map, anomalies, critical, validation, methods, offline | URL hash |
 | `mode` | raw, harmonized | URL hash |
-| `aoi` | preset id or GeoJSON polygon | URL |
+| `aoi` | preset id | URL |
+| `poly` | a drawn ring, as JSON `[lon, lat]` pairs | URL |
 | `date` | selected date/bin | URL |
 | `theme` | dark (default), light | local storage |
 

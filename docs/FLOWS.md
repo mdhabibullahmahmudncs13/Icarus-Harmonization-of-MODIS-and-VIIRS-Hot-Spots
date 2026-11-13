@@ -96,6 +96,10 @@ Deep links:
 - **Entry:** rail, or a "view cells" link from Calendar/Critical period.
 - **Shows:** cell polygons shaded by the active mode; legend with units.
 - **Primary action:** draw a polygon AOI, or pick a preset.
+- **Drawing:** "Draw an area" turns the map into a corner picker — each click
+  adds a vertex, and "Use this area" applies the shape. The shape stays a
+  draft until then, so a half-finished polygon never changes the data.
+  "Redraw" starts over; "Clear" goes back to the preset.
 - **States:** the basemap is a bundled NASA Earth image, so it is present
   offline; the cells themselves need the API (or the cached payloads).
 
@@ -214,11 +218,17 @@ window.
 
 ```
 Map screen
-  -> draw a polygon
-  -> client validates (closed ring, >= 4 points, within extent, <= 100,000 cells)
+  -> draw a polygon (click the corners, then "Use this area")
+  -> client checks the shape is drawable (>= 3 points, not crossing itself, not flat)
   -> submit -> series / anomalies / critical-period re-run for the polygon
+  -> the API checks it again (ring closed, >= 4 positions, within extent,
+     no self-intersection, <= 100,000 cells)
   -> invalid input returns a structured error naming the field
 ```
+
+The drawn shape is a real polygon: the detections are filtered by point-in-ring,
+and the density is divided by the cells the shape holds, not by its bounding
+box. It travels in the URL hash, so the area is shareable like any other view.
 
 ### Journey 5 — Verify the method
 
