@@ -35,8 +35,7 @@ Do not include real credentials in a report. Redact keys.
 
 ## 3. Secrets and credentials
 
-- **Environment variables only.** No credential is ever hardcoded, committed, or
-  baked into a Docker image.
+- **Environment variables only.** No credential is ever hardcoded or committed.
 - `.env` is git-ignored. `.env.example` lists the required names with empty
   values.
 - The only secret this project needs is a NASA **FIRMS API key**
@@ -44,16 +43,26 @@ Do not include real credentials in a report. Redact keys.
   by the API, the frontend, or the demo.
 - If a key is exposed, rotate it at
   <https://firms.modaps.eosdis.nasa.gov/api/map_key/> and purge it from history.
+- **Never put an account password in `.env`.** The burned-area cross-check uses
+  an Earthdata Login *bearer token* (`EARTHDATA_TOKEN`), which expires and can
+  be revoked on its own. A password grants account-wide access and is the one
+  credential with no safe home.
+- `tests/test_secrets.py` fails the build if a credential-shaped literal
+  appears in a tracked config file, and if `.env` is ever committed. It scans
+  the project's own files only, not vendored third-party directories.
 
 Required environment variables (names only):
 
 | Variable | Scope | Notes |
 |----------|-------|-------|
-| `FIRMS_MAP_KEY` | S0 only | NASA FIRMS Area API key |
-| `PORT` | API | default 8000 |
-| `DATA_DIR` | API | path to data cache |
-| `LOG_LEVEL` | API | DEBUG/INFO/WARNING/ERROR |
-| `DUCKDB_MEMORY` | API | default 2GB |
+| `FIRMS_MAP_KEY` | acquisition only | NASA FIRMS Area API key |
+| `EARTHDATA_TOKEN` | acquisition only | Earthdata Login bearer token, for the burned-area fetch |
+| `OFFLINE` | acquisition, API | `1` forces the cache/fixture path and never the network |
+| `VITE_DATA`, `VITE_API_BASE` | frontend build | Which data tier the built app uses, and where the API is |
+
+The API reads no other environment variable. There is no `DATA_DIR`, no
+`LOG_LEVEL` and no `DUCKDB_MEMORY`: the cache lives in `cache/`, the fixture
+in `demo_fixtures/`, and the port is chosen on the uvicorn command line.
 
 ---
 
@@ -61,13 +70,12 @@ Required environment variables (names only):
 
 | Control | Implementation |
 |---------|----------------|
-| Read-only data | API mounts `data/` read-only; it cannot mutate source data. |
-| Input validation | AOI geometry must be closed, ≥ 4 positions, within extent, non-self-intersecting, ≤ 100,000 cells. |
-| Request bounding | Request size limits and a 30 s per-request timeout. |
+| Read-only data | The API only reads the Parquet cache; nothing in the request path writes to it. |
+| Input validation | An AOI is either a known preset id or a bbox of four degrees with `west<east` and `south<north`; an area over `api.max_aoi_cells` grid cells is refused before any query runs. |
+| Request bounding | A 30 s per-request timeout, from `api.request_timeout_s`. |
 | Structured errors | Invalid input returns HTTP 422 `{code, message, field}`; no stack traces to clients. |
-| Log hygiene | Logs contain request path, duration, status — **not** user AOI geometries. |
-| Transport | HTTPS with HSTS for any network communication. |
-| Container | Runs as a non-root user; read-only data volume. |
+| Origin restriction | CORS allows the loopback dev (`:5174`) and preview (`:4173`) origins only — no wildcard. |
+| Transport | HTTPS is a deployment concern: terminate TLS in front of the API. The service itself speaks plain HTTP. |
 | No auth by design | The API is read-only over public data; do not expose it as a general compute service. |
 
 ---
@@ -76,13 +84,12 @@ Required environment variables (names only):
 
 | Threat | Mitigation |
 |--------|------------|
-| Key leakage via repo or image | Env-only secrets; `.env` ignored; S0-only usage. |
+| Key leakage via repo or image | Env-only secrets; `.env` ignored; acquisition-only usage. |
 | Query resource exhaustion (huge AOI) | Cell-count cap + per-request timeout. |
-| Malformed / hostile geometry | Full AOI validation before any query. |
+| Malformed / hostile geometry | A bbox is parsed and range-checked before any query. |
 | Path traversal via file names | Data paths are fixed by the pipeline; no user-supplied paths. |
-| Prompt injection via the AI layer | AI layer reads API JSON only, cannot compute, and is hidden if unavailable. |
 | Supply-chain risk in dependencies | Pinned deps; CI installs from a lock; no CDN at runtime. |
-| Offline cache tampering | Caches are versioned and rebuilt from checksummed raw files. |
+| Offline cache tampering | The cache is rebuilt by `make cache`, which never re-requests a chunk already on disk. |
 
 ---
 

@@ -295,6 +295,35 @@ body::before {
   background: var(--accent);
 }
 
+.aoi-picker {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.aoi-picker__label {
+  font: 600 11px var(--font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.aoi-picker__select {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--glass-fill-sunken);
+  color: var(--text);
+  font: 600 13px var(--font);
+  cursor: pointer;
+}
+
+.aoi-picker__select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .main {
   padding: 20px 16px 56px;
   max-width: 1140px;

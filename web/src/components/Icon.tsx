@@ -14,6 +14,7 @@ export type IconName =
   | 'close'
   | 'chevron-left'
   | 'chevron-right'
+  | 'refresh'
   | 'area';
 
 const PATHS: Record<IconName, string> = {
@@ -34,6 +35,7 @@ const PATHS: Record<IconName, string> = {
   close: 'm6 6 12 12M18 6 6 18',
   'chevron-left': 'm14 6-6 6 6 6',
   'chevron-right': 'm10 6 6 6-6 6',
+  refresh: 'M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4',
   area: 'M4 6h6v6H4V6Zm10 0h6v6h-6V6ZM4 15h6v4H4v-4Zm10 0h6v4h-6v-4Z',
 };
 

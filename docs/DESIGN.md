@@ -208,13 +208,15 @@ outline. Tooltip states value, units, coverage, and source.
 
 ### 5.10 Cell map
 
-Cells as polygons shaded by the active mode. No basemap by default (a tile
-source would be a third-party request offline); PMTiles when bundled. Legend
+Cells as polygons shaded by the active mode. The basemap is a NASA Earth image
+bundled with the app, so there is never a third-party tile request. Legend
 shows units and the ramp.
 
 ### 5.11 Panels
 
 - **Anomaly box:** enters a date/area, returns percentile and baseline window.
+- **Baseline chart:** the seasonal baseline bands (p05–p95, p25–p75) with the
+  median line, and the selected day marked on it.
 - **Critical-period panel:** onset, peak, end bins, window mass.
 - **Validation card:** raw and harmonized correlations from the overlap period.
 - **Provenance drawer:** the JSON behind the current view, dataset names,

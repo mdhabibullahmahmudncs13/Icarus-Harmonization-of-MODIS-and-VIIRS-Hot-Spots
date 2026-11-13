@@ -1,31 +1,33 @@
 # Deployment & Runbook
 
-How to build, run, and operate Project Icarus, including the offline field demo.
-The system is a single read-only FastAPI service plus a static frontend, backed
-by a pre-fetched Parquet cache. See `docs/ARCHITECTURE.md` for the design.
+How to install, run, and operate Project Icarus, including the offline field
+demo. The system is a single read-only FastAPI service plus a static
+frontend, backed by a pre-fetched Parquet cache. See `docs/ARCHITECTURE.md`
+for the design.
 
 ---
 
 ## 1. Deployment model
 
-One Docker image contains the API, the static frontend, and the data cache.
-There is no server database and no runtime dependency on NASA.
+The API runs from a source checkout. There is no container image, no server
+database and no runtime dependency on NASA: the data is a Parquet cache on
+disk, read through DuckDB.
 
-Three supported targets:
+Three supported targets, all running the same code:
 
 | Target | Use | Notes |
 |--------|-----|-------|
-| Laptop | Field demo, judging | The API runs locally; no internet after cache. |
-| Raspberry Pi | Local LAN server | Same image, ARM build. |
+| Laptop | Field demo, judging | The API runs locally; no internet after the cache is built. |
+| Raspberry Pi | Local LAN server | Same commands; ARM build. |
 | Cloud VM | Shared access | Put behind TLS; still read-only. |
 
 ---
 
 ## 2. Prerequisites
 
-- Docker 24+ (or Python 3.11+, Node 20+ for a source run).
-- A pre-built data cache in `data/` (produced by stage S0; see §4).
-- TLS termination if anyone other than localhost will reach the API.
+- Python 3.11+ (`uv` for the venv, or any `venv` you manage).
+- Node 20+ for the frontend.
+- A populated data cache (see §4) or the committed offline fixture.
 
 ---
 
@@ -33,65 +35,80 @@ Three supported targets:
 
 Environment variables (names only — never commit values):
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `FIRMS_MAP_KEY` | — | NASA FIRMS key; **S0 only**, not needed at runtime |
-| `PORT` | `8000` | API port |
-| `DATA_DIR` | `data/` | Path to the data cache |
-| `LOG_LEVEL` | `INFO` | DEBUG / INFO / WARNING / ERROR |
-| `DUCKDB_MEMORY` | `2GB` | DuckDB memory limit |
+| Variable | Default | Read by | Purpose |
+|----------|---------|---------|---------|
+| `FIRMS_MAP_KEY` | — | `make cache` only | NASA FIRMS Area API key |
+| `OFFLINE` | unset | acquisition, API | `1` forces the cache/fixture path; never the network |
+| `FIRMS_PRODUCTS` | all four | `make cache` only | Which FIRMS products to download |
+| `FIRMS_BBOX` | `88,20,93,27` | `make cache` only | Acquisition window, `west,south,east,north` |
+| `FIRMS_START` / `FIRMS_END` | `2003-01-01` / `2026-09-30` | `make cache` only | Acquisition window |
+| `EARTHDATA_TOKEN` | — | burned-area fetch | Earthdata Login bearer token, not a password |
+| `VITE_DATA` | `mock` | frontend build | `mock` (bundled payloads) or `api` (live backend) |
+| `VITE_API_BASE` | `/api/v1` | frontend build | Where the API lives, when `VITE_DATA=api` |
 
-Copy `.env.example` to `.env` for local runs; `.env` is git-ignored.
+Copy `.env.example` to `.env` for local runs; `.env` is git-ignored. The API
+reads no other environment variable: there is no `DATA_DIR`, `LOG_LEVEL` or
+`DUCKDB_MEMORY`, and the cache always lives in `cache/` (the fixture in
+`demo_fixtures/`).
 
 ---
 
-## 4. Building the data cache (S0, network required)
+## 4. Building the data cache (network required)
 
 Run this **before** the event, on a machine with internet access.
 
 ```bash
-# 1. Acquire raw files and write the checksum manifest
-python -m icarus.pipeline.cli s0 --config config/params.yaml
+# 1. Create the environment and install the pinned dependencies
+make venv
 
-# 2. Run the full pipeline S1–S9
-python -m icarus.pipeline.cli run-all --config config/params.yaml
+# 2. Acquire raw files and write the per-product parquet under cache/raw/
+make cache
 ```
 
-S0 writes `data/raw/**` plus `data/manifest.csv` (file, bytes, sha256, rows,
-retrieved, url). It is resumable: a file already registered with a matching
-checksum is never re-requested. Verify integrity with:
+`make cache` accepts arguments, so one product or one window at a time works:
 
 ```bash
-python -m icarus.pipeline.cli verify-manifest --config config/params.yaml
+make cache ARGS="--products VIIRS_SNPP_SP --start 2012-01-01"
 ```
 
-Derived outputs are written under `data/derived/`; `data/meta/params.hash`
-records the parameter set that produced them.
+The acquisition layer is resumable: a chunk already on disk is never
+re-requested. Without a `FIRMS_MAP_KEY` it reads only from `cache/` and
+`demo_fixtures/`, so an offline run is harmless.
 
-> **Data is never modified after acquisition.** `data/raw/` is append-only.
+To write the committed offline demo detections instead:
+
+```bash
+make fixture
+```
 
 ---
 
-## 5. Building the image
+## 5. Building the frontend
 
 ```bash
-docker build -f docker/Dockerfile -t icarus:latest .
+cd web
+npm ci
+npm run build        # typecheck + production build into web/dist/
 ```
 
-The build runs from a clean checkout, installs pinned dependencies, and packages
-the frontend. The container runs as a non-root user and mounts `data/`
-read-only.
+`npm run build:release` is the release build: it refuses to ship on mock data
+(`web/vite.config.ts`). Serve `web/dist/` with any static file server, or use
+the Vite preview:
+
+```bash
+cd web && npm run preview      # :4173
+```
 
 ---
 
 ## 6. Running
 
 ```bash
-# Field / local run
-docker run --rm -p 8000:8000 \
-  -v "$PWD/data:/app/data:ro" \
-  --env-file .env \
-  icarus:latest
+# Field / local run: the API offline against the local cache or fixture
+make demo
+
+# The frontend dev server, against the API above:
+cd web && npm run dev           # :5174
 ```
 
 - API: <http://127.0.0.1:8000>
@@ -99,12 +116,10 @@ docker run --rm -p 8000:8000 \
 - Metadata: `GET /meta`
 - Interactive docs: `/docs`
 
-For a source run without Docker:
-
-```bash
-make demo     # starts the API offline against the local cache
-cd web && npm run dev
-```
+The frontend reads the bundled mock payloads by default. To point it at the
+live API, build or serve it with `VITE_DATA=api` (and `VITE_API_BASE` if the
+API is not on the same origin). The API allows the dev server (`:5174`) and
+the preview server (`:4173`); both are loopback-only, with no wildcard.
 
 ---
 
@@ -112,14 +127,14 @@ cd web && npm run dev
 
 Goal: the demo works with the network off, from a cold start.
 
-1. **Before the event:** complete §4 and §5, then confirm `data/derived/` and
-   `data/tiles/basemap_<region>.pmtiles` exist and the image is built.
-2. **Prime the browser cache:** open the app once online and use the
-   "Download for offline" screen to cache the region and layers. Confirm the
-   per-layer "data last updated" timestamp is current.
+1. **Before the event:** complete §4 and §5, then confirm `cache/` (or
+   `demo_fixtures/`) is populated and the frontend is built.
+2. **Prime the browser cache:** open the app once online. The service worker
+   registers on load and reports the resources the page used — the app shell,
+   the hashed assets, and the nine mock payloads — so they are cached.
 3. **Turn the network off:** disable Wi-Fi, or enable airplane mode.
 4. **Cold start:** close the browser fully, reopen the app. The service worker
-   serves the app shell and cached data.
+   serves the app shell and the cached payloads.
 5. **Verify:** run the primary flow — select a preset AOI → series loads →
    calendar renders → anomaly panel → critical-period panel → provenance panel.
 6. **Fallback:** if anything fails, play the recorded fallback video. Keep it on
@@ -137,11 +152,13 @@ curl -s localhost:8000/meta
 
 curl -s -X POST localhost:8000/api/v1/series \
   -H 'content-type: application/json' \
-  -d '{"aoi":{"type":"preset","id":"BGD"},"metric":"density","view":"harmonized"}'
+  -d '{"aoi":"BGD","metric":"density"}'
 ```
 
-Expected: 200 with a `params_hash` present in every body; the invalid-AOI path
-returns 422 with `{code, message, field}`.
+Expected: 200 with a `params_hash` present in every body; an unknown AOI
+returns 422 with `{code, message, field}`; an AOI over the cell limit returns
+422 `aoi_too_large`; a request that overruns the timeout returns 503
+`timeout`.
 
 ---
 
@@ -149,22 +166,25 @@ returns 422 with `{code, message, field}`.
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| `/meta` reports no years/streams | Cache not built or wrong `DATA_DIR` | Re-run §4; check the volume mount. |
-| API returns 422 for a valid-looking AOI | Ring not closed, outside extent, or > 100,000 cells | Check the `field` in the error. |
-| Cold start fails offline | App shell not precached | Open once online; re-run the offline download; check the service worker. |
-| Map tiles missing offline | PMTiles not included in the image | Add `data/tiles/*.pmtiles` and rebuild. |
-| Results changed unexpectedly | `params.yaml` changed → new hash | Expected; regenerate derived outputs. |
-| API slow / OOM | AOI too large or `DUCKDB_MEMORY` too low | Lower the AOI cell count; raise `DUCKDB_MEMORY`. |
-| 503 / AI panel missing | Optional AI layer not running | Expected; the layer hides itself and the core app is unaffected. |
+| `/meta` reports no years/streams | Cache not built, or only the fixture is present | Re-run §4; check that `cache/raw/` has parquet. |
+| API returns 422 for a valid-looking AOI | Unknown AOI id, or the area covers more cells than the limit | Check the `field` in the error; the limit is `api.max_aoi_cells` in `config/params.yaml`. |
+| Cold start fails offline | App shell not precached | Open once online and reload; check the service worker registered. |
+| Frontend shows mock data, not the API | `VITE_DATA` is `mock` | Rebuild with `VITE_DATA=api`. |
+| Browser blocks the API request | Origin not allowed | The API allows `:5174` and `:4173` only. |
+| Results changed unexpectedly | `config/params.yaml` changed → new `params_hash` | Expected; the hash covers the file. |
+| API slow / OOM | AOI too large | Lower the AOI cell count; the API caps it at `api.max_aoi_cells`. |
+| 503 timeout | The request overran `api.request_timeout_s` | Expected above the bound; narrow the area or raise the timeout. |
 
 ---
 
 ## 10. Upgrade & rollback
 
-- Build the new image, run the smoke test in §8, then swap.
-- Keep the previous image tag until the new one passes the smoke test.
-- A parameter change requires a full re-run of `run-all`; derived outputs are
-  keyed by the parameter hash and regenerate deterministically.
+- Change the code, rebuild the frontend, restart the API, then run the smoke
+  test in §8.
+- The API holds the dataset in memory for its lifetime, so a restart reloads
+  it from disk. There is no database and no migration to run.
+- A parameter change in `config/params.yaml` changes `params_hash`, so a
+  cached response from before the change is distinguishable from one after.
 
 ---
 
@@ -173,4 +193,6 @@ returns 422 with `{code, message, field}`.
 - Read-only API; no writes, no schema migrations.
 - One process is sufficient for field use; scale horizontally only for shared
   cloud access.
-- Data refresh is a batch operation (S0 → S9), not a live sync.
+- Data refresh is a batch operation (`make cache`), not a live sync.
+- The API never calls NASA: the acquisition step is separate and offline
+  afterwards.

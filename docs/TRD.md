@@ -26,16 +26,17 @@ This TRD specifies the engineering requirements for the deterministic harmonizat
 |------|--------|----------------|
 | Backend language | Python | 3.11+ |
 | Analytical engine | DuckDB | Embedded, over Parquet |
-| API framework | FastAPI | Async, OpenAPI docs, type-safe |
+| API framework | FastAPI | OpenAPI docs, type-safe |
 | Storage format | Parquet | Sorted keys, fixed compression (determinism) |
-| Frontend | TypeScript + Vite | Bundled locally, no CDN |
-| Map | MapLibre GL JS | Reads PMTiles directly |
-| Calendar / charts | d3 + lightweight chart lib | 46-bin calendar |
-| Offline cache | Workbox service worker + IndexedDB/OPFS | Cache-first tiles, stale-while-revalidate data |
-| Basemap | PMTiles | One file per region |
-| Container | Docker | Single image: API + frontend + cache |
+| Frontend | React + TypeScript + Vite | Bundled locally, no CDN |
+| Map | three.js on a NASA Earth texture | No tile server, so the map works offline |
+| Calendar / charts | d3-array + d3-scale, hand-drawn SVG | 46-bin calendar |
+| Offline cache | Hand-rolled service worker + Cache API | Cache-first assets, stale-while-revalidate data |
+| Basemap | NASA Earth images | Shipped under `web/public/earth/` |
+| Deployment | Source checkout | API from `src.api.main`; frontend is a static build |
 
-Exact dependency pin versions: **TBD — needs decision** (locked at first clean-checkout build).
+Exact dependency pin versions live in `web/package.json` and the `DEPS` list
+in the `Makefile`; both are pinned.
 
 ---
 
@@ -92,11 +93,11 @@ Each stage is deterministic, idempotent, reads named inputs, writes named output
 
 | Stage | Input → Output | Parameters | Failure / fallback |
 |-------|----------------|------------|--------------------|
-| **S0 Acquire** | NASA sources → `data/raw/**` + `manifest.csv` | source URLs, pilot extent | Skip already-manifested (sha256) files; S0 runs pre-event with network. |
-| **S1 Normalize** | raw → `derived/det` (Parquet) | product-specific parsers, stream map | Unknown product version → recorded in manifest, parsing error surfaced. |
-| **S2 Quality filter** | det → det_ok | c_min, modis_allowed_types, viirs_classes | c_min default 30. |
+| **S0 Acquire** | NASA sources → `cache/raw/**` + `<source>.manifest.json` | source URLs, pilot extent | Skip already-manifested (sha256) files; S0 runs pre-event with network. |
+| **S1 Normalize** | raw → in-memory det (Parquet) | product-specific parsers, stream map | Unknown product version → recorded in manifest, parsing error surfaced. |
+| **S2 Quality filter** | det → det_ok | c_min, modis_allowed_types, viirs_classes | c_min default 50. |
 | **S3 Static mask** | det_ok → det_clean | fine_K, min_days | Removes cells with ≥ min_days distinct dates/year. Sensitive to repeated agri-burning (tested E4). |
-| **S4 Grid snap** | det_clean → cell indices | K | Floor semantics; boundary detections go to higher index. |
+| **S4 Grid snap** | det_clean → cell indices | cell_km, reference_latitude_deg | Floor semantics; boundary detections go to higher index. |
 | **S5 Cell-day collapse** | det_clean → cell_day | (stream bits) | Idempotent; row-order invariant. |
 | **S6 Temporal binning** | cell_day → cell_bin | bin_days=8 | bin(n) = min(⌊(n−1)/8⌋+1, 46). |
 | **S7 Availability/coverage** | cell_bin + outages → avail, bin_day, bin_coverage | cov_min, zero_detection_rule | Low coverage excluded from baselines; never described as "no fire". |
@@ -113,7 +114,7 @@ Each stage is deterministic, idempotent, reads named inputs, writes named output
 keep(MODIS) = [conf_num >= c_min] AND [hs_type = 0 OR hs_type IS NULL]
 keep(VIIRS) = [conf_class IN {n, h}]
 ```
-Default `c_min = 30`.
+Default `c_min = 50`.
 
 ### 5.2 Static Mask (S3)
 
@@ -121,12 +122,17 @@ A fine grid of `fine_K = 200` cells/degree; a fine cell is masked for year y if 
 
 ### 5.3 Grid Snapping (S4)
 
+Cells are `cell_km = 5.5` km wide. The latitude step is `cell_km / 111` degrees; the longitude step is that divided by `cos(reference_latitude_deg)`, so an east-west cell stays near the stated size at the region's representative latitude.
+
 ```
-cell_x = floor(lon * K)              K = 20 → Δ = 0.05°
-cell_y = floor(lat * K)
-cell_centre = ((cell_x + 0.5)/K, (cell_y + 0.5)/K)
+Δlat = cell_km / 111
+Δlon = Δlat / cos(reference_latitude_deg)
+cell_y = floor(lat / Δlat)
+cell_x = floor(lon / Δlon)
 area_weight w_c = cos(lat_c)
 ```
+
+This is an approximation, not a geodesic: one reference latitude keeps the grid a clean partition, and cells shrink east-west away from it.
 
 ### 5.4 Temporal Binning (S6)
 
@@ -186,8 +192,9 @@ If mean density < `min_mean_density = 1e-5`, return "insufficient activity".
 
 | Parameter | Default | Meaning |
 |-----------|---------|---------|
-| K | 20 | Cells per degree (Δ = 0.05°) |
-| c_min | 30 | Min MODIS confidence |
+| cell_km | 5.5 | Grid cell size (km) |
+| reference_latitude_deg | 23.5 | Latitude the east-west step is scaled for |
+| c_min | 50 | Min MODIS confidence |
 | viirs_classes | [n, h] | Allowed VIIRS classes |
 | fine_K | 200 | Fine grid for static mask |
 | min_days | 16 | Persistence threshold |
@@ -205,6 +212,12 @@ If mean density < `min_mean_density = 1e-5`, return "insufficient activity".
 | request_timeout_s | 30 | API per-request timeout |
 
 All parameters live in `config/params.yaml`; the hash of that file is stored with every derived artifact.
+
+`max_aoi_cells` and `request_timeout_s` are enforced by the API, not just
+recorded: `src/api/main.py` reads both from the file at import, refuses an AOI
+covering more cells than `max_aoi_cells` with `422 aoi_too_large` before any
+query runs, and cuts a request that overruns `request_timeout_s` off with
+`503 timeout`.
 
 ---
 
@@ -251,9 +264,9 @@ HTTP 422 { "code": "invalid_aoi", "message": "Polygon ring is not closed.",
 
 ## 7. Frontend & Offline Mechanics
 
-**Stack:** TypeScript + Vite; MapLibre GL JS; d3 calendar; all assets bundled locally.
+**Stack:** React + TypeScript + Vite; three.js globe on a NASA Earth texture; d3 calendar; all assets bundled locally.
 
-**Screens:** Map panel (PMTiles basemap, AOI selection, layer toggles); calendar heatmap (rows = years, columns = 46 bins); anomaly panel; critical-period panel; provenance panel; offline manager.
+**Screens:** Map panel (Earth basemap, AOI selection, layer toggles); calendar heatmap (rows = years, columns = 46 bins); anomaly panel; critical-period panel; provenance panel; offline manager.
 
 **Visual encoding rules (requirements):**
 - Activity and anomaly never share a palette in the same view.
@@ -261,14 +274,21 @@ HTTP 422 { "code": "invalid_aoi", "message": "Polygon ring is not closed.",
 - Modelled bins carry a thin outline; tooltip states "modelled (VIIRS calibrated)" or "modelled (bridge)".
 - Every chart shows units and bin length (8 days).
 
-**Offline mechanism (5 layers):**
-1. Workbox service worker: precache app shell; tiles cache-first; data stale-while-revalidate.
-2. PMTiles basemap: one file per region.
-3. DuckDB-WASM: query GeoParquet in-browser; COG range requests; zarr chunks.
-4. IndexedDB / OPFS: large data; request persistent storage via `navigator.storage.persist()`.
-5. Download-for-offline screen: area/layer picker, size estimate, progress, per-layer last-updated.
+**Offline mechanism (2 layers, both implemented):**
+1. Service worker (`web/public/sw.js`): precaches the app shell and the landing
+   page; hashed assets cache-first; `/mock/` and `/api/` stale-while-revalidate.
+   Caches are versioned, so a new worker drops the old ones.
+2. Resource report (`web/src/lib/sw.ts`): on load the page tells the worker
+   which resources it used — the hashed assets and the nine mock payloads — so
+   they are cached without waiting for a fetch event that may never come.
 
-**Degradation:** if the FastAPI server is unreachable, backend is local (Docker on laptop/Raspberry Pi); if the AI layer is unavailable it is hidden; user actions queue via Background Sync.
+The basemap is a set of NASA Earth images under `web/public/earth/`. There is
+no DuckDB-WASM and no IndexedDB/OPFS layer; the offline screen reports the
+service worker's cache state rather than downloading anything. The backend is
+local in every deployment, so there is no remote service to fall back from.
+
+**Degradation:** if the FastAPI server is unreachable, the app falls back to
+the payloads the service worker holds, and the error is reported per panel.
 
 ---
 
@@ -278,7 +298,8 @@ HTTP 422 { "code": "invalid_aoi", "message": "Polygon ring is not closed.",
 - All randomness seeded (bootstrap seed 20260101).
 - Staged outputs keyed by parameter hash of `config/params.yaml`.
 - Requirement: identical raw inputs + identical parameter hash → byte-identical derived outputs (NFR-01 / AC-1).
-- Build provenance recorded in `data/meta/build_info.json`.
+- Build provenance: `params_hash` on every payload, plus the manifest beside each
+  acquired file.
 
 ---
 
@@ -297,23 +318,23 @@ A synthetic data generator produces `det.parquet` matching §3.1 with configurab
 
 ## 10. Deployment & CI
 
-- Single Docker image containing API, frontend, and data cache; volume mount for large data.
-- Non-root container user.
+- Source checkout, no container image: the API runs from `src.api.main` (uvicorn), the frontend is a static build served from `web/dist/`.
 - Deployment targets: laptop (field), Raspberry Pi (local server), cloud VM (shared).
 - CI on every push: lint + test (`make lint`, `make test`); trunk-based with short-lived branches.
-- Runtime environment variables: `FIRMS_API_KEY` (S0 only), `PORT` (default 8000), `DATA_DIR`, `LOG_LEVEL`, `DUCKDB_MEMORY` (default 2GB).
+- Environment variables: `FIRMS_MAP_KEY` (S0 only), `OFFLINE`, `FIRMS_PRODUCTS`, `FIRMS_BBOX`, `FIRMS_START`/`FIRMS_END` (S0 only), `EARTHDATA_TOKEN` (S0 only), `VITE_DATA`/`VITE_API_BASE` (frontend build). The API reads no other variable: the cache lives in `cache/`, the fixture in `demo_fixtures/`, and the port is a uvicorn command-line argument. See `docs/DEPLOYMENT.md`.
 
 ---
 
 ## 11. Security & Data Governance
 
-- API runs with a read-only data mount; cannot write source data.
-- All inputs validated (AOI geometry, year ranges, cell count ≤ 100,000).
-- Request size limits and 30 s per-request timeout.
-- `FIRMS_API_KEY` read from the environment only; never committed, baked into the image, or logged.
+- The API reads the Parquet cache and never writes to it.
+- All inputs validated (AOI geometry, year ranges, cell count ≤ `api.max_aoi_cells` = 100,000).
+- Request size limits and a 30 s per-request timeout (`api.request_timeout_s`).
+- `FIRMS_MAP_KEY` read from the environment only; never committed or logged.
 - Logs contain request path, duration, and status — not user AOI geometries.
 - No hardcoded credentials; secrets are environment variables only.
-- HTTPS with HSTS for any network communication.
+- CORS allows the loopback dev (`:5174`) and preview (`:4173`) origins only — no wildcard.
+- HTTPS is a deployment concern: terminate TLS in front of the API, which speaks plain HTTP.
 
 ---
 
@@ -324,7 +345,6 @@ A synthetic data generator produces `det.parquet` matching §3.1 with configurab
 | Offline cold-start load | Measured on laptop-class hardware | E9, Lighthouse PWA |
 | API response time (series/anomalies) | Measured, reported | E9 |
 | Service worker cache size | Measured, reported | E9 |
-| Browser query (DuckDB-WASM) | Must not block UI thread interactively | Manual + E9 |
 
 Numeric targets are **TBD — needs decision**; the requirement is that E9 measures and reports each against a stated baseline.
 
@@ -332,8 +352,6 @@ Numeric targets are **TBD — needs decision**; the requirement is that E9 measu
 
 ## 13. Open Technical Questions
 
-- Exact DuckDB-WASM and MapLibre versions to pin.
 - Whether calibration bootstrap bands are computed at request time or precomputed and cached.
-- Chunking strategy for zarr/COG reads in-browser.
 - Minimum device RAM/storage supported by the offline demo.
 - Whether bridge factors are computed for both MODIS satellites independently.

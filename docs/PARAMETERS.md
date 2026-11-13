@@ -13,8 +13,9 @@ this document, and the sensitivity experiment it affects (see §4).
 
 | Parameter | Default | Meaning | Section |
 |-----------|---------|---------|---------|
-| `K` | `20` | Cells per degree; `Δ = 1/K = 0.05°` | §5.4 |
-| `c_min` | `30` | Minimum MODIS confidence (0–100) | §5.2 |
+| `cell_km` | `5.5` | Grid cell size in km | §5.4 |
+| `reference_latitude_deg` | `23.5` | Latitude the east-west step is scaled for | §5.4 |
+| `c_min` | `50` | Minimum MODIS confidence (0–100) | §5.2 |
 | `modis_allowed_types` | `[0]` | Allowed MODIS hot-spot types (null also allowed) | §5.2 |
 | `viirs_classes` | `[n, h]` | Allowed VIIRS confidence classes | §5.2 |
 | `fine_K` | `200` | Fine grid cells per degree for the static mask (~550 m) | §5.3 |
@@ -50,9 +51,10 @@ this document, and the sensitivity experiment it affects (see §4).
 
 ```yaml
 grid:
-  K: 20                 # cells per degree -> 0.05 deg
+  cell_km: 5.5
+  reference_latitude_deg: 23.5
 quality:
-  c_min: 30             # min MODIS confidence
+  c_min: 50             # min MODIS confidence
   modis_allowed_types: [0]
   viirs_classes: [n, h]
 mask:
@@ -96,12 +98,12 @@ The exact key layout is fixed by the pipeline; values shown are the defaults.
 
 ## 3. Hashing & versioning
 
-- `config/params.yaml` is hashed to `data/meta/params.hash`.
+- `config/params.yaml` is hashed by `src/compute/params.py`; the hash of its
+  bytes is part of every `params_hash` the API and the export tool produce.
 - Every derived file and every API response carries the hash.
 - Two runs with the same raw inputs and the same hash MUST produce byte-identical
   outputs (NFR-01).
-- A hash change marks all downstream artifacts stale; regenerate with
-  `run-all`.
+- A hash change marks all downstream artifacts stale; regenerate them.
 
 ---
 
@@ -113,7 +115,7 @@ Changing a default should be justified by the experiment that tests it.
 |-----------|---------|------------|
 | `c_min` | Detections retained; series and anomalies | E3 |
 | `min_days` | Static-mask removal fraction | E4 |
-| `K` | Cell size; cell-day counts | E6 (resolution), cell-size sweep |
+| `cell_km` | Cell size; cell-day counts | E6 (resolution), cell-size sweep |
 | `kappa`, `tile_deg` | Calibration stability in sparse tiles | E2, E5 |
 | `viirs_extra` | VIIRS inclusion | E7 |
 | `bin_days` | Temporal resolution | E6 |
@@ -125,7 +127,10 @@ Changing a default should be justified by the experiment that tests it.
 
 ## 5. Rules
 
-1. **No magic numbers in code.** Read every tunable from `params.yaml`.
+1. **No magic numbers in code.** Every tunable has a named constant in the
+   module that uses it, and `config/params.yaml` records that constant's value.
+   The file is the registry and the reproducibility key; the constant is what
+   the code reads.
 2. **Document before you change.** A parameter change ships with an update to
    this file.
 3. **Keep defaults honest.** Defaults are the published method's values; changing

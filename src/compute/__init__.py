@@ -1,11 +1,10 @@
 """Deterministic science for harmonizing MODIS and VIIRS hotspots.
 
 One callable facade for anomalies: ``anomaly(...)`` scores a date (z-score,
-percentile, flag) while ``anomaly.anomaly_report(...)`` is the percentile-rank
-report the API contract needs.
+percentile, flag). It is the only scorer, and the one the API contract serves.
 """
 
-from .anomaly import anomaly, anomaly_payload, anomaly_report
+from .anomaly import anomaly
 from .availability import (
     Outage,
     availability_table,
@@ -14,7 +13,7 @@ from .availability import (
     load_outages,
     stream_epochs,
 )
-from .baseline import doy, percentile, seasonal_baseline
+from .baseline import doy, percentile
 from .calibrate import (
     KAPPA,
     TILE_DEG,
@@ -35,25 +34,15 @@ from .coverage import (
     days_in_bin,
     source_for,
 )
-from .grid import (
-    MODIS_MASK,
-    STREAM_BITS,
-    VIIRS_MASK,
-    CellDay,
-    collapse_cell_days,
-    grid_snap,
-    merge_cell_days,
-    to_cells,
-    to_series,
-)
 from .harmonize import (
     DEFAULT_CELL_KM,
     DEFAULT_WINDOW_DAYS,
     REFERENCE_LATITUDE_DEG,
-    anomaly_score,
     baseline_percentiles,
     cell_bounds,
     cell_id,
+    cell_totals,
+    collapse_cell_days,
     daily_series,
     degrees_per_lat,
     degrees_per_lon,
@@ -63,13 +52,14 @@ from .harmonize import (
     parse_cell_id,
     raw_series,
     to_grid,
-    years_used,
 )
+from .params import load_params, param, params_file_hash
 from .schema import (
     CANONICAL_COLUMNS,
     MIN_CONFIDENCE,
     MODIS,
     REQUIRED_COLUMNS,
+    STREAM_BITS,
     VIIRS,
     VIIRS_CONFIDENCE_MAP,
     Detection,
@@ -84,7 +74,6 @@ from .series_util import BIN_DAYS, bin_of_doy
 from .validate import (
     Correlation,
     ValidationReport,
-    cell_sweep,
     correlation_stats,
     family_date_range,
     overlap_validation,
@@ -106,7 +95,6 @@ __all__ = [
     "KAPPA",
     "MIN_CONFIDENCE",
     "MODIS",
-    "MODIS_MASK",
     "REFERENCE_LATITUDE_DEG",
     "REQUIRED_COLUMNS",
     "SOURCES",
@@ -114,17 +102,12 @@ __all__ = [
     "TILE_DEG",
     "VIIRS",
     "VIIRS_CONFIDENCE_MAP",
-    "VIIRS_MASK",
-    "CellDay",
     "Correlation",
     "Detection",
     "Outage",
     "ValidationReport",
     "active_cell_days",
     "anomaly",
-    "anomaly_payload",
-    "anomaly_report",
-    "anomaly_score",
     "availability_table",
     "baseline_percentiles",
     "bin_coverage",
@@ -132,7 +115,7 @@ __all__ = [
     "calibrate_viirs",
     "cell_bounds",
     "cell_id",
-    "cell_sweep",
+    "cell_totals",
     "collapse_cell_days",
     "confidence_mapping",
     "confidence_to_numeric",
@@ -152,16 +135,17 @@ __all__ = [
     "family_daily_frames",
     "family_date_range",
     "grid_index",
-    "grid_snap",
     # ``harmonize`` is also reachable as the submodule of the same name
     "harmonize",
     "harmonized_series",
     "infer_family",
     "load_outages",
-    "merge_cell_days",
+    "load_params",
     "normalize",
     "overlap_validation",
     "overlap_window",
+    "param",
+    "params_file_hash",
     "parse_cell_id",
     "pearson",
     "percentile",
@@ -169,14 +153,10 @@ __all__ = [
     "ranks",
     "raw_series",
     "regional_factor",
-    "seasonal_baseline",
     "source_for",
     "spearman",
     "stream_epochs",
     "tile_factors",
-    "to_cells",
     "to_grid",
-    "to_series",
     "validate_overlap",
-    "years_used",
 ]

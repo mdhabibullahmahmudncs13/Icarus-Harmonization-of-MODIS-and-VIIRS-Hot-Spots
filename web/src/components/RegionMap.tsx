@@ -1,5 +1,5 @@
 import type { CellPoint, Mode } from '../contract/types';
-import { rampColor } from '../lib/series';
+import { cellExtent, rampColor } from '../lib/series';
 
 const W = 720;
 const H = 420;
@@ -41,10 +41,13 @@ export function RegionMap({
 }) {
   if (cells.length === 0) return <p className="chart-empty">No cells in this window.</p>;
 
-  const west = Math.min(...cells.map((c) => c.bounds[0]));
-  const south = Math.min(...cells.map((c) => c.bounds[1]));
-  const east = Math.max(...cells.map((c) => c.bounds[2]));
-  const north = Math.max(...cells.map((c) => c.bounds[3]));
+  // One pass over the cells for all four bounds and the maximum, rather than
+  // five separate ones. `Math.max(...cells.map(...))` also blows the call
+  // stack on a large area — the pilot extent is ~380,000 cells, well past
+  // the argument limit a spread can take.
+  const pick = (c: CellPoint) => (mode === 'raw' ? c.raw : c.harmonized);
+  const { bounds, max, active } = cellExtent(cells, mode);
+  const [west, south, east, north] = bounds;
 
   const padX = (east - west) * 0.03 || 0.05;
   const padY = (north - south) * 0.05 || 0.05;
@@ -63,10 +66,6 @@ export function RegionMap({
 
   const xTicks = ticks(lon0, lon1, niceStep(lon1 - lon0));
   const yTicks = ticks(lat0, lat1, niceStep(lat1 - lat0));
-
-  const pick = (c: CellPoint) => (mode === 'raw' ? c.raw : c.harmonized);
-  const max = Math.max(...cells.map(pick), 1);
-  const active = cells.filter((c) => pick(c) > 0).length;
 
   return (
     <>

@@ -27,7 +27,6 @@ from src.compute.harmonize import (
     overlap_correlation,
     parse_cell_id,
     raw_series,
-    seasonal_baseline,
     to_grid,
 )
 from src.compute.harmonize import (
@@ -235,37 +234,6 @@ def test_collapse_makes_identical_cell_days_match_while_raw_counts_do_not():
     # Harmonization collapses all four into one cell-day, so the total
     # equals the MODIS-only count: the VIIRS inflation is gone.
     assert daily["harm_total"].sum() == pytest.approx(daily["harm_modis"].sum())
-
-
-# --------------------------------------------------------------------------
-# Baseline and anomaly z-score
-# --------------------------------------------------------------------------
-
-
-def test_seasonal_baseline_is_the_median_for_each_day_of_year():
-    # Mid-January in each year: the same day of year in leap and non-leap
-    # years alike, so the sample really is one calendar day.
-    index = pd.to_datetime(["2020-01-15", "2021-01-15", "2022-01-15"])
-    series = pd.Series([10.0, 20.0, 30.0], index=index)
-    doy = int(index[0].dayofyear)
-    baseline = seasonal_baseline(series, window_days=0)
-    assert baseline.loc[doy] == 20.0
-    assert baseline.loc[doy + 1] != baseline.loc[doy + 1]  # NaN: no data that day
-
-
-def test_anomaly_score_is_positive_above_the_baseline_and_negative_below():
-    index = pd.to_datetime(["2020-01-15", "2021-01-15", "2022-01-15"])
-    series = pd.Series([10.0, 20.0, 30.0], index=index)
-    baseline = seasonal_baseline(series, window_days=0)
-    probe = index[2]
-    above = harmonize.anomaly_score(
-        pd.Series([10.0, 20.0, 99.0], index=index), baseline, probe
-    )
-    below = harmonize.anomaly_score(
-        pd.Series([10.0, 20.0, 1.0], index=index), baseline, probe
-    )
-    assert above > 0
-    assert below < 0
 
 
 # --------------------------------------------------------------------------

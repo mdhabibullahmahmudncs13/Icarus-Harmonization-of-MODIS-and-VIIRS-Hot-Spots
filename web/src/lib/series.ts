@@ -33,10 +33,20 @@ export function binStartISO(year: number, bin: number, binDays = 8): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Last day of a bin, as an ISO date.
+ *
+ * The 46th bin starts on day 361, so it runs past the end of the year in a
+ * 365-day one. The end is clamped to 31 December, otherwise the bin claims
+ * days that belong to the next year and a January date looks like it falls
+ * in the previous year's last bin.
+ */
 export function binEndISO(year: number, bin: number, binDays = 8): string {
   const offset = bin * binDays - 1;
   const d = new Date(Date.UTC(year, 0, 1 + offset));
-  return d.toISOString().slice(0, 10);
+  const lastDay = Date.UTC(year, 11, 31);
+  const clamped = Math.min(d.getTime(), lastDay);
+  return new Date(clamped).toISOString().slice(0, 10);
 }
 
 /** The value a row contributes for the active mode. */
@@ -84,20 +94,65 @@ export function extent(values: number[]): [number, number] {
   return [min, max];
 }
 
-/** Mean of a series before and after a transition date. */
-export function stepRatios(
-  rows: SeriesPoint[],
-  transition: string,
-): { raw: number; harmonized: number } {
-  const pre = rows.filter((r) => r.date < transition);
-  const post = rows.filter((r) => r.date >= transition);
-  const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
-  const eps = 1e-9;
-  return {
-    raw: mean(post.map((r) => r.raw_total)) / Math.max(mean(pre.map((r) => r.raw_total)), eps),
-    harmonized:
-      mean(post.map((r) => r.harm_total)) / Math.max(mean(pre.map((r) => r.harm_total)), eps),
-  };
+/**
+ * The largest value in a list, never below a floor.
+ *
+ * A loop rather than `Math.max(...values)`: a spread passes every element as
+ * an argument, and the engine's argument limit is lower than the number of
+ * cells a large region can produce.
+ */
+export function maxValue(values: number[], floor = 1): number {
+  let max = floor;
+  for (const v of values) {
+    if (v > max) max = v;
+  }
+  return max;
+}
+
+/**
+ * The bounding box of a set of grid cells, and their largest value.
+ *
+ * One pass for all five numbers, for the same reason as :func:`maxValue`:
+ * the pilot extent is ~380,000 cells, well past what a spread can carry.
+ */
+export function cellExtent(
+  cells: { bounds: [number, number, number, number]; raw: number; harmonized: number }[],
+  mode: Mode,
+): { bounds: [number, number, number, number]; max: number; active: number } {
+  let west = Infinity;
+  let south = Infinity;
+  let east = -Infinity;
+  let north = -Infinity;
+  let max = 1;
+  let active = 0;
+  for (const c of cells) {
+    west = Math.min(west, c.bounds[0]);
+    south = Math.min(south, c.bounds[1]);
+    east = Math.max(east, c.bounds[2]);
+    north = Math.max(north, c.bounds[3]);
+    const value = mode === 'raw' ? c.raw : c.harmonized;
+    if (value > max) max = value;
+    if (value > 0) active += 1;
+  }
+  return { bounds: [west, south, east, north], max, active };
+}
+
+/**
+ * The bin a date falls in, or undefined if it falls in none.
+ *
+ * A bin owns every date from its start to its end, so the date that starts a
+ * bin and the date in the middle of it select the same bin. When two bins
+ * could match, the later one wins: a bin that starts on the date belongs to
+ * that bin, not to the previous year's tail.
+ */
+export function findBin(bins: Bin[], date: string): Bin | undefined {
+  let found: Bin | undefined;
+  for (const b of bins) {
+    if (b.start <= date && date <= b.end) {
+      if (!found || b.start >= found.start) found = b;
+    }
+  }
+  return found;
 }
 
 const RAMP_DARK: [number, number, number][] = [

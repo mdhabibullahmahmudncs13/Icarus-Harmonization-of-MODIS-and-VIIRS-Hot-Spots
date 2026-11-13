@@ -5,9 +5,11 @@
 # Defaults and their meaning are documented in docs/PARAMETERS.md; the algorithm
 # each one feeds is in docs/TRD.md §5.
 grid:
-  K: 20            # cells per degree -> Δ = 1/K = 0.05°
+  cell_km: 5.5     # grid cell size in km; the longitude step is widened by
+                   # cos(reference_latitude) so cells stay near this size
+  reference_latitude_deg: 23.5   # representative latitude for that widening
 quality:
-  c_min: 30        # minimum MODIS confidence (0-100)
+  c_min: 50        # minimum MODIS confidence (0-100)
   modis_allowed_types: [0]   # MODIS hot-spot types kept (null also allowed)
   viirs_classes: [n, h]      # allowed VIIRS confidence classes
 mask:

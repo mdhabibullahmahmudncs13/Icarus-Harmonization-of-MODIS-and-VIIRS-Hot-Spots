@@ -1,10 +1,10 @@
 """Write the exact JSON the API contract defines, from harmonized detections.
 
-This is the bridge between ``src/compute`` and the frontend: it lets real
-cached data be served as static files before ``src/api`` exists, and it is
-what ``src/api`` will call later. Every payload here validates against the
-zod schemas in ``web/src/contract/schemas.ts`` (exported to
-``docs/contract.schema.json``).
+This is the bridge between ``src/compute`` and the frontend: it builds the
+payloads the API serves, and ``tools/export_payloads.py`` writes them to disk
+when static files are wanted instead of a server. Every payload here
+validates against the zod schemas in ``web/src/contract/schemas.ts`` (exported
+to ``docs/contract.schema.json``).
 
 Deterministic given its inputs (pass ``generated_at`` for byte-stable
 output). No LLM, no network.
@@ -12,13 +12,9 @@ output). No LLM, no network.
 
 from __future__ import annotations
 
-import argparse
-import glob as globlib
 import hashlib
 import json
-import os
-import sys
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -27,11 +23,10 @@ import numpy as np
 import pandas as pd
 
 from src.acquire import firms
-from src.compute import anomaly, calibrate, coverage, harmonize, schema, season, validate
+from src.compute import anomaly, calibrate, coverage, harmonize, params, schema, season, validate
 from src.compute.availability import availability_table
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_OUT_DIR = REPO_ROOT / "web" / "public" / "data"
 
 BANGLADESH_BBOX: tuple[float, float, float, float] = firms.BANGLADESH_BBOX
 
@@ -136,6 +131,11 @@ def params_hash(
     response discarded when a parameter changes. It covers parameters only —
     never the data tier, never a timestamp — so the same parameters hash the
     same whether they were served from the cache or from the fixture.
+
+    The hash covers ``config/params.yaml`` as well as the arguments, so the
+    file the docs call the single source of truth actually takes part: change
+    a value in it and the id changes, which is what marks derived artifacts
+    stale (docs/PARAMETERS.md §3).
     """
     payload = json.dumps(
         {
@@ -145,6 +145,7 @@ def params_hash(
             "date_range": [str(date_range[0]), str(date_range[1])],
             "confidence_mapping": dict(schema.confidence_mapping()),
             "collapse": "cell_days",
+            "params_file": params.params_file_hash(),
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -240,11 +241,56 @@ def detections_date_range(detections: pd.DataFrame) -> tuple[str, str]:
     )
 
 
-def build_meta_response(detections: pd.DataFrame, **kwargs: Any) -> dict[str, Any]:
-    """``GET /api/v1/meta`` payload."""
-    kwargs.setdefault("date_range", detections_date_range(detections))
+def _default_date_range(kwargs: dict[str, Any], detections: pd.DataFrame) -> None:
+    """Fill ``date_range`` from the detections, unless it is already known.
+
+    A caller that filtered the detections down to an area with no fire passes
+    its own ``date_range`` — the area is a run of zeros over those dates, not
+    an undatable empty frame. This must not derive a range of its own in that
+    case, so it is a function rather than a ``setdefault`` argument: Python
+    evaluates a ``setdefault`` default eagerly, and deriving a range from an
+    empty frame raises.
+    """
+    if "date_range" not in kwargs:
+        kwargs["date_range"] = detections_date_range(detections)
+
+
+def _series_date_range(kwargs: dict[str, Any], series: pd.Series) -> None:
+    """Fill ``date_range`` from a dated series, unless it is already known.
+
+    The three payload builders that take a series rather than detections
+    (baseline, anomaly, critical period) describe the period that series
+    covers, so the range comes from the series itself. An empty series has no
+    range to derive, and ``meta`` requires one, so it falls back to the
+    epoch — a placeholder that says "no data" rather than a day that looks
+    like a real one.
+    """
+    if "date_range" in kwargs:
+        return
+    if series.empty:
+        kwargs["date_range"] = ("1970-01-01", "1970-01-01")
+        return
+    kwargs["date_range"] = (
+        series.index.min().strftime("%Y-%m-%d"),
+        series.index.max().strftime("%Y-%m-%d"),
+    )
+
+
+def build_meta_response(
+    detections: pd.DataFrame,
+    *,
+    bbox: tuple[float, float, float, float] = BANGLADESH_BBOX,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """``GET /api/v1/meta`` payload.
+
+    ``bbox`` is the region the payload describes; it must be the region the
+    detections were filtered to, or ``meta.region.bbox`` names one area while
+    ``streams``/``years`` describe another.
+    """
+    _default_date_range(kwargs, detections)
     return {
-        "meta": build_meta(**kwargs),
+        "meta": build_meta(bbox=bbox, **kwargs),
         "sensors": sensor_table(),
         "years": _years_from_range(kwargs["date_range"]),
         "streams": streams_present(detections),
@@ -275,6 +321,8 @@ def build_series(
     detections: pd.DataFrame,
     *,
     metric: str = "cell_days",
+    bbox: tuple[float, float, float, float] = BANGLADESH_BBOX,
+    cell_km: float = harmonize.DEFAULT_CELL_KM,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """``GET /api/v1/series`` payload: daily counts, one row per calendar day.
@@ -284,11 +332,15 @@ def build_series(
     * ``cell_days`` (default) — the integer counts themselves: detections
       (``raw_*``) and active cells (``harm_*``) per day.
     * ``density`` — each count divided by the number of grid cells covering
-      the region (``harmonize.grid_cell_count`` over ``meta.region.bbox``),
-      so ``harm_*`` is the fraction of the area's cells that were active that
-      day (0..1, the density ``docs/DATA_DICTIONARY.md`` §4 documents) and
-      ``raw_*`` is detections per cell. Scaling is uniform, so every raw vs
-      harmonized ratio is unchanged.
+      the region (``harmonize.grid_cell_count`` over ``bbox``), so ``harm_*``
+      is the fraction of the area's cells that were active that day (0..1, the
+      density ``docs/DATA_DICTIONARY.md`` §4 documents) and ``raw_*`` is
+      detections per cell. Scaling is uniform, so every raw vs harmonized
+      ratio is unchanged.
+
+    ``bbox`` is the area the counts cover: the caller must pass the same
+    region it filtered ``detections`` to, or the density divisor describes a
+    different area than the numbers.
 
     ``bin_days`` is 1 because the series is not binned; an 8-day view would be
     a different payload, not a different flag. ``metric`` and ``view`` are
@@ -303,7 +355,7 @@ def build_series(
     """
     if metric not in SERIES_METRICS:
         raise ValueError(f"unknown metric {metric!r}; expected one of {SERIES_METRICS}")
-    kwargs.setdefault("date_range", detections_date_range(detections))
+    _default_date_range(kwargs, detections)
     start = date.fromisoformat(kwargs["date_range"][0])
     end = date.fromisoformat(kwargs["date_range"][1])
     availability = availability_table(start, end)
@@ -326,15 +378,12 @@ def build_series(
         row["coverage"] = coverage_value
         row["source"] = source
     if metric == "density":
-        n_cells = harmonize.grid_cell_count(
-            kwargs.get("bbox", BANGLADESH_BBOX),
-            cell_km=kwargs.get("cell_km", harmonize.DEFAULT_CELL_KM),
-        )
+        n_cells = harmonize.grid_cell_count(bbox, cell_km=cell_km)
         for row in rows:
             for column in COUNT_COLUMNS:
                 row[column] = round(float(row[column]) / n_cells, 12)
     return {
-        "meta": build_meta(**kwargs),
+        "meta": build_meta(bbox=bbox, cell_km=cell_km, **kwargs),
         "metric": metric,
         "bin_days": 1,
         "series": rows,
@@ -346,12 +395,13 @@ def build_cells(
     *,
     start: date | None = None,
     end: date | None = None,
+    bbox: tuple[float, float, float, float] = BANGLADESH_BBOX,
     cell_km: float = harmonize.DEFAULT_CELL_KM,
     reference_latitude_deg: float = harmonize.REFERENCE_LATITUDE_DEG,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """``GET /api/cells`` payload over a window."""
-    kwargs.setdefault("date_range", detections_date_range(detections))
+    _default_date_range(kwargs, detections)
     frame = detections
     if start is not None:
         frame = frame[frame["acq_date"] >= pd.Timestamp(start)]
@@ -360,34 +410,19 @@ def build_cells(
 
     rows: list[dict[str, Any]] = []
     if not frame.empty:
-        grouped = frame.assign(date=frame["acq_date"].dt.normalize()).groupby("cell_id")
-        peak = (
-            grouped["frp"].max()
-            if "frp" in frame.columns
-            else pd.Series(0.0, index=grouped.size().index)
-        )
-        counts = pd.DataFrame(
-            {
-                "raw": grouped.size(),
-                "harmonized": grouped["date"].nunique(),
-                "peak_frp": peak,
-            }
-        ).sort_index()
-        for cell, row in counts.iterrows():
-            rows.append(
-                {
-                    "cell_id": str(cell),
-                    "bounds": [float(v) for v in harmonize.cell_bounds(cell, cell_km, reference_latitude_deg)],
-                    "raw": int(row["raw"]),
-                    "harmonized": int(row["harmonized"]),
-                    "peak_frp": _number_or_null(row["peak_frp"]),
-                }
-            )
+        rows = [
+            dict(row)  # type: ignore[arg-type]
+            for row in harmonize.cell_totals(frame, cell_km, reference_latitude_deg)
+        ]
     window = {
         "start": start.isoformat() if start is not None else kwargs["date_range"][0],
         "end": end.isoformat() if end is not None else kwargs["date_range"][1],
     }
-    return {"meta": build_meta(cell_km=cell_km, **kwargs), "window": window, "cells": rows}
+    return {
+        "meta": build_meta(bbox=bbox, cell_km=cell_km, **kwargs),
+        "window": window,
+        "cells": rows,
+    }
 
 
 def build_baseline(
@@ -397,15 +432,7 @@ def build_baseline(
     **kwargs: Any,
 ) -> dict[str, Any]:
     """``GET /api/baseline`` payload."""
-    if not series.empty:
-        kwargs.setdefault(
-            "date_range",
-            (
-                series.index.min().strftime("%Y-%m-%d"),
-                series.index.max().strftime("%Y-%m-%d"),
-            ),
-        )
-    kwargs.setdefault("date_range", ("1970-01-01", "1970-01-01"))
+    _series_date_range(kwargs, series)
     percentiles = harmonize.baseline_percentiles(series, window_days).dropna(how="any")
     rows = [
         {"doy": int(doy), **{k: float(v) for k, v in row.items()}}
@@ -433,15 +460,7 @@ def build_anomaly(
     needs ``flag``/``reason`` so a not-scored day can say why it was not
     scored, and the schema allows ``value``/``percentile`` to be null.
     """
-    if not series.empty:
-        kwargs.setdefault(
-            "date_range",
-            (
-                series.index.min().strftime("%Y-%m-%d"),
-                series.index.max().strftime("%Y-%m-%d"),
-            ),
-        )
-    kwargs.setdefault("date_range", ("1970-01-01", "1970-01-01"))
+    _series_date_range(kwargs, series)
     score = anomaly(series, date_, window_days=window_days)
     low, high = score["doy_range"]
     return {
@@ -498,15 +517,7 @@ def build_critical_period(
     null window (its ``start_bin`` is bounded to 1-46, so there is no zero
     window to invent) and the frontend already renders that state.
     """
-    if not series.empty:
-        kwargs.setdefault(
-            "date_range",
-            (
-                series.index.min().strftime("%Y-%m-%d"),
-                series.index.max().strftime("%Y-%m-%d"),
-            ),
-        )
-    kwargs.setdefault("date_range", ("1970-01-01", "1970-01-01"))
+    _series_date_range(kwargs, series)
     rows = [
         {"date": pd.Timestamp(stamp).strftime("%Y-%m-%d"), "harm_total": float(value)}
         for stamp, value in series.items()
@@ -533,10 +544,14 @@ def build_critical_period(
     }
 
 
-def build_aoi(**kwargs: Any) -> dict[str, Any]:
+def build_aoi(
+    *,
+    bbox: tuple[float, float, float, float] = BANGLADESH_BBOX,
+    **kwargs: Any,
+) -> dict[str, Any]:
     """``GET /api/v1/aoi`` payload: the preset list."""
     kwargs.setdefault("date_range", ("2003-01-01", "2026-09-30"))
-    return {"meta": build_meta(**kwargs), "presets": load_presets()}
+    return {"meta": build_meta(bbox=bbox, **kwargs), "presets": load_presets()}
 
 
 def build_validation(
@@ -546,7 +561,7 @@ def build_validation(
     **kwargs: Any,
 ) -> dict[str, Any]:
     """``GET /api/validation`` payload."""
-    kwargs.setdefault("date_range", detections_date_range(detections))
+    _default_date_range(kwargs, detections)
     kwargs.setdefault("cell_km", cell_km)
     report = validate.validate_overlap(detections, cell_km=cell_km)
     return {"meta": build_meta(**kwargs), **report.as_dict()}
@@ -554,6 +569,7 @@ def build_validation(
 
 def build_methods(
     *,
+    bbox: tuple[float, float, float, float] = BANGLADESH_BBOX,
     cell_km: float = harmonize.DEFAULT_CELL_KM,
     min_confidence: float = schema.MIN_CONFIDENCE,
     date_range: tuple[str, str] = ("2003-01-01", "2026-09-30"),
@@ -564,7 +580,7 @@ def build_methods(
     kwargs.setdefault("min_confidence", min_confidence)
     kwargs.setdefault("date_range", date_range)
     return {
-        "meta": build_meta(**kwargs),
+        "meta": build_meta(bbox=bbox, **kwargs),
         "cell_km": float(cell_km),
         "min_confidence": int(min_confidence),
         # The panel reports the VIIRS classes by their documented names, not by
@@ -606,90 +622,9 @@ def build_methods(
     }
 
 
-def write_json(payload: Mapping[str, Any], path: Path) -> Path:
-    """Write ``payload`` as pretty JSON, creating parent directories."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, allow_nan=False) + "\n")
-    return path
-
-
-def write_all(
-    detections: pd.DataFrame,
-    out_dir: Path = DEFAULT_OUT_DIR,
-    *,
-    series: pd.Series | None = None,
-    anomaly_date: str | None = None,
-    source: str = "cache",
-    generated_at: datetime | None = None,
-) -> list[Path]:
-    """Write every contract payload to ``out_dir`` and return the paths.
-
-    ``detections`` must already be harmonized (filtered and gridded). The
-    series defaults to the harmonized *total* series, which is what the
-    baseline and the anomaly are computed against.
-    """
-    if series is None:
-        series = harmonize.harmonized_series(detections)
-    packets: dict[str, Mapping[str, Any]] = {
-        "meta.json": build_meta_response(detections, source=source, generated_at=generated_at),
-        "series.json": build_series(detections, source=source, generated_at=generated_at),
-        "cells.json": build_cells(detections, source=source, generated_at=generated_at),
-        "baseline.json": build_baseline(series, source=source, generated_at=generated_at),
-        "critical-period.json": build_critical_period(
-            series, source=source, generated_at=generated_at
-        ),
-        "validation.json": build_validation(detections, source=source, generated_at=generated_at),
-        "methods.json": build_methods(source=source, generated_at=generated_at),
-        "aoi.json": build_aoi(source=source, generated_at=generated_at),
-    }
-    if anomaly_date is not None:
-        packets["anomaly.json"] = build_anomaly(
-            series, date_=anomaly_date, source=source, generated_at=generated_at
-        )
-    return [write_json(payload, out_dir / name) for name, payload in packets.items()]
-
-
-def load_detections(pattern: str = "cache/raw/*.parquet") -> pd.DataFrame:
-    """Read the raw parquet written by ``src/acquire/firms.py``.
-
-    Returns the concatenated frames; the caller harmonizes them.
-    """
-    absolute = pattern if os.path.isabs(pattern) else str(REPO_ROOT / pattern)
-    paths = sorted(Path(path) for path in globlib.glob(absolute))
-    if not paths:
-        raise FileNotFoundError(f"no parquet matched {pattern!r}; run `make cache` first")
-    return pd.concat([pd.read_parquet(path) for path in paths], ignore_index=True)
-
-
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        prog="python -m src.compute.export",
-        description="Write the API contract JSON from cached FIRMS parquet.",
-    )
-    parser.add_argument("--glob", default="cache/raw/*.parquet")
-    parser.add_argument("--out", type=Path, default=DEFAULT_OUT_DIR)
-    parser.add_argument("--anomaly-date", default=None)
-    args = parser.parse_args(argv)
-
-    try:
-        raw = load_detections(args.glob)
-    except FileNotFoundError as exc:
-        print(str(exc), file=sys.stderr)
-        return 2
-    detections = harmonize.harmonize(raw)
-    if detections.empty:
-        print("no detections survived harmonization", file=sys.stderr)
-        return 1
-    written = write_all(detections, args.out, anomaly_date=args.anomaly_date)
-    for path in written:
-        print(f"wrote {path}")
-    return 0
-
-
 __all__: Iterable[str] = (
     "AOI_PRESETS_PATH",
     "BANGLADESH_BBOX",
-    "DEFAULT_OUT_DIR",
     "PRODUCT_STREAMS",
     "SENSOR_LABELS",
     "build_anomaly",
@@ -703,18 +638,10 @@ __all__: Iterable[str] = (
     "build_series",
     "build_validation",
     "detections_date_range",
-    "load_detections",
     "load_presets",
-    "main",
     "params_hash",
     "sensor_table",
     "streams_present",
-    "write_all",
-    "write_json",
     "year_timing_deviation",
     "years_in",
 )
-
-
-if __name__ == "__main__":  # pragma: no cover - thin CLI shim
-    raise SystemExit(main())

@@ -31,7 +31,7 @@ rests on it.
 | Milestone | Gate | Evidence |
 |-----------|------|----------|
 | M0 — Contract frozen | Mock JSON validates; OpenAPI draft matches the API | Contract tests pass |
-| M1 — Data on disk | Raw parquet for all pilot streams; manifest verified | `verify-manifest` clean |
+| M1 — Data on disk | Raw parquet for all pilot streams; manifest verified | Each source's `*.manifest.json` written |
 | M2 — Pipeline complete | S0–S9 run end-to-end on one year pair | Golden-file tests pass |
 | M3 — Harmonization proven | Artificial step shrinks (E1); offset reduced (E2) | E1/E2 figures |
 | M4 — API + frontend | Series, anomalies, critical period render | E2E + contract tests pass |
@@ -61,7 +61,7 @@ pilot sub-region.
 ### WP2 — Core pipeline (weeks 2–4)
 
 S2 quality filter, S3 static mask, S4 grid snap, S5 cell-day collapse. Pure
-functions in `src/core/`; orchestration in `src/pipeline/`.
+functions in `src/compute/`.
 
 **Exit:** `cell_day/` parquet for the pilot extent; unit + property tests.
 
@@ -81,8 +81,9 @@ and critical-period endpoints under `/api/v1`.
 
 ### WP5 — Frontend + offline (weeks 7–8)
 
-MapLibre map with PMTiles, d3 calendar, anomaly and critical-period panels,
-provenance panel, offline manager, service worker (Workbox).
+three.js globe on a NASA Earth basemap, d3 calendar, anomaly and
+critical-period panels, provenance panel, service worker and its cache-state
+screen.
 
 **Exit:** full MVP runs offline from a cold start.
 
@@ -124,6 +125,6 @@ Keep the harmonization result and the offline demo intact to the end.
 
 - Preset AOIs included at launch and their geometry ownership.
 - Minimum device profile for the field demo.
-- Whether the AI narration layer ships in the launch demo.
+- Whether an AI narration layer is worth adding in a later release.
 - Export formats (CSV / GeoJSON) and licensing.
 - Numeric performance budgets and pinned dependency versions.

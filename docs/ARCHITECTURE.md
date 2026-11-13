@@ -14,29 +14,25 @@ Icarus is a four-layer system. All NASA data is acquired **before** the event
 (S0, network required). From then on the system is offline: the pipeline
 transforms cached raw data into harmonized Parquet, a single read-only FastAPI
 service answers DuckDB queries, and a static web app renders and caches results.
-An optional AI layer reads API JSON and narrates; it never computes.
 
 ```
 [NASA Sources]  FIRMS Archive / UMD SFTP / MCD64CMQ / LAADS DAAC
         │  (S0: pre-event, network required)
         ▼
-[Pre-fetch Layer]  data/raw/**  +  manifest.csv (sha256, rows, dates)
+[Pre-fetch Layer]  cache/raw/**  +  <source>.manifest.json (sha256, rows, dates)
         │  (S1–S9: offline batch, Python + DuckDB)
         ▼
-[Data Cache]  data/derived/*.parquet, data/calib/*.parquet, data/tiles/*.pmtiles
+[Data Cache]  cache/raw/*.parquet, demo_fixtures/detections.parquet
         │
         ▼
 [FastAPI Service]  read-only; DuckDB queries; /api/v1/*
         │  HTTP (localhost or LAN)
         ▼
-[Static Web App]  MapLibre + d3 calendar + service worker + OPFS cache
-        │
-        ▼
-[Optional AI Layer]  reads API JSON, narrates; hidden if unavailable
+[Static Web App]  three.js globe + d3 calendar + service worker + cache
 ```
 
 Rule: a layer may depend only on the layers above it, which keeps the offline
-path intact when any optional layer is absent.
+path intact when any layer is absent.
 
 ---
 
@@ -45,14 +41,12 @@ path intact when any optional layer is absent.
 | Layer | Responsibility | Network | Runtime |
 |-------|----------------|---------|---------|
 | Pre-fetch | Download and register raw files with checksums | Required (S0) | Pre-event batch |
-| Data Cache | Store derived Parquet, calibration, tiles | None | Build-time artifact |
+| Data Cache | Store the acquired Parquet and the offline fixture | None | Build-time artifact |
 | FastAPI Service | Serve read-only analytics over DuckDB | Local/LAN | Long-running process |
 | Static Web App | Map, calendar, panels, offline cache | Local/LAN, then offline | User session |
-| Optional AI Layer | Retrieve and explain API output | Local/LAN | Optional process |
 
 Layers are strictly ordered by runtime: the pipeline and cache exist before the
-event, the API and web app run during the session, and the AI layer is an
-optional observer on top.
+event, and the API and web app run during the session.
 
 ---
 
@@ -66,13 +60,12 @@ src/
     safe.py         SAFE / UMD SFTP helpers
   compute/       # pure, deterministic, no I/O, no web framework
     schema.py       normalize detections; confidence mapping; stream bits
-    grid.py         cell snapping and cell-day collapse
-    harmonize.py    harmonization facade (grid, series, calibration)
+    harmonize.py    harmonization facade (grid, cell-days, series, calibration)
     series_util.py  8-day bin rule
     availability.py stream epochs and outage calendar
     coverage.py     per-bin coverage and source tagging
     calibrate.py    multiplicative calibration + bootstrap
-    baseline.py     day-of-year percentiles
+    baseline.py     day-of-year helpers and percentiles
     anomaly.py      z-score and percentile-rank scoring
     season.py       critical-period onset/peak/end/window
     validate.py     raw vs harmonized overlap validation
@@ -84,11 +77,12 @@ src/
     experiments.py  experiment definitions and runners
     report.py       report assembly
   demo.py        # deterministic synthetic detections for the offline fixture
-tools/           # gen_mock.py, gen_golden.py, experiments.py
+tools/           # gen_mock.py, gen_golden.py, experiments.py, export_payloads.py
 tests/           # unit, property, golden, contract
 web/             # the frontend: app at `/`, landing at `/landing.html`, one Vite build
 config/params.yaml   # every tunable value
-data/            # git-ignored: raw/ + derived/ + reference/
+cache/            # git-ignored: the acquired data (raw/) and its manifests
+demo_fixtures/    # the committed offline demo detections (tracked on purpose)
 ```
 
 `compute/` is pure: values in, values out. All I/O and framework use live in
@@ -103,8 +97,7 @@ data/            # git-ignored: raw/ + derived/ + reference/
 | Ingest (`src/acquire`) | S0: download, checksum and register raw files; write the manifest | Run at app runtime |
 | Compute (`src/compute`) | Pure functions: schema, grid, coverage, calibration, baseline, anomaly, season | Perform I/O or depend on web frameworks |
 | API (`src/api`) | FastAPI app; read-only; JSON; parameter-hash header | Mutate data or compute statistics |
-| Frontend (`web/`) | MapLibre map; d3 calendar; polygon drawer; offline service worker | Call NASA APIs directly |
-| AI Agent (optional) | MCP server exposing series, anomalies, critical-period tools; narrate from JSON | Compute statistics; fail loudly |
+| Frontend (`web/`) | three.js globe map; d3 calendar; polygon drawer; offline service worker | Call NASA APIs directly |
 
 ---
 
@@ -136,26 +129,23 @@ Each stage's inputs, outputs, parameters, and algorithm are specified in
 
 | Producer | Consumer | Contract |
 |----------|----------|----------|
-| Ingest | Data Cache | Parquet files keyed by year/stream; `meta/params.hash` |
+| Ingest | Data Cache | Parquet files under `cache/raw/`; a per-source manifest with sha256 |
 | Data Cache | API | Read-only DuckDB access over Parquet |
 | API | Frontend | JSON over `/api/v1/*`; `params_hash` in body and header |
-| API | AI Agent (MCP) | JSON tools: series, anomalies, critical-period |
-| Frontend | Service Worker | Cache API + OPFS; versioned caches |
+| Frontend | Service Worker | Cache API; versioned caches |
 | Ingest | Manifest | Every raw file registered with sha256 |
 
-The JSON boundary is the only cross-component contract; the AI layer consumes
-exactly what the frontend consumes. Request and response bodies are defined in
-`docs/TRD.md` §6.
+The JSON boundary is the only cross-component contract. Request and response
+bodies are defined in `docs/TRD.md` §6.
 
 **Request lifecycle (series query):** the frontend posts an AOI to
 `/api/v1/series`. The API validates the geometry, resolves preset cells or
-polygon coverage, runs a read-only DuckDB query over `cell_bin_h`, attaches
-`params_hash` and bootstrap bands, and returns JSON. The service worker serves
-the response stale-while-revalidate and caches it. The AI layer, if enabled,
-reads the same JSON to narrate — it never issues its own query. Analysis
-endpoints also accept `POST` because AOI geometries can be large; the optional
-body carries `aoi`, `date`, and `bbox`, which take precedence over the query
-parameters.
+polygon coverage, runs a read-only DuckDB query over the harmonized
+detections, attaches `params_hash` and bootstrap bands, and returns JSON. The
+service worker serves the response stale-while-revalidate and caches it.
+Analysis endpoints also accept `POST` because AOI geometries can be large; the
+optional body carries `aoi`, `date`, and `bbox`, which take precedence over the
+query parameters.
 
 ---
 
@@ -202,60 +192,59 @@ button works:
 ## 8. Storage layout and lifecycle
 
 ```
-data/
-  raw/                    # S0 output, never modified
-    modis/MCD14ML.YYYYMM.*.txt.gz
-    viirs_snpp/*.csv
-    mcd64cmq/*.hdf
-  manifest.csv            # file, bytes, sha256, rows, retrieved, url
-  reference/
-    outages.csv           # stream, start, end, reason
-    streams.csv           # stream, bit, first_date, last_date
-    regions.parquet       # preset AOIs (GeoParquet)
-  derived/
-    det/stream=*/year=*/part-*.parquet       # S1
-    cell_day/year=*/part-*.parquet           # S5
-    cell_bin/year=*/part-*.parquet           # S6
-    avail.parquet, bin_coverage.parquet      # S7
-    calib_factor.parquet, calib_boot.parquet # S8
-    cell_bin_h/year=*/part-*.parquet         # S9
-  tiles/
-    basemap_<region>.pmtiles
-  meta/
-    params.yaml, params.hash, build_info.json
+cache/                     # git-ignored: the acquired data and its manifests
+  raw/                     # S0 output, never modified
+    MODIS_SP.parquet
+    VIIRS_SNPP_SP.parquet
+    VIIRS_NOAA20_SP.parquet
+    VIIRS_NOAA21_NRT.parquet
+    <source>.manifest.json # per-source manifest (files, rows, sha256)
+  burned_area/             # E8 external validation
+    raw/, derived.parquet
+demo_fixtures/
+  detections.parquet       # the committed offline demo detections
+config/
+  params.yaml              # every tunable value
 ```
 
-Lifecycle: `raw/` is append-only and checksummed; `derived/` is fully
-rebuildable from `raw/` + `config/params.yaml`; any change to the parameter hash
-invalidates downstream artifacts.
+The API reads `cache/raw/*.parquet` (or `demo_fixtures/detections.parquet`)
+and harmonizes in memory; there is no separate `derived/` tree on disk, and
+no `meta/` directory — `params_hash` is derived from the bytes of
+`config/params.yaml` at request time (`src/compute/params.py`).
+
+Lifecycle: `cache/raw/` is append-only and checksummed; the served series is
+fully rebuildable from it plus `config/params.yaml`; any change to the
+parameter hash invalidates downstream artifacts.
 
 ---
 
 ## 9. Deployment topology
 
-- **Single Docker image** containing API, frontend, and data cache. Optional volume mount for large data.
+- **A source checkout**, run directly: the API from `src.api.main`, the frontend from `web/dist/` or the Vite dev server.
 - **Targets:** laptop (field use), Raspberry Pi (local server), cloud VM (shared access).
-- **Field mode:** the "server" is local on the laptop; no internet needed once data is cached.
-- **Build:** created from a clean checkout; non-root container user.
-- **Config:** `FIRMS_API_KEY` (S0 only), `PORT`, `DATA_DIR`, `LOG_LEVEL`, `DUCKDB_MEMORY`.
+- **Field mode:** the "server" is local on the laptop; no internet needed once the cache is built.
+- **Build:** `make venv` for the Python environment, `npm run build` in `web/` for the frontend.
+- **Config:** `FIRMS_MAP_KEY` (acquisition only), `OFFLINE`, and `VITE_DATA`/`VITE_API_BASE` for the frontend build.
 
-The runbook (build, deploy, smoke test) is `docs/DEPLOYMENT.md`.
+The runbook (install, run, smoke test) is `docs/DEPLOYMENT.md`.
 
 ---
 
 ## 10. Offline architecture and degradation
 
-Five layers:
+Two layers, both implemented:
 
-1. **Service Worker (Workbox):** precache app shell; serve tiles cache-first; stale-while-revalidate for data.
-2. **PMTiles basemap:** one file per region replaces thousands of tile requests; MapLibre reads PMTiles directly.
-3. **DuckDB-WASM:** query GeoParquet in-browser; read COGs via range requests; load zarr chunks client-side.
-4. **IndexedDB / OPFS:** hold large data; request persistent storage via `navigator.storage.persist()`.
-5. **Download for Offline screen:** user picks area/layers; size estimate and progress; per-layer "data last updated" timestamp.
+1. **Service Worker** (`web/public/sw.js`): precaches the app shell (`/`, `/index.html`, `/landing.html`), keeps a versioned shell cache and a versioned data cache, and serves the shell from cache when the network is gone.
+2. **Resource report** (`web/src/lib/sw.ts`): on load, the page tells the worker which resources it used — the hashed assets and the nine mock payloads — so the worker caches them itself rather than waiting for a fetch event it may never see.
 
-Degradation path: if the FastAPI server is unreachable → the backend is local
-(Docker on laptop/Raspberry Pi). If the AI layer is unavailable → it is hidden.
-User actions queue via Background Sync until connectivity returns.
+The basemap is a set of NASA Earth images under `web/public/earth/`, not
+PMTiles; there is no in-browser DuckDB-WASM or IndexedDB/OPFS layer. The
+offline screen reports the worker's cache state (cache name, entry count, size)
+read from the Cache API — there is no download manager (FR-19, PRD §6).
+
+Degradation path: if the API is unreachable, the app falls back to the cached
+payloads the service worker holds. The backend is local in every deployment
+model, so there is no remote service to fall back from.
 
 ---
 
@@ -263,14 +252,15 @@ User actions queue via Background Sync until connectivity returns.
 
 | Failure | Behaviour |
 |---------|-----------|
-| Network down after S0 | Full app works offline from cache. |
-| API unreachable | Local Docker backend serves; if none, cached data is used; actions queue via Background Sync. |
-| AI layer unavailable | Layer hidden; core app unaffected. |
+| Network down after the cache is built | Full app works offline from the service worker's caches. |
+| API unreachable | The app shows the cached payloads; the error is reported per panel. |
 | Insufficient overlap years | Calibration not applied; notice shown. |
 | Sparse calibration tiles | Shrinkage to regional ratio; fall-back to regional-only. |
 | Low coverage bin | Hatched, excluded from baselines, never shown as "no fire". |
-| Service worker eviction | `navigator.storage.persist()`; versioned caches; OPFS fallback. |
+| Service worker eviction | Versioned caches, re-primed by the next online visit. |
 | Invalid AOI | HTTP 422 structured error (`{code, message, field}`); no computation performed. |
+| AOI too large | HTTP 422 `aoi_too_large`, refused before any query runs. |
+| Request over the timeout | HTTP 503 `timeout`. |
 
 The per-screen loading / empty / error / offline / mock states are in
 `docs/FLOWS.md`.
@@ -280,12 +270,12 @@ The per-screen loading / empty / error / offline / mock states are in
 ## 12. Security boundaries and trust assumptions
 
 - **Trust boundary:** the API is the only network-exposed surface; it is read-only.
-- Data mount is read-only; the service cannot mutate source data.
-- All AOI input is validated before any query (closed ring, ≥ 4 positions, within extent, no self-intersection, ≤ 100,000 cells).
+- The service reads the Parquet cache; nothing in the request path writes to it.
+- All AOI input is validated before any query (a known preset id, or a bbox of four degrees with `west<east` and `south<north`, over at most `api.max_aoi_cells` grid cells).
 - Request size limits and a 30 s timeout bound resource use.
-- `FIRMS_API_KEY` is read from the environment only — never committed, baked into images, or logged.
-- Logs record path, duration, status; user AOI geometries are not logged.
-- HTTPS with HSTS for any network communication.
+- `FIRMS_MAP_KEY` is read from the environment only — never committed or logged.
+- CORS allows the loopback dev (`:5174`) and preview (`:4173`) origins only; no wildcard.
+- HTTPS is a deployment concern: terminate TLS in front of the API. The service itself speaks plain HTTP.
 - **Assumption:** the local/field deployment is trusted; network-exposed deployments are assumed to sit behind TLS and network controls.
 
 ---
@@ -296,9 +286,8 @@ The per-screen loading / empty / error / offline / mock states are in
 - **Hardware:** laptop-class, no GPUs.
 - **Determinism:** same raw inputs + same `params_hash` ⇒ identical output bytes (sorted Parquet keys, fixed compression, seeded bootstrap, hash recorded on every artifact).
 - **Bounded queries:** AOI cell cap and per-request timeout protect interactive latency.
-- **Portability:** the same SQL runs in DuckDB (server) and DuckDB-WASM (browser) where feasible.
-- **Rebuild cost:** the derived cache is fully rebuildable from `raw/` plus `config/params.yaml`; changing any parameter changes the hash and marks all downstream artifacts stale, which trades a bounded rebuild for guaranteed consistency.
-- **Constraint:** `data/raw/` is never modified after acquisition.
+- **Rebuild cost:** the derived cache is fully rebuildable from `cache/raw/` plus `config/params.yaml`; changing any parameter changes the hash and marks all downstream artifacts stale, which trades a bounded rebuild for guaranteed consistency.
+- **Constraint:** `cache/raw/` is never modified after acquisition.
 
 ---
 
@@ -311,8 +300,8 @@ The per-screen loading / empty / error / offline / mock states are in
 | ADR-3 | Read-only API | Removes mutation risk; keeps the science in the pipeline. |
 | ADR-4 | Multiplicative calibration | Keeps values additive so arbitrary AOIs aggregate without recalibration. |
 | ADR-5 | Explicit coverage + source tags | Prevents modelled or uncovered data from reading as observed zero. |
-| ADR-6 | PMTiles basemap | One file per region enables true offline maps. |
-| ADR-7 | Deterministic code; optional LLM | Claims must be reproducible; the LLM only narrates. |
-| ADR-8 | Single Docker image | Simplest unit for laptop, Pi, and VM targets. |
+| ADR-6 | NASA Earth basemap images | Shipped with the app, so the map works with no network and no tile server. |
+| ADR-7 | Deterministic code, no LLM | Claims must be reproducible, so every number is computed in the pipeline. |
+| ADR-8 | Source checkout, no container image | The API is a local process over a local cache; there is nothing to image. |
 | ADR-9 | 8-day bins (46/year) | Follows the MODIS composite convention; aligns with the reference record. |
 | ADR-10 | `params.yaml` + hash | Makes every result reproducible and invalidates downstream outputs safely. |

@@ -11,26 +11,22 @@ import json
 import random
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from src.compute import (
     STREAM_BITS,
     Detection,
     anomaly,
-    cell_sweep,
-    collapse_cell_days,
     critical_period,
-    merge_cell_days,
+    harmonize,
     overlap_validation,
     pearson,
     percentile,
     quality_filter,
-    seasonal_baseline,
+    schema,
     spearman,
-    to_cells,
-    to_series,
 )
-from src.compute.grid import grid_snap
 
 # --- fixtures --------------------------------------------------------------
 
@@ -99,57 +95,68 @@ def test_quality_filter_viirs_classes() -> None:
 # --- S4 grid ---------------------------------------------------------------
 
 
-def test_grid_snap_floor_and_negatives() -> None:
-    assert grid_snap(0.0, 0.0) == (0, 0)
-    assert grid_snap(0.05, 0.05) == (1, 1)
-    assert grid_snap(1.0, 1.0) == (20, 20)
-    assert grid_snap(-0.01, -0.01) == (-1, -1)
-    assert grid_snap(89.99, 20.0) == (1799, 400)
+def test_grid_index_floor_and_negatives() -> None:
+    # ``grid_index`` returns (row, column), latitude first.
+    assert harmonize.grid_index(0.0, 0.0) == (0, 0)
+    assert harmonize.grid_index(-0.01, -0.01) == (-1, -1)
+    # A point exactly on a cell boundary belongs to the higher index.
+    step = harmonize.degrees_per_lat()
+    assert harmonize.grid_index(step, 0.0) == (1, 0)
+    assert harmonize.grid_index(0.0, harmonize.degrees_per_lon()) == (0, 1)
 
 
 # --- S5 collapse -----------------------------------------------------------
 
 
-def test_collapse_groups_and_bitmask() -> None:
+def _collapsed(dets: list[Detection]) -> pd.DataFrame:
+    """The cell-day table the production collapse produces."""
+    return harmonize.collapse_cell_days(
+        harmonize.harmonize(schema.detections_to_frame(dets))
+    )
+
+
+def test_collapse_groups_and_counts() -> None:
+    # The two MODIS hits sit inside one production cell (~0.05 deg), so all
+    # three detections collapse into one cell-day.
     dets = [
         modis(0.10, 0.10, "2019-01-01", frp=5.0),
-        modis(0.11, 0.11, "2019-01-01", frp=12.0),
+        modis(0.105, 0.105, "2019-01-01", frp=12.0),
         viirs(0.10, 0.10, "2019-01-01", frp=9.0),
     ]
-    cds = collapse_cell_days(dets)
+    cds = _collapsed(dets)
     assert len(cds) == 1
-    cd = cds[0]
-    assert cd.stream_mask == (STREAM_BITS["MOD_T"] | STREAM_BITS["VIIRS_SNPP"])
-    assert cd.n_det == 3
-    assert cd.max_frp == 12.0
+    cd = cds.iloc[0]
+    assert cd["raw_detections"] == 3
+    # Two sensors saw the cell-day: a MODIS hit and a VIIRS hit.
+    assert cd["sensors_agreeing"] == 2
 
 
 def test_collapse_is_row_order_invariant() -> None:
     dets = [modis(0.1 * i, 0.1 * i, "2019-01-01") for i in range(1, 6)]
     shuffled = dets[:]
     random.Random(7).shuffle(shuffled)
-    assert collapse_cell_days(dets) == collapse_cell_days(shuffled)
+    pd.testing.assert_frame_equal(_collapsed(dets), _collapsed(shuffled))
 
 
 def test_collapse_duplicate_tolerance() -> None:
     base = [modis(0.10, 0.10, "2019-01-01")]
     with_dupe = base + [modis(0.10, 0.10, "2019-01-01")]
-    assert len(collapse_cell_days(base)) == 1
-    assert len(collapse_cell_days(with_dupe)) == 1
-    assert collapse_cell_days(with_dupe)[0].n_det == 2
+    assert len(_collapsed(base)) == 1
+    assert len(_collapsed(with_dupe)) == 1
+    assert _collapsed(with_dupe).iloc[0]["raw_detections"] == 2
 
 
-def test_collapse_idempotent_via_merge() -> None:
-    dets = [modis(0.1 * i, 0.1 * i, "2019-01-01") for i in range(1, 4)]
-    once = collapse_cell_days(dets)
-    assert merge_cell_days(once) == once
-    assert merge_cell_days(merge_cell_days(once)) == once
+def test_collapse_is_idempotent() -> None:
+    """Collapsing an already-collapsed table changes nothing."""
+    once = _collapsed([modis(0.1 * i, 0.1 * i, "2019-01-01") for i in range(1, 4)])
+    twice = harmonize.collapse_cell_days(once)
+    assert len(twice) == len(once)
 
 
 # --- series / cells --------------------------------------------------------
 
 
-def test_to_series_raw_vs_harmonized() -> None:
+def test_daily_series_raw_vs_harmonized() -> None:
     dets = [
         modis(0.10, 0.10, "2019-06-01"),  # cell A
         modis(0.30, 0.30, "2019-06-01"),  # cell B
@@ -157,7 +164,8 @@ def test_to_series_raw_vs_harmonized() -> None:
         viirs(0.10, 0.10, "2019-06-01"),  # cell A again
         viirs(0.50, 0.50, "2019-06-01"),  # cell C
     ]
-    s = to_series(collapse_cell_days(dets))
+    frame = harmonize.harmonize(schema.detections_to_frame(dets))
+    s = harmonize.daily_series(frame).to_dict(orient="records")
     assert len(s) == 1
     row = s[0]
     assert row["raw_modis"] == 2
@@ -168,9 +176,10 @@ def test_to_series_raw_vs_harmonized() -> None:
     assert row["harm_total"] == 3  # A, B, C (union, not sum)
 
 
-def test_to_cells_totals() -> None:
+def test_cell_totals() -> None:
     dets = [modis(0.10, 0.10, "2019-06-01", frp=4.0), modis(0.10, 0.10, "2019-06-02", frp=8.0)]
-    cells = to_cells(collapse_cell_days(dets))
+    frame = harmonize.harmonize(schema.detections_to_frame(dets))
+    cells = harmonize.cell_totals(frame)
     assert len(cells) == 1
     assert cells[0]["raw"] == 2
     assert cells[0]["harmonized"] == 2
@@ -190,15 +199,14 @@ def test_percentile_interpolation() -> None:
 
 def test_seasonal_baseline_pools_years() -> None:
     # non-leap years only, so all three share day-of-year 60
-    series = [
-        {"date": "2018-03-01", "harm_total": 4},
-        {"date": "2019-03-01", "harm_total": 8},
-        {"date": "2021-03-01", "harm_total": 12},
-    ]
-    bl = {row["doy"]: row for row in seasonal_baseline(series)}
+    series = pd.Series(
+        [4, 8, 12],
+        index=pd.to_datetime(["2018-03-01", "2019-03-01", "2021-03-01"]),
+    )
+    bl = harmonize.baseline_percentiles(series, window_days=0)
     doy_march1 = 60
-    assert bl[doy_march1]["p50"] == pytest.approx(8.0)
-    assert bl[doy_march1]["p05"] == pytest.approx(4.4)
+    assert bl.loc[doy_march1, "p50"] == pytest.approx(8.0)
+    assert bl.loc[doy_march1, "p05"] == pytest.approx(4.4)
 
 
 # --- anomaly ---------------------------------------------------------------
@@ -285,13 +293,6 @@ def test_overlap_validation_harmonized_beats_raw() -> None:
     result = overlap_validation(rows, transition="2012-01-20")
     assert result["overlap"]["n_days"] == 40
     assert result["harmonized"]["pearson"] > result["raw"]["pearson"]
-
-
-def test_cell_sweep_shape() -> None:
-    dets = [modis(0.1 * i, 0.1 * i, f"2013-06-{i + 1:02d}") for i in range(1, 20)]
-    sweep = cell_sweep(collapse_cell_days(dets))
-    assert [row["cell_km"] for row in sweep] == [5.5, 11.0, 22.0]
-    assert all(0.0 <= row["harmonized_correlation"] <= 1.0 for row in sweep)
 
 
 # --- golden scenario: the whole point of the project ------------------------

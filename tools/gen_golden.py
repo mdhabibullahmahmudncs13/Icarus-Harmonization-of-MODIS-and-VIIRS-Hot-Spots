@@ -37,14 +37,14 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 from src.compute import (
     STREAM_BITS,
     Detection,
-    collapse_cell_days,
     critical_period,
-    seasonal_baseline,
-    to_cells,
-    to_series,
+    harmonize,
+    schema,
     validate_overlap,
 )
 from src.compute.availability import availability_table
@@ -123,21 +123,42 @@ def _mean(rows: list[dict], key: str) -> float:
     return sum(row[key] for row in rows) / len(rows)
 
 
+def step_frame() -> pd.DataFrame:
+    """The step scenario as the raw detection table the pipeline takes."""
+    return schema.detections_to_frame(step_detections())
+
+
 def step_payloads() -> dict[str, Any]:
-    """Series, cells, baseline and critical period for the step scenario."""
-    cell_days = collapse_cell_days(step_detections())
-    series = to_series(cell_days)
+    """Series, cells, baseline and critical period for the step scenario.
+
+    Everything here comes from the production code — the same grid, the same
+    series and the same per-cell totals the API serves — so the committed
+    goldens freeze the science that ships, not a parallel implementation of it.
+    """
+    detections = harmonize.harmonize(step_frame())
+    series = harmonize.daily_series(detections).to_dict(orient="records")
+    for row in series:
+        row["date"] = pd.Timestamp(row["date"]).strftime("%Y-%m-%d")
 
     pre = [r for r in series if r["date"] < STEP_TRANSITION]
     post = [r for r in series if r["date"] >= STEP_TRANSITION]
 
     # Only the days the scenario covers carry a baseline; the empty rest of the
     # year would be 300+ rows of zeros with no information in them.
-    baseline = [row for row in seasonal_baseline(series) if row["p95"] > 0.0]
+    counts = pd.Series(
+        [row["harm_total"] for row in series],
+        index=pd.to_datetime([row["date"] for row in series]),
+    )
+    percentiles = harmonize.baseline_percentiles(counts, window_days=0)
+    baseline = [
+        {"doy": int(doy), **{label: round(float(value), 3) for label, value in row.items()}}
+        for doy, row in percentiles.iterrows()
+        if row["p95"] > 0.0
+    ]
 
     return {
         "series": series,
-        "cells": to_cells(cell_days),
+        "cells": harmonize.cell_totals(detections),
         "baseline": baseline,
         "critical_period": critical_period(series),
         "headline": {

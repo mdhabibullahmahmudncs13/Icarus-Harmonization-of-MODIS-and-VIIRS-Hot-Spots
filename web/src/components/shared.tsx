@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { Component, useEffect, useRef, type ErrorInfo, type ReactNode } from 'react';
 import type { MetaBlock, SourceKind } from '../contract/types';
 import { bannerFor, sourceNotice } from '../lib/source';
 import { Icon } from './Icon';
@@ -83,6 +83,41 @@ export function LoadingSkeleton() {
       </div>
     </div>
   );
+}
+
+/**
+ * Catches a render that throws, so a bad payload shows a message instead of
+ * a blank page.
+ *
+ * A fetch that fails is reported through the error state, but a throw during
+ * render — a payload the app could not read — has nowhere else to go: React
+ * unmounts the tree and the user sees nothing at all.
+ */
+export class RenderBoundary extends Component<
+  { children: ReactNode },
+  { message: string | null }
+> {
+  override state: { message: string | null } = { message: null };
+
+  static getDerivedStateFromError(error: unknown): { message: string } {
+    return { message: error instanceof Error ? error.message : String(error) };
+  }
+
+  override componentDidCatch(error: unknown, info: ErrorInfo): void {
+    console.error('render failed', error, info.componentStack);
+  }
+
+  override render(): ReactNode {
+    if (this.state.message === null) return this.props.children;
+    return (
+      <div className="card">
+        <div className="card__body error">
+          <strong>Could not draw this view</strong>
+          <span>{this.state.message}</span>
+        </div>
+      </div>
+    );
+  }
 }
 
 const SHORTCUTS: { keys: string[]; label: string }[] = [

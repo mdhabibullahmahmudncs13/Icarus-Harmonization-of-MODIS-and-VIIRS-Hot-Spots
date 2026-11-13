@@ -53,8 +53,7 @@ Vision: a field-usable, trustworthy calendar of burning activity in which activi
 - Cross-sensor multiplicative calibration on overlap years, with pseudo-count shrinkage and bootstrap uncertainty.
 - Climatology, z-score anomaly scoring, and critical fire-period detection.
 - Area-of-interest aggregation via preset regions and user-drawn polygons.
-- Offline-first frontend: service worker, PMTiles basemap, in-browser query cache.
-- Optional MCP-based AI narration layer that reads API JSON and explains results.
+- Offline-first frontend: service worker, bundled NASA Earth basemap, cached query payloads.
 
 ### 4.2 Out of Scope
 
@@ -72,7 +71,7 @@ Vision: a field-usable, trustworthy calendar of burning activity in which activi
 **US-3 — Season window.** As a planner, I read the critical fire period (onset, peak, end) so I can schedule readiness.
 **US-4 — Custom study area.** As an analyst, I draw a polygon so I can query a non-preset area.
 **US-5 — Provenance.** As a reviewer, I open the provenance panel so I can confirm which datasets, versions, and parameters produced the view.
-**US-6 — Offline use.** As a field user, I download a region for offline use so the app still works without connectivity.
+**US-6 — Offline use.** As a field user, I load the app online so the service worker caches the shell and payloads, and the app then works without connectivity.
 
 **Primary flow (region overview):** launch app → select preset AOI → series query returns bins → calendar heatmap renders activity with coverage hatching → user toggles anomaly layer → user opens critical-period panel → provenance panel shows dataset and parameter hash.
 
@@ -98,14 +97,20 @@ Priority: **M** = must, **S** = should, **C** = could.
 | FR-12 | System computes the critical fire period (onset, peak, end, window mass) for an AOI. | M |
 | FR-13 | API exposes health, meta, series, anomalies, critical-period, and preset-AOI endpoints, all returning the parameter hash. | M |
 | FR-14 | System validates AOI input (closed ring, minimum positions, within extent, non-self-intersecting, cell-count limit) and returns structured errors. | M |
-| FR-15 | Frontend renders a MapLibre map with PMTiles basemap and a d3 calendar heatmap. | M |
+| FR-15 | Frontend renders a three.js globe on a NASA Earth basemap and a d3 calendar heatmap. | M |
 | FR-16 | Frontend supports preset selection and polygon drawing. | M |
 | FR-17 | Frontend renders distinct anomaly and critical-period panels. | M |
 | FR-18 | Frontend renders a provenance panel with dataset names, versions, retrieval dates, and parameter hash. | M |
-| FR-19 | Frontend provides a "Download for offline" screen with size estimate, progress, and per-layer last-updated timestamps. | M |
+| FR-19 | Frontend provides a "Download for offline" screen with size estimate, progress, and per-layer last-updated timestamps. | C |
 | FR-20 | Low-coverage and modelled bins are visually distinct (hatching, outline) and never coloured as zero activity. | M |
-| FR-21 | Optional AI narration layer reads API JSON only and is hidden when unavailable. | S |
-| FR-22 | System supports display of UTC and local acquisition time for seasonal alignment. | C |
+| FR-21 | System supports display of UTC and local acquisition time for seasonal alignment. | C |
+
+**FR-19 is reclassified from M to C.** The offline story is the service worker
+(`web/public/sw.js`): it precaches the app shell and the payloads the page
+actually used, and the offline screen reports that cache state. A download
+manager with size estimates, progress bars and per-layer timestamps describes
+a different product — one where the user chooses what to download — and is
+later work. The requirement is kept, at C, so it is not silently lost.
 
 ---
 
@@ -140,10 +145,9 @@ Priority: **M** = must, **S** = should, **C** = could.
 | R1 | Slow or blocked data download | M | H | Start S0 in week 1; use archive downloads; scope to pilot sub-region. |
 | R2 | Calibration unstable in sparse tiles | M | M | Shrinkage toward regional ratio; larger tiles; regional-only fall-back. |
 | R3 | Insufficient overlap years | L | H | Documented calibration fall-back; N20/N21 as fallback streams. |
-| R4 | Offline storage exceeds device capacity | M | M | Size estimate before download; incremental caching; last-updated timestamps. |
-| R5 | Service worker cache eviction | M | M | Request persistent storage; versioned Cache API; OPFS fallback. |
+| R4 | Offline storage exceeds device capacity | M | M | The offline screen reports the cache size; the worker caches only the shell and the payloads the page used, and versioned caches drop the old ones. |
+| R5 | Service worker cache eviction | M | M | Versioned Cache API; the app re-primes the caches on the next online visit. |
 | R6 | UTC date splitting misaligns local season | L | L | Quantified in E6; offer UTC and local time display. |
-| R7 | AI narration states an incorrect figure | L | M | Hide layer when unavailable; every number must appear in API JSON; label as AI-generated. |
 
 ---
 
@@ -163,6 +167,6 @@ Priority: **M** = must, **S** = should, **C** = could.
 
 - Which preset AOIs are included at launch, and who owns their geometries?
 - What is the exact target device profile (minimum RAM and storage) for the field demo?
-- Is the AI narration layer part of the launch demo or a stretch feature?
+- Is the AI narration layer part of a later release?
 - Should results be exportable (CSV/GeoJSON), and if so under which licence?
 - What is the retention and refresh policy for cached offline layers?

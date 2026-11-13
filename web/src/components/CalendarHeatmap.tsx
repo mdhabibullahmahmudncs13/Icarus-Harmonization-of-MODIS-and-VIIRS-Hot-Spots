@@ -1,12 +1,6 @@
 import type { Mode } from '../contract/types';
-import { rampColor, type Bin } from '../lib/series';
+import { findBin, maxValue, rampColor, type Bin } from '../lib/series';
 import { Icon } from './Icon';
-
-function findBin(bins: Bin[], date: string): Bin | undefined {
-  const exact = bins.find((b) => b.start === date);
-  if (exact) return exact;
-  return bins.find((b) => b.start <= date && date <= b.end);
-}
 
 export function CalendarHeatmap({
   bins,
@@ -28,9 +22,14 @@ export function CalendarHeatmap({
   const years = [...new Set(bins.map((b) => b.year))].sort((a, b) => b - a);
   const byKey = new Map(bins.map((b) => [`${b.year}-${b.bin}`, b]));
   const pick = (b: Bin) => (mode === 'raw' ? b.raw : b.harmonized);
-  const max = Math.max(...bins.map(pick), 1);
+  // A loop, not `Math.max(...bins.map(pick))`: a spread of that many arguments
+  // is close to the engine's limit, and the loop costs nothing.
+  const max = maxValue(bins.map(pick));
   const unit = mode === 'raw' ? 'detections' : 'cell-days';
   const active = selected ? findBin(bins, selected) : undefined;
+  // The selected date may sit anywhere inside a bin, so the highlighted cell
+  // is the bin that contains it — the same bin the strip above describes.
+  const selectedBin = active ? `${active.year}-${active.bin}` : null;
 
   return (
     <>
@@ -68,7 +67,7 @@ export function CalendarHeatmap({
                   const t = value / max;
                   const low = b.coverage < 0.75;
                   const modelled = b.source === 'BRIDGE' || b.source === 'VIIRS_CAL';
-                  const isSelected = selected === b.start;
+                  const isSelected = selectedBin === `${year}-${bin}`;
                   return (
                     <button
                       key={bin}

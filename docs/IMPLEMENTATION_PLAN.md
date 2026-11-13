@@ -199,8 +199,8 @@ Artifacts:
 | Module | Responsibility |
 |--------|----------------|
 | `src/compute/schema.py` | Normalized `Detection`, stream bits, `VIIRS_CONFIDENCE`, S2 quality filter |
-| `src/compute/grid.py` | S4 grid snap, S5 cell-day collapse/merge, daily series, per-cell totals |
-| `src/compute/baseline.py` | Day-of-year helpers, `percentile`, seasonal baseline |
+| `src/compute/harmonize.py` | S4 grid snap, S5 cell-day collapse, daily series, per-cell totals |
+| `src/compute/baseline.py` | Day-of-year helpers, `percentile` |
 | `src/compute/anomaly.py` | z-score + percentile rank, elevated/extreme/not-scored flags |
 | `src/compute/season.py` | Critical fire period (onset, peak, end, window mass) |
 | `src/compute/validate.py` | Pearson/Spearman/ratio, overlap validation, cell-size sweep |
@@ -248,9 +248,10 @@ reads the committed `step_series.json` for its headline ratio assertion rather
 than regenerating the scenario in-test.
 
 **Note — deliberate extension over the spec.** The spec's `cell_day` stores a
-single combined `n_det`, which cannot yield per-stream *detection* totals. Each
-`CellDay` here also carries `n_modis` and `n_viirs` so the raw series is
-derivable in one pass. `n_det` remains the combined total and is unchanged.
+single combined `n_det`, which cannot yield per-stream *detection* totals. The
+cell-day table here keeps the detections (`raw_detections`) and the number of
+distinct sensor families that saw the cell (`sensors_agreeing`), so the raw
+series is derivable in one pass. The combined total is unchanged.
 
 Verified this session: `make lint` clean; 179 tests pass, of which 21 are
 `test_compute.py` and 23 are `test_golden.py`; no network access anywhere in
@@ -284,9 +285,10 @@ Artifacts:
 | Availability | `src/compute/availability.py`, `src/outages.json` | S7: stream epochs minus the outage table |
 | Coverage stage | `src/compute/coverage.py` | S7: per-bin coverage and source tagging |
 | Calibration | `src/compute/calibrate.py` | S8: multiplicative VIIRS-to-MODIS factor |
-| Payload builders | `src/compute/export.py` | The contract JSON, shared with the static export |
+| Payload builders | `src/compute/export.py` | The contract JSON, served by the API |
+| Static export | `tools/export_payloads.py` | Writes the same payloads to disk from the cache |
 | AOI presets | `src/aoi_presets.json` | One preset list for the API and the mock generator |
-| Contract tests | `tests/test_api.py`, `tests/test_export.py` | Every payload against `$defs` |
+| Contract tests | `tests/test_api.py`, `tests/test_export.py`, `tests/test_export_payloads.py` | Every payload against `$defs` |
 
 Run and verify:
 
@@ -457,6 +459,11 @@ release build (§3.5).
 - **Gate:** a cold start with the network off succeeds on a real device.
   Record a fallback video.
 
+> Two of these bullets describe an architecture the project no longer has, and
+> are retired in §7.1: the basemap is bundled NASA Earth images, not PMTiles,
+> and the worker is hand-rolled, not Workbox. The deployment model is a source
+> checkout, not a Docker image (`docs/DEPLOYMENT.md` §1).
+
 ### 7.1 Phase 5 status
 
 - [x] Service worker (`web/public/sw.js`, registered by `web/src/lib/sw.ts`
@@ -481,12 +488,14 @@ release build (§3.5).
       blocking every other host.
 - [x] Source badge shown throughout (`web/src/lib/source.ts`).
 - [x] Minimum demo set committed as fixtures (`demo_fixtures/detections.parquet`).
-- [ ] Package the basemap as PMTiles — not applicable yet: the map is
-      client-side SVG polygons and requests no tiles at all. Revisit when a
-      MapLibre basemap lands; the no-third-party test is what keeps it honest.
-- [ ] Backend portable as one Docker image — `make demo` is one command, but
-      the image `docs/DEPLOYMENT.md` §1 describes does not exist yet.
-- [ ] Real-device cold start and the recorded fallback video — need a device.
+- [x] Package the basemap as PMTiles — superseded: the map is client-side SVG
+      polygons and requests no tiles at all. The no-third-party test keeps that
+      honest.
+- [x] Backend portable as one Docker image — superseded: the source checkout is
+      the deployment model (`docs/DEPLOYMENT.md` §1).
+- [ ] Real-device cold start and the recorded fallback video — blocked on
+      hardware: the automated cold start passes (`web/e2e/offline-cold-start.spec.ts`),
+      but a real device and a recorded video are still needed for the demo.
 
 ---
 
@@ -558,7 +567,7 @@ Never cut the toggle demo or the offline cold start.
 | Contract drifts between mock and API | Integration pain | One shared schema; contract tests in CI |
 | Mock numbers leak into the demo | Misleading | Mock banner + release guard; fixtures labelled |
 | Sensor step not visible in real data | Demo weakens | Check early in Phase 4; adjust cell size; report honestly |
-| Map/offline tile work overruns | Lost days | Static polygons first; PMTiles only in Phase 5 |
+| Map/offline tile work overruns | Lost days | Static polygons first; the map requests no tiles, so there is no tile work to overrun |
 | Third-party request breaks offline | Demo fails | Playwright external-host block test |
 | Parameter change silently alters outputs | Non-reproducible | Hash every artifact; regenerate on change |
 

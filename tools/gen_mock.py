@@ -30,14 +30,17 @@ import sys
 from datetime import date, timedelta
 from pathlib import Path
 
-from src.compute import critical_period, pearson, percentile, spearman
+from src.compute import critical_period, params, pearson, percentile, spearman
 from src.compute.coverage import MODIS_SOURCE
 
 # --- fixed configuration (mirrors config/params.yaml defaults) -------------
 SEED = 20260101
 CELL_KM = 5.5
-K = 20  # cells per degree -> 0.05 deg step
-STEP = 1.0 / K
+#: The drawing resolution of the synthetic blobs. The pipeline's grid is
+#: ``cell_km``; this is how finely the mock paints its fire blobs, so it is
+#: not a pipeline parameter and does not belong in the parameter file.
+BLOB_STEP_DEG = 0.05
+STEP = BLOB_STEP_DEG
 BBOX = (60.0, 5.0, 93.0, 36.0)  # pilot extent: 60-93E, 5-36N
 WINDOW = (date(2010, 1, 1), date(2016, 12, 31))
 VIIRS_START = date(2012, 1, 20)
@@ -108,12 +111,14 @@ def params_hash() -> str:
         {
             "seed": SEED,
             "cell_km": CELL_KM,
-            "K": K,
             "bbox": BBOX,
             "window": [WINDOW[0].isoformat(), WINDOW[1].isoformat()],
             "min_confidence": MIN_CONFIDENCE,
             "confidence_mapping": CONF_MAP,
             "viirs_start": VIIRS_START.isoformat(),
+            # The parameter file takes part, so changing a tunable in it marks
+            # the mock stale, exactly as it marks the pipeline's output stale.
+            "params_file": params.params_file_hash(),
         },
         sort_keys=True,
         separators=(",", ":"),

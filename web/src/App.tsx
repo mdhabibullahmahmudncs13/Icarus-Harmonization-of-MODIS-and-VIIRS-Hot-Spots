@@ -8,6 +8,7 @@ import { Rail } from './components/Rail';
 import { SeriesChart } from './components/SeriesChart';
 import { CalendarHeatmap } from './components/CalendarHeatmap';
 import { RegionMap } from './components/RegionMap';
+import { BaselineChart } from './components/BaselineChart';
 import {
   AnomalyBox,
   CriticalPeriodPanel,
@@ -16,7 +17,7 @@ import {
   ValidationCard,
 } from './components/panels';
 import { ProvenanceDrawer } from './components/ProvenanceDrawer';
-import { HelpDialog, KeyboardHint, LoadingSkeleton, MockBanner } from './components/shared';
+import { HelpDialog, KeyboardHint, LoadingSkeleton, MockBanner, RenderBoundary } from './components/shared';
 import { Icon } from './components/Icon';
 
 const TITLES: Record<View, { title: string; sub: string }> = {
@@ -53,7 +54,7 @@ function formatBbox(bbox: [number, number, number, number]): string {
 }
 
 export function App() {
-  const { state, setView, setMode, setDate } = useAppState();
+  const { state, setView, setMode, setAoi, setDate } = useAppState();
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [collapsed, setCollapsed] = useState(false);
   const [data, setData] = useState<Dataset | null>(null);
@@ -74,13 +75,17 @@ export function App() {
     let cancelled = false;
     setError(null);
     getDataSource()
-      .load()
+      .load({ aoi: state.aoi, date: state.date })
       .then((d) => !cancelled && setData(d))
       .catch((e: unknown) => !cancelled && setError(e instanceof Error ? e.message : String(e)));
     return () => {
       cancelled = true;
     };
-  }, [reload]);
+    // The area and the day are what the payloads are about, so a change to
+    // either re-asks for them (docs/FLOWS.md §Journey 1-2). The mode is not
+    // here on purpose: it only redraws the payload already loaded
+    // (docs/FLOWS.md §Interaction rules).
+  }, [reload, state.aoi, state.date]);
 
   const bins = useMemo(
     () => (data ? aggregateToBins(data.series.series, 8) : []),
@@ -101,7 +106,9 @@ export function App() {
       case 'map':
         return data.cells;
       case 'anomalies':
-        return data.anomaly;
+        // The anomalies screen shows the score and the baseline it was ranked
+        // against, so the drawer carries both.
+        return { anomaly: data.anomaly, baseline: data.baseline };
       case 'critical':
         return data.criticalPeriod;
       case 'validation':
@@ -163,8 +170,11 @@ export function App() {
         theme={theme}
         meta={data?.meta.meta ?? null}
         collapsed={collapsed}
+        aoi={state.aoi}
+        presets={data?.aoi.presets ?? []}
         onView={setView}
         onMode={setMode}
+        onAoi={setAoi}
         onTheme={setTheme}
         onCollapse={() => setCollapsed((c) => !c)}
       />
@@ -225,7 +235,7 @@ export function App() {
         ) : !data ? (
           <LoadingSkeleton />
         ) : (
-          <>
+          <RenderBoundary>
             {view === 'overview' && (
               <>
                 <div className="card">
@@ -295,12 +305,29 @@ export function App() {
               </div>
             )}
 
-            {view === 'anomalies' && <AnomalyBox anomaly={data.anomaly} />}
+            {view === 'anomalies' && (
+              <>
+                <AnomalyBox anomaly={data.anomaly} />
+                <div className="card">
+                  <div className="card__head">
+                    <span className="card__title">Seasonal baseline</span>
+                    <span className="badge badge--outline">±{data.baseline.window_days} d</span>
+                  </div>
+                  <div className="card__body">
+                    <BaselineChart baseline={data.baseline} date={state.date} />
+                    <p className="hint">
+                      The typical number of cell-days for each day of the year. The score above
+                      ranks the selected day against this curve.
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
             {view === 'critical' && <CriticalPeriodPanel critical={data.criticalPeriod} />}
             {view === 'validation' && <ValidationCard validation={data.validation} />}
             {view === 'methods' && <MethodsPanel methods={data.methods} />}
             {view === 'offline' && <OfflinePanel source={data.meta.meta.source} />}
-          </>
+          </RenderBoundary>
         )}
 
         <KeyboardHint />

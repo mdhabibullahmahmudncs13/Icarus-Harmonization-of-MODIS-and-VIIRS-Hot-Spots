@@ -1,5 +1,6 @@
-import type { MetaBlock, Mode } from '../contract/types';
+import type { AoiPayload, MetaBlock, Mode } from '../contract/types';
 import type { View } from '../state/urlState';
+import { AoiPicker } from './AoiPicker';
 import { Icon, type IconName } from './Icon';
 import { ModeToggle } from './ModeToggle';
 import { StatusCard } from './shared';
@@ -24,8 +25,11 @@ export function Rail({
   theme,
   meta,
   collapsed,
+  aoi,
+  presets,
   onView,
   onMode,
+  onAoi,
   onTheme,
   onCollapse,
 }: {
@@ -34,8 +38,11 @@ export function Rail({
   theme: 'dark' | 'light';
   meta: MetaBlock | null;
   collapsed: boolean;
+  aoi: string;
+  presets: AoiPayload['presets'];
   onView: (v: View) => void;
   onMode: (m: Mode) => void;
+  onAoi: (aoi: string) => void;
   onTheme: (t: 'dark' | 'light') => void;
   onCollapse: () => void;
 }) {
@@ -78,6 +85,8 @@ export function Rail({
       </div>
 
       <ModeToggle mode={mode} onChange={onMode} compact={collapsed} />
+
+      {!collapsed ? <AoiPicker aoi={aoi} presets={presets} onChange={onAoi} /> : null}
 
       <div className="rail__nav">
         <div className="nav-group">

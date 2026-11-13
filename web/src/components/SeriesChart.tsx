@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { scaleLinear } from 'd3-scale';
 import { extent } from 'd3-array';
 import type { Mode, SeriesPoint } from '../contract/types';
@@ -21,28 +21,70 @@ export function SeriesChart({
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<number | null>(null);
 
-  if (rows.length === 0) return <p className="chart-empty">No series data.</p>;
+  // The geometry depends only on the rows, never on the pointer. Pointer
+  // moves re-render this component, and the dataset runs to thousands of
+  // days, so rebuilding the two path strings and the extents on every move
+  // made the chart cost more than the draw it was paying for.
+  const geometry = useMemo(() => {
+    if (rows.length === 0) return null;
+    const innerW = W - M.left - M.right;
+    const innerH = H - M.top - M.bottom;
+    const x = scaleLinear()
+      .domain([0, rows.length - 1])
+      .range([M.left, M.left + innerW]);
+    const maxY = extent(rows.flatMap((r) => [r.raw_total, r.harm_total]))[1] ?? 1;
+    const y = scaleLinear().domain([0, maxY]).nice().range([M.top + innerH, M.top]);
 
-  const innerW = W - M.left - M.right;
-  const innerH = H - M.top - M.bottom;
-  const x = scaleLinear()
-    .domain([0, rows.length - 1])
-    .range([M.left, M.left + innerW]);
-  const maxY = extent(rows.flatMap((r) => [r.raw_total, r.harm_total]))[1] ?? 1;
-  const y = scaleLinear()
-    .domain([0, maxY])
-    .nice()
-    .range([M.top + innerH, M.top]);
+    const line = (pick: (r: SeriesPoint) => number) =>
+      rows
+        .map((r, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(pick(r)).toFixed(1)}`)
+        .join(' ');
 
-  const line = (pick: (r: SeriesPoint) => number) =>
-    rows.map((r, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(pick(r)).toFixed(1)}`).join(' ');
+    const firstYear = Number(rows[0].date.slice(0, 4));
+    const lastYear = Number(rows[rows.length - 1].date.slice(0, 4));
+    // The index of each year's first row, found in one pass: searching the
+    // whole array once per year was quadratic in the number of rows.
+    const yearIndex = new Map<number, number>();
+    rows.forEach((r, i) => {
+      const year = Number(r.date.slice(0, 4));
+      if (!yearIndex.has(year)) yearIndex.set(year, i);
+    });
+    const yearTicks: { year: number; index: number }[] = [];
+    for (let yy = firstYear; yy <= lastYear; yy++) {
+      const index = yearIndex.get(yy);
+      if (index !== undefined) yearTicks.push({ year: yy, index });
+    }
 
-  const transitionIdx = rows.findIndex((r) => r.date >= transition);
-  const yTicks = y.ticks(4);
-  const firstYear = Number(rows[0].date.slice(0, 4));
-  const lastYear = Number(rows[rows.length - 1].date.slice(0, 4));
-  const yearTicks: number[] = [];
-  for (let yy = firstYear; yy <= lastYear; yy++) yearTicks.push(yy);
+    return {
+      x,
+      y,
+      innerW,
+      innerH,
+      rawPath: line((r) => r.raw_total),
+      harmPath: line((r) => r.harm_total),
+      yTicks: y.ticks(4),
+      firstYear,
+      lastYear,
+      yearTicks,
+      transitionIdx: rows.findIndex((r) => r.date >= transition),
+    };
+  }, [rows, transition]);
+
+  if (geometry === null) return <p className="chart-empty">No series data.</p>;
+
+  const {
+    x,
+    y,
+    innerW,
+    innerH,
+    rawPath,
+    harmPath,
+    yTicks,
+    firstYear,
+    lastYear,
+    yearTicks,
+    transitionIdx,
+  } = geometry;
 
   const indexAt = (clientX: number): number | null => {
     const svg = svgRef.current;
@@ -97,24 +139,20 @@ export function SeriesChart({
               </g>
             ))}
 
-            {yearTicks.map((yy) => {
-              const idx = rows.findIndex((r) => r.date.startsWith(String(yy)));
-              if (idx < 0) return null;
-              return (
-                <text
-                  key={yy}
-                  x={x(idx)}
-                  y={H - 8}
-                  textAnchor="middle"
-                  fill="var(--text-muted)"
-                >
-                  {yy}
-                </text>
-              );
-            })}
+            {yearTicks.map(({ year, index }) => (
+              <text
+                key={year}
+                x={x(index)}
+                y={H - 8}
+                textAnchor="middle"
+                fill="var(--text-muted)"
+              >
+                {year}
+              </text>
+            ))}
 
             <path
-              d={line((r) => r.raw_total)}
+              d={rawPath}
               fill="none"
               stroke="var(--series-raw)"
               strokeWidth={mode === 'raw' ? 2.4 : 1.2}
@@ -122,7 +160,7 @@ export function SeriesChart({
               strokeLinejoin="round"
             />
             <path
-              d={line((r) => r.harm_total)}
+              d={harmPath}
               fill="none"
               stroke="var(--series-harmonized)"
               strokeWidth={mode === 'harmonized' ? 2.4 : 1.2}

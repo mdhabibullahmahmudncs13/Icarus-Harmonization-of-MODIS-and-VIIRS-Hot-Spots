@@ -1,3 +1,5 @@
+import { useCallback, useEffect, useState } from 'react';
+
 import type {
   AnomalyPayload,
   CriticalPeriodPayload,
@@ -5,6 +7,12 @@ import type {
   SourceKind,
   ValidationPayload,
 } from '../contract/types';
+import {
+  formatBytes,
+  readCacheState,
+  type CacheState,
+} from '../lib/cacheState';
+import { Icon } from './Icon';
 import { Chip } from './shared';
 
 const FLAG_COLOR: Record<AnomalyPayload['flag'], string> = {
@@ -203,17 +211,105 @@ export function MethodsPanel({ methods }: { methods: MethodsPayload }) {
   );
 }
 
+/**
+ * The offline screen: what the service worker has cached, and the data source
+ * the app is running on.
+ *
+ * There is no download manager here — the worker caches the app shell and the
+ * payloads the page actually used, so the honest question is "what is in the
+ * cache right now?", not "how big is the download?".
+ */
 export function OfflinePanel({ source }: { source: SourceKind }) {
+  const [state, setState] = useState<CacheState | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+
+  const refresh = useCallback(() => {
+    let cancelled = false;
+    void readCacheState().then((next) => {
+      if (cancelled) return;
+      if (next === null) {
+        setUnavailable(true);
+        return;
+      }
+      setUnavailable(false);
+      setState(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(refresh, [refresh]);
+
   return (
     <div className="card">
       <div className="card__head">
-        <span className="card__title">Download for offline</span>
+        <span className="card__title">Offline</span>
+        <span className="badge badge--outline">source {source}</span>
       </div>
       <div className="card__body">
-        <p className="empty">
-          Offline caching arrives in Phase 5. The app currently runs on {source} data served from
-          this origin, so it works without any external request.
-        </p>
+        {unavailable ? (
+          <p className="empty">
+            This browser does not expose the Cache API, so the offline state cannot be read here.
+          </p>
+        ) : (
+          <>
+            <div className="stat-grid">
+              <Stat
+                label="cached entries"
+                value={state === null ? '—' : String(state.totalEntries)}
+              />
+              <Stat
+                label="cache size"
+                value={state === null ? '—' : formatBytes(state.totalBytes)}
+              />
+              <Stat
+                label="service worker"
+                value={
+                  state === null ? '—' : state.controlled ? 'controlling this page' : 'not active'
+                }
+                small
+              />
+            </div>
+
+            {state !== null && state.caches.length > 0 && (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col">cache</th>
+                    <th scope="col">entries</th>
+                    <th scope="col">size</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {state.caches.map((cache) => (
+                    <tr key={cache.name}>
+                      <td>{cache.name}</td>
+                      <td>{cache.entries}</td>
+                      <td>{formatBytes(cache.bytes)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {state !== null && state.caches.length === 0 && (
+              <p className="empty">
+                Nothing is cached yet. Load a view online and the service worker caches the shell
+                and the payloads it used.
+              </p>
+            )}
+
+            <p className="hint">
+              The service worker caches the app shell and the data payloads this page used. With
+              the network off, a reload serves them from the cache.
+            </p>
+            <button type="button" className="btn btn--quiet" onClick={refresh}>
+              <Icon name="refresh" size={15} />
+              Reload to refresh the cache
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

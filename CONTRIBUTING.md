@@ -2,8 +2,8 @@
 
 Icarus harmonizes MODIS and VIIRS active-fire hot spots into one burning activity
 calendar (NASA Space Apps 2026). This guide covers setup, conventions, and the
-rules that keep the science reproducible. Read `AGENTS.md` / `CLAUDE.md` for the
-AI-agent contract before using a coding agent on this repo.
+rules that keep the science reproducible. Section 9 covers working with a
+coding agent on this repo.
 
 ---
 
@@ -15,7 +15,6 @@ AI-agent contract before using a coding agent on this repo.
 | `uv` | latest | Fast, reproducible virtualenv (`make venv`) |
 | Node.js | 20+ | Frontend (`web/`) |
 | DuckDB | bundled via `duckdb` (Python) | Analytical engine |
-| Docker | 24+ (optional) | Single-image deployment |
 | `ruff` | bundled | Lint |
 
 A `FIRMS_MAP_KEY` is only needed for stage S0 (data acquisition). Everything else
@@ -45,9 +44,11 @@ npm run test                # unit tests
 
 The module-by-module tree is `docs/ARCHITECTURE.md` §3. At the root:
 
-- `README.md` — quick start and the offline demo steps.
 - `config/params.yaml` — every tunable value (`docs/PARAMETERS.md`).
-- `data/` — git-ignored except `reference/`.
+- `cache/` — git-ignored: the acquired NASA data and its manifests.
+- `demo_fixtures/` — the committed offline demo detections (tracked on purpose).
+
+The quick start and the offline demo steps are in `docs/DEPLOYMENT.md`.
 
 Full background: `docs/PRD.md`, `docs/TRD.md`, `docs/ARCHITECTURE.md`.
 
@@ -74,8 +75,8 @@ parameter you are satisfying when relevant (for example `FR-07`, `§5.5`).
 1. **Determinism.** Identical raw inputs + identical `params.yaml` hash MUST
    produce byte-identical derived output (NFR-01). Never introduce unseeded
    randomness, wall-clock time into outputs, or non-deterministic ordering.
-2. **Pure core.** `src/core/` performs no I/O and imports no web framework. It
-   takes values in and returns values out.
+2. **Pure core.** `src/compute/` performs no I/O and imports no web framework.
+   It takes values in and returns values out.
 3. **The API is read-only.** It never mutates data and never computes statistics;
    that work belongs to the pipeline.
 4. **The frontend never calls NASA.** It reads the API (or cached JSON) only.
@@ -83,8 +84,9 @@ parameter you are satisfying when relevant (for example `FR-07`, `§5.5`).
    explain — never compute a number.
 6. **Every number carries its source.** No displayed value without a provenance
    path.
-7. **Never commit data or secrets.** `data/`, `cache/`, `.env`, and `*.parquet`
-   (except committed fixtures) are git-ignored. Do not disable that.
+7. **Never commit data or secrets.** `cache/`, `.env`, and `*.parquet` are
+   git-ignored. Do not disable that. The one exception is the committed demo
+   fixture, `demo_fixtures/detections.parquet`, which is tracked on purpose.
 8. **Name NASA datasets correctly.** Use product names verbatim and cite them
    with a URL (see `docs/DATA_DICTIONARY.md`).
 
@@ -96,14 +98,16 @@ parameter you are satisfying when relevant (for example `FR-07`, `§5.5`).
 
 - `ruff` with `line-length = 100`, target `py311` (see `pyproject.toml`).
 - Type hints on public functions; docstrings state units and the spec section.
-- One stage per module: `s0_acquire.py` … `s9_harmonize.py`.
+- One concern per module: `src/compute/` holds the pipeline stages
+  (`schema`, `harmonize`, `coverage`, `calibrate`, `baseline`, `anomaly`,
+  `season`, `export`).
 - Raise on invalid configuration; fail loud rather than guessing defaults.
-- No hidden network calls outside `src/pipeline/` and `src/acquire/`.
+- No hidden network calls outside `src/acquire/`.
 
 ### SQL / DuckDB
 
-- Keep reusable queries in `src/sql/` so the API and the (stretch) browser share
-  them.
+- Queries live with the code that uses them; the API reads Parquet through
+  DuckDB in `src/api/dataset.py`.
 - Prefer `FILTER (WHERE ...)` for conditional counts, as in the reference SQL.
 - Preserve deterministic ordering when writing Parquet (sorted keys).
 
@@ -149,7 +153,7 @@ This repo is agent-friendly. When using one:
 
 - Record the tool and any notable prompts in the pull-request description, and
   note installed agent skills so they stay visible in review.
-- Keep agents inside `src/`, `web/`, and `docs/` — never let them touch `data/`.
+- Keep agents inside `src/`, `web/`, and `docs/` — never let them touch `cache/`.
 - Require them to run `make lint` and `make test` and to report real results.
 - The harmonization method, parameters, and statistics are the team's own and
   must not be delegated blindly to a model.
@@ -172,5 +176,6 @@ This repo is agent-friendly. When using one:
 
 ## 11. License
 
-By contributing you agree your work is released under **Apache-2.0** (see
-`LICENSE`).
+By contributing you agree your work is released under **Apache-2.0**. The
+`LICENSE` file has not been added to the repository yet — it should be
+restored before the release.

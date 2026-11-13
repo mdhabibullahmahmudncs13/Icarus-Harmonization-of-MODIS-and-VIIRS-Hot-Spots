@@ -30,6 +30,7 @@ from src.acquire import burned_area, safe
 from src.compute import export, harmonize
 from src.validate import run_all
 from src.validate.report import render_markdown, render_svg
+from tools.export_payloads import load_detections
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RESULTS_DIR = REPO_ROOT / "validation"
@@ -58,10 +59,10 @@ def load(data: str):
         if not path.exists():
             print(f"no fixture at {path}; run `python -m src.demo`", file=sys.stderr)
             raise SystemExit(2)
-        return export.load_detections(str(path)), "fixture"
+        return load_detections(str(path)), "fixture"
     if safe.is_offline() and (safe.FIXTURE_DIR / "detections.parquet").exists():
-        return export.load_detections(str(safe.FIXTURE_DIR / "detections.parquet")), "fixture"
-    return export.load_detections(), "cache"
+        return load_detections(str(safe.FIXTURE_DIR / "detections.parquet")), "fixture"
+    return load_detections(), "cache"
 
 
 def artifacts(results) -> dict[Path, str]:

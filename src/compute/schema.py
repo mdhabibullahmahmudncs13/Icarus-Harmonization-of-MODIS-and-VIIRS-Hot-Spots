@@ -208,6 +208,27 @@ def confidence_mapping() -> Mapping[str, float]:
     return {"l": VIIRS_CONFIDENCE_MAP["l"], "n": VIIRS_CONFIDENCE_MAP["n"], "h": VIIRS_CONFIDENCE_MAP["h"]}
 
 
+def detections_to_frame(detections: Iterable[Detection]) -> pd.DataFrame:
+    """Detection objects as the raw detection table the pipeline takes.
+
+    The columns are the ones :func:`normalize` expects: latitude, longitude,
+    acq_date, confidence, instrument and frp. A MODIS detection carries its
+    numeric confidence, a VIIRS one its letter class.
+    """
+    rows = [
+        {
+            "latitude": det.lat,
+            "longitude": det.lon,
+            "acq_date": det.acq_date,
+            "confidence": det.conf_num if det.conf_num is not None else det.conf_class,
+            "instrument": det.instrument,
+            "frp": det.frp,
+        }
+        for det in detections
+    ]
+    return pd.DataFrame(rows)
+
+
 #: MODIS ``hs_type`` values the quality filter keeps (config/params.yaml
 #: ``quality.modis_allowed_types``). ``None`` is kept: MODIS rows that do not
 #: carry a type are not evidence of an urban/persistent exclusion.

@@ -63,3 +63,17 @@ export function buildHash(state: AppState): string {
   if (state.date) params.set('date', state.date);
   return `#${state.view}?${params.toString()}`;
 }
+
+/**
+ * Apply a change to the state it applies to.
+ *
+ * A change is a function of the state, not a copy of it made when the setter
+ * was built: two changes in one tick must both land, and a copy made earlier
+ * drops the first.
+ */
+export function applyChange(
+  current: AppState,
+  change: Partial<AppState>,
+): AppState {
+  return { ...current, ...change };
+}

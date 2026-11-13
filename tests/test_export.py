@@ -136,6 +136,23 @@ def test_density_series_divides_every_count_by_the_region_cell_count(detections)
     assert active_days, "the synthetic data has active cells"
 
 
+def test_density_divides_by_the_given_region_not_the_default(detections):
+    """The divisor follows the region the payload is about.
+
+    A smaller region has fewer cells, so the same count is a larger density:
+    dividing by the default region's cell count would understate it.
+    """
+    bbox = (88.0, 22.0, 90.0, 24.0)
+    counts = export.build_series(detections, bbox=bbox)
+    density = export.build_series(detections, bbox=bbox, metric="density")
+    n_cells = harmonize.grid_cell_count(bbox)
+    assert n_cells < harmonize.grid_cell_count(export.BANGLADESH_BBOX)
+    assert density["meta"]["region"]["bbox"] == [88.0, 22.0, 90.0, 24.0]
+    for count_row, density_row in zip(counts["series"], density["series"], strict=True):
+        for column in export.COUNT_COLUMNS:
+            assert density_row[column] == pytest.approx(count_row[column] / n_cells, abs=1e-12)
+
+
 def test_density_rows_are_floats_while_cell_day_rows_stay_integers(detections):
     counts = export.build_series(detections)
     density = export.build_series(detections, metric="density")
@@ -295,54 +312,3 @@ def test_sensor_epochs_carry_the_firms_product_names_and_the_npp_deadline():
     assert "VIIRS_SNPP_SP" in products
     assert products["VIIRS_SNPP_SP"]["family"] == "VIIRS"
     assert products["VIIRS_SNPP_SP"]["end"] == "2026-11-01"
-
-
-# --------------------------------------------------------------------------
-# Writing
-# --------------------------------------------------------------------------
-
-
-def test_write_all_writes_every_file_and_is_serializable(tmp_path, detections):
-    written = export.write_all(
-        detections,
-        tmp_path,
-        anomaly_date=str(detections["acq_date"].iloc[0].date()),
-        generated_at=pd.Timestamp("2026-10-04T00:00:00Z").to_pydatetime(),
-    )
-    names = {path.name for path in written}
-    assert names == {
-        "meta.json",
-        "series.json",
-        "cells.json",
-        "baseline.json",
-        "anomaly.json",
-        "critical-period.json",
-        "validation.json",
-        "methods.json",
-        "aoi.json",
-    }
-    definition_for = {
-        "meta": "metaResponse",
-        "series": "series",
-        "cells": "cells",
-        "baseline": "baseline",
-        "anomaly": "anomalies",
-        "critical-period": "criticalPeriod",
-        "validation": "validation",
-        "methods": "methods",
-        "aoi": "aoi",
-    }
-    for path in written:
-        payload = json.loads(path.read_text())
-        assert_matches(definition_for[path.stem], payload)
-
-
-def test_written_json_is_byte_stable_for_a_fixed_timestamp(tmp_path, detections):
-    stamp = pd.Timestamp("2026-10-04T00:00:00Z").to_pydatetime()
-    first = export.write_json(
-        export.build_series(detections, generated_at=stamp), tmp_path / "a.json"
-    )
-    second = export.write_json(
-        export.build_series(detections, generated_at=stamp), tmp_path / "b.json"
-    )
-    assert first.read_bytes() == second.read_bytes()

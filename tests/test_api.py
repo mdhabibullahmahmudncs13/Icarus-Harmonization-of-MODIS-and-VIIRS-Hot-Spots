@@ -443,6 +443,42 @@ def test_post_body_serves_the_density_metric_on_the_series(client: TestClient):
     assert saw_active, "the fixture has active cells"
 
 
+def test_the_aoi_narrows_the_answer(client: TestClient):
+    """The AOI must scope the numbers, not just label the response.
+
+    The fixture's fire sits in the Bangladesh preset; the Nepal Terai preset
+    overlaps none of it. A request for NPL that still reported Bangladesh's
+    counts would mean the AOI was resolved and then thrown away.
+    """
+    bgd = client.post("/api/v1/series", json={"aoi": "BGD"}).json()
+    npl = client.post("/api/v1/series", json={"aoi": "NPL"}).json()
+    assert bgd["meta"]["region"]["bbox"] == [88.0, 20.0, 93.0, 27.0]
+    assert npl["meta"]["region"]["bbox"] == [80.0, 26.0, 88.0, 31.0]
+    assert sum(row["harm_total"] for row in bgd["series"]) > 0
+    assert sum(row["harm_total"] for row in npl["series"]) == 0
+
+
+def test_the_density_divisor_follows_the_region(client: TestClient):
+    """Density divides by the requested region's cells, not Bangladesh's.
+
+    The two presets have different cell counts, so a divisor that ignored the
+    AOI would give the wrong number for one of them.
+    """
+    divisors = {}
+    for aoi in ("BGD", "NPL"):
+        counts = client.post("/api/v1/series", json={"aoi": aoi, "metric": "cell_days"}).json()
+        density = client.post("/api/v1/series", json={"aoi": aoi, "metric": "density"}).json()
+        bbox = tuple(density["meta"]["region"]["bbox"])
+        n_cells = harmonize.grid_cell_count(bbox)
+        divisors[aoi] = n_cells
+        for count_row, density_row in zip(counts["series"], density["series"], strict=True):
+            for column in export.COUNT_COLUMNS:
+                assert density_row[column] == pytest.approx(
+                    count_row[column] / n_cells, abs=1e-12
+                )
+    assert divisors["BGD"] != divisors["NPL"]
+
+
 def test_post_body_refuses_density_where_the_payload_has_no_metric(client: TestClient):
     """Refused, not silently served as cell_days on an endpoint with no metric."""
     for name in ("cells", "baseline", "anomalies", "critical-period", "validation"):
@@ -557,3 +593,55 @@ def test_endpoints_work_with_all_network_blocked(client: TestClient, monkeypatch
     for endpoint in ENDPOINTS.values():
         response = client.get(endpoint["path"], params=endpoint["params"])
         assert response.status_code == 200, endpoint["path"]
+
+
+# --------------------------------------------------------------------------
+# Request bounds: the AOI cell cap and the per-request timeout
+# --------------------------------------------------------------------------
+
+
+def test_an_aoi_over_the_cell_cap_is_refused(client: TestClient):
+    """A huge bbox is refused before any query runs."""
+    response = client.post("/api/v1/series", json={"bbox": [-80.0, -60.0, 80.0, 70.0]})
+    assert response.status_code == 422, response.text
+    body = response.json()
+    assert body["code"] == "aoi_too_large"
+    assert body["field"] == "bbox"
+    assert "grid cells" in body["message"]
+
+
+def test_the_cell_cap_lets_an_ordinary_area_through(client: TestClient):
+    """The cap must not refuse the region the app actually serves."""
+    response = client.get("/api/v1/series")
+    assert response.status_code == 200, response.text
+
+
+def test_the_cell_cap_applies_to_a_preset_too(client: TestClient, monkeypatch):
+    """The bound is on the resolved area, not only on an explicit bbox."""
+    from src.api import main
+
+    monkeypatch.setattr(main, "PRESET_BBOX", {"HUGE": (-80.0, -60.0, 80.0, 70.0)})
+    monkeypatch.setattr(main, "PRESET_IDS", frozenset({"HUGE"}))
+    response = client.post("/api/v1/series", json={"aoi": "HUGE"})
+    assert response.status_code == 422, response.text
+    assert response.json()["code"] == "aoi_too_large"
+
+
+def test_a_slow_request_is_cut_off_with_a_timeout(client: TestClient, monkeypatch):
+    """A request that overruns the bound gets a 503, not an open-ended wait."""
+    import time
+
+    from src.api import main
+
+    monkeypatch.setattr(main, "REQUEST_TIMEOUT_S", 0.05)
+
+    @main.app.get("/api/v1/never-finishes")
+    def _slow() -> dict:
+        time.sleep(2.0)
+        return {"done": True}
+
+    response = client.get("/api/v1/never-finishes")
+    assert response.status_code == 503, response.text
+    body = response.json()
+    assert body["code"] == "timeout"
+    assert body["message"]

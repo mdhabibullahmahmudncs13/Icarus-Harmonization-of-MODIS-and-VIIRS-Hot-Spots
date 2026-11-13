@@ -28,7 +28,7 @@ requirements in `docs/PRD.md`.
 | 4 | Critical period | `#critical` | Onset, peak, end, window mass |
 | 5 | Validation | `#validation` | Raw vs harmonized correlation on the overlap |
 | 6 | Methods | `#methods` | Cell size, confidence filter, collapse rule, datasets |
-| 7 | Offline | `#offline` | Download-for-offline manager |
+| 7 | Offline | `#offline` | Service-worker cache state |
 
 Global chrome on every screen: the **rail** (brand, search, Raw | Harmonized
 mode, nav, theme switch, status footer), the **source badge**, and the
@@ -96,13 +96,15 @@ Deep links:
 - **Entry:** rail, or a "view cells" link from Calendar/Critical period.
 - **Shows:** cell polygons shaded by the active mode; legend with units.
 - **Primary action:** draw a polygon AOI, or pick a preset.
-- **States:** no basemap by default offline; PMTiles when bundled.
+- **States:** the basemap is a bundled NASA Earth image, so it is present
+  offline; the cells themselves need the API (or the cached payloads).
 
 ### Screen 3 — Anomalies
 
 - **Entry:** rail; accepts a date + area.
 - **Shows:** z-score, percentile, flag (Normal / Elevated / Extreme / Not
-  scored), baseline window, years used.
+  scored), baseline window, years used, and the seasonal baseline curve
+  (p05–p95 and p25–p75 bands, median line) with the selected day marked.
 - **Primary action:** change date → re-ask.
 
 ### Screen 4 — Critical period
@@ -126,9 +128,9 @@ Deep links:
 ### Screen 7 — Offline
 
 - **Entry:** rail (Reference group), or the offline notice in any empty state.
-- **Shows:** area/layer picker, size estimate, progress, per-layer "last
-  updated".
-- **Exit:** "Done" → returns to the previous screen.
+- **Shows:** what the service worker has cached (cache name, entry count, size),
+  and the data source the app is running on.
+- **Primary action:** "Reload to refresh the cache" re-reads the Cache API.
 
 ---
 
@@ -238,14 +240,18 @@ of display and in the drawer.
 **Persona:** P4. **Goal:** work with no network.
 
 ```
-Offline screen
-  -> choose area + layers
-  -> see size estimate -> start download -> progress -> per-layer "last updated"
+Load the app online (the service worker caches the shell and the payloads used)
+  -> Offline screen
+  -> see the cache state: cache name, entry count, size
   -> Success: cold start with the network off serves the app shell and data
 ```
 
 Exit criterion: after a full device reload with the network disabled, the
 Overview renders and the mode toggle still responds.
+
+There is no download manager here: the worker caches what the page used, so
+"prepare for offline" means loading the app while online, then checking the
+Offline screen that the cache is populated.
 
 ---
 

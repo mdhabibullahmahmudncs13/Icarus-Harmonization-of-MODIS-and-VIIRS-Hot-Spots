@@ -1,8 +1,10 @@
-.PHONY: venv cache demo fixture golden validate test lint help
+.PHONY: venv cache demo fixture golden validate export test lint help
 
 # The one list of Python dependencies, installed by `make venv`. CI runs the
 # same target, so the dependency list can never drift between the two.
-DEPS ?= duckdb pandas pyarrow requests fastapi uvicorn httpx2 jsonschema pytest ruff earthaccess pyhdf
+# numpy and pydantic are imported directly, so they are declared even though
+# pandas and fastapi would pull them in anyway.
+DEPS ?= duckdb pandas numpy pyarrow requests fastapi pydantic uvicorn httpx2 jsonschema pytest ruff earthaccess pyhdf
 
 # Prefer the project venv (created with `uv venv .venv`) when it exists.
 PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
@@ -15,6 +17,7 @@ help:
 	@echo "  fixture - write the offline demo detections to demo_fixtures/"
 	@echo "  golden  - regenerate the committed Phase 2 golden fixtures"
 	@echo "  validate- run the E1-E9 validation experiments, write the report"
+	@echo "  export  - write the contract payloads to web/public/data from the cache"
 	@echo "  demo    - run the API offline (OFFLINE=1) against demo_fixtures/"
 	@echo "  test    - run the test suite"
 	@echo "  lint  - run ruff"
@@ -36,6 +39,9 @@ golden:
 
 validate:
 	@$(PYTHON) -m tools.experiments
+
+export:
+	@$(PYTHON) -m tools.export_payloads $(ARGS)
 
 demo:
 	OFFLINE=1 $(PYTHON) -m uvicorn src.api.main:app

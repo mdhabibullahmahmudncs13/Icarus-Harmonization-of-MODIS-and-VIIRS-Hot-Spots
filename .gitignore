@@ -32,3 +32,6 @@ web/.playwright/
 **/.impeccable/review/
 **/.impeccable/build/
 **/.impeccable/mocks/
+
+# Tooling caches (the artifacts are not project content)
+.brud/

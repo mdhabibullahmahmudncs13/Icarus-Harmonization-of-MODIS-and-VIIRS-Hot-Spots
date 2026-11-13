@@ -198,10 +198,16 @@ def collapse_cell_days(df: pd.DataFrame) -> pd.DataFrame:
     cell-day; ``sensors_agreeing`` counts distinct sensor families, so a
     same-day MODIS + VIIRS hit in one cell is recorded as two sensors
     agreeing rather than two fires.
+
+    Idempotent: collapsing a cell-day table returns it unchanged.
     """
     frame = df.copy()
     if frame.empty:
         return frame
+    if "acq_date" not in frame.columns:
+        # Already collapsed: one row per (cell, day), so there is nothing to
+        # group.
+        return frame.reset_index(drop=True)
     frame["date"] = frame["acq_date"].dt.normalize()
     grouped = (
         frame.groupby(["date", "cell_id"], as_index=False)
@@ -299,6 +305,49 @@ def family_daily_frames(detections: pd.DataFrame) -> dict[str, pd.DataFrame]:
     return out
 
 
+def cell_totals(
+    detections: pd.DataFrame,
+    cell_km: float = DEFAULT_CELL_KM,
+    reference_latitude_deg: float = REFERENCE_LATITUDE_DEG,
+) -> list[dict[str, object]]:
+    """Per-cell totals over the window: raw detections, harmonized cell-days.
+
+    One row per grid cell that saw a detection, sorted by cell id. ``raw`` is
+    the number of detections, ``harmonized`` the number of distinct cell-days,
+    and ``peak_frp`` the highest fire radiative power seen in the cell.
+    """
+    if detections.empty:
+        return []
+    frame = detections.assign(date=detections["acq_date"].dt.normalize())
+    grouped = frame.groupby("cell_id")
+    peak = (
+        grouped["frp"].max()
+        if "frp" in frame.columns
+        else pd.Series(0.0, index=grouped.size().index)
+    )
+    counts = pd.DataFrame(
+        {
+            "raw": grouped.size(),
+            "harmonized": grouped["date"].nunique(),
+            "peak_frp": peak,
+        }
+    ).sort_index()
+    rows: list[dict[str, object]] = []
+    for cell, row in counts.iterrows():
+        bounds = cell_bounds(str(cell), cell_km, reference_latitude_deg)
+        frp = float(row["peak_frp"])
+        rows.append(
+            {
+                "cell_id": str(cell),
+                "bounds": [float(v) for v in bounds],
+                "raw": int(row["raw"]),
+                "harmonized": int(row["harmonized"]),
+                "peak_frp": frp if math.isfinite(frp) else None,
+            }
+        )
+    return rows
+
+
 # --------------------------------------------------------------------------
 # Seasonal baseline and anomaly
 # --------------------------------------------------------------------------
@@ -333,21 +382,6 @@ def _window_values(buckets: dict[int, list[float]], doy: int, window_days: int) 
     return values
 
 
-def seasonal_baseline(series: pd.Series, window_days: int = DEFAULT_WINDOW_DAYS) -> pd.Series:
-    """Median of the daily series for each day of year.
-
-    Each day-of-year is estimated from every year in ``series`` inside a
-    circular +/- ``window_days`` window, so neighbouring days reinforce the
-    estimate. Indexed 1..366.
-    """
-    buckets = _by_doy(series)
-    values = {
-        doy: (float(np.median(window)) if (window := _window_values(buckets, doy, window_days)) else float("nan"))
-        for doy in range(1, 367)
-    }
-    return pd.Series(values, name="p50")
-
-
 def baseline_percentiles(
     series: pd.Series,
     window_days: int = DEFAULT_WINDOW_DAYS,
@@ -374,13 +408,6 @@ def baseline_percentiles(
     return frame[labels]
 
 
-def years_used(series: pd.Series) -> int:
-    """Distinct calendar years contributing to a series."""
-    if series.empty:
-        return 0
-    return int(pd.Index(series.index.year).nunique())
-
-
 def seasonal_window(
     series: pd.Series, date: pd.Timestamp, window_days: int = DEFAULT_WINDOW_DAYS
 ) -> pd.Series:
@@ -395,31 +422,6 @@ def seasonal_window(
         return series.iloc[0:0]
     mask = series.index.dayofyear.isin(keep)
     return series[mask].dropna()
-
-
-def anomaly_score(series: pd.Series, baseline: pd.Series, date: pd.Timestamp) -> float:
-    """Standardized departure of ``date`` from its seasonal baseline.
-
-    ``(value - baseline[doy]) / sd`` where ``sd`` is the sample standard
-    deviation of the same day-of-year window across years. Positive is above
-    the baseline. Returns ``NaN`` when the value or the spread is undefined.
-    """
-    stamp = pd.Timestamp(date)
-    doy = int(stamp.dayofyear)
-    try:
-        value = float(series.loc[stamp])
-    except KeyError:
-        return float("nan")
-    if doy not in baseline.index:
-        return float("nan")
-    central = float(baseline.loc[doy])
-    window = seasonal_window(series, stamp, DEFAULT_WINDOW_DAYS).to_numpy(dtype="float64")
-    if len(window) < 2:
-        return float("nan")
-    spread = float(np.std(window, ddof=1))
-    if spread == 0:
-        return 0.0
-    return (value - central) / spread
 
 
 # --------------------------------------------------------------------------
@@ -463,10 +465,10 @@ __all__: Iterable[str] = (
     "DEFAULT_CELL_KM",
     "DEFAULT_WINDOW_DAYS",
     "REFERENCE_LATITUDE_DEG",
-    "anomaly_score",
     "baseline_percentiles",
     "cell_bounds",
     "cell_id",
+    "cell_totals",
     "collapse_cell_days",
     "daily_series",
     "degrees_per_lat",
@@ -480,8 +482,6 @@ __all__: Iterable[str] = (
     "overlap_correlation",
     "parse_cell_id",
     "raw_series",
-    "seasonal_baseline",
     "seasonal_window",
     "to_grid",
-    "years_used",
 )

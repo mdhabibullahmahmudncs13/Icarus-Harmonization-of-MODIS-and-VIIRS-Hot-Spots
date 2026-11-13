@@ -21,7 +21,6 @@ import numpy as np
 import pandas as pd
 
 from src.compute import harmonize, schema
-from src.compute.grid import MODIS_MASK, VIIRS_MASK
 
 #: Cell sizes, in km, swept to show the result is not an artefact of one grid.
 DEFAULT_CELL_SIZES: tuple[float, ...] = (5.5, 11.0, 16.5, 22.0)
@@ -245,8 +244,8 @@ def overlap_validation(
 ) -> dict[str, Any]:
     """Raw vs harmonized agreement over the overlap, from daily series rows.
 
-    ``rows`` carries the :func:`src.compute.grid.to_series` shape (``date``,
-    ``raw_modis``, ``raw_viirs``, ``harm_modis``, ``harm_viirs``).
+    ``rows`` carries the :func:`src.compute.harmonize.daily_series` shape
+    (``date``, ``raw_modis``, ``raw_viirs``, ``harm_modis``, ``harm_viirs``).
     ``transition`` is the VIIRS start date: rows before it are excluded,
     because there is no second sensor to compare against.
 
@@ -286,64 +285,10 @@ def overlap_validation(
     }
 
 
-def cell_sweep(
-    cell_days: Iterable,
-    *,
-    factors: Sequence[int] = (1, 2, 4),
-    cell_km: float = harmonize.DEFAULT_CELL_KM,
-) -> list[dict[str, float]]:
-    """Harmonized agreement as the grid coarsens; raw is grid-independent.
-
-    Each cell-day is re-snapped to a grid ``factor`` times coarser and the
-    per-day distinct-cell counts of the two sensors are correlated, which
-    shows the improvement is not an artefact of one cell size. Raw counts are
-    point data and do not aggregate, so ``raw_correlation`` is constant
-    across the sweep. Undefined correlations (a constant series) count as
-    0.0 rather than ``NaN``: the contract only carries real numbers.
-    """
-    items = list(cell_days)
-    dates = sorted({cd.date for cd in items})
-
-    raw_modis = dict.fromkeys(dates, 0.0)
-    raw_viirs = dict.fromkeys(dates, 0.0)
-    for cd in items:
-        if cd.stream_mask & MODIS_MASK:
-            raw_modis[cd.date] += cd.n_modis
-        if cd.stream_mask & VIIRS_MASK:
-            raw_viirs[cd.date] += cd.n_viirs
-    raw_corr = pearson(
-        [raw_modis[d] for d in dates], [raw_viirs[d] for d in dates]
-    ) or 0.0
-
-    sweep: list[dict[str, float]] = []
-    for factor in factors:
-        hit_modis = {d: set() for d in dates}
-        hit_viirs = {d: set() for d in dates}
-        for cd in items:
-            cell = (cd.cell_x // factor, cd.cell_y // factor)
-            if cd.stream_mask & MODIS_MASK:
-                hit_modis[cd.date].add(cell)
-            if cd.stream_mask & VIIRS_MASK:
-                hit_viirs[cd.date].add(cell)
-        corr = pearson(
-            [len(hit_modis[d]) for d in dates],
-            [len(hit_viirs[d]) for d in dates],
-        ) or 0.0
-        sweep.append(
-            {
-                "cell_km": round(cell_km * factor, 2),
-                "raw_correlation": round(float(raw_corr), 4),
-                "harmonized_correlation": round(float(corr), 4),
-            }
-        )
-    return sweep
-
-
 __all__: Iterable[str] = (
     "DEFAULT_CELL_SIZES",
     "Correlation",
     "ValidationReport",
-    "cell_sweep",
     "correlation_stats",
     "family_date_range",
     "overlap_validation",
