@@ -875,6 +875,82 @@
         }
       },
       "additionalProperties": false
+    },
+    "fireNews": {
+      "type": "object",
+      "required": [
+        "date",
+        "region",
+        "generated_at",
+        "cached",
+        "partial",
+        "count",
+        "results",
+        "satellite",
+        "message"
+      ],
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "region": {
+          "type": "object",
+          "required": ["id", "label", "bbox"],
+          "properties": {
+            "id": {"type": "string"},
+            "label": {"type": "string"},
+            "bbox": {"$ref": "#/$defs/bbox"}
+          },
+          "additionalProperties": false
+        },
+        "generated_at": {"type": "string"},
+        "cached": {"type": "boolean"},
+        "partial": {"type": "boolean"},
+        "count": {"type": "integer", "minimum": 0},
+        "results": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/fireNewsItem"}
+        },
+        "satellite": {"$ref": "#/$defs/fireNewsSatellite"},
+        "message": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "fireNewsItem": {
+      "type": "object",
+      "required": [
+        "headline",
+        "summary",
+        "published_date",
+        "event_date",
+        "source_name",
+        "url",
+        "satellite_agreement"
+      ],
+      "properties": {
+        "headline": {"type": "string"},
+        "summary": {"type": "string"},
+        "published_date": {"type": "string", "format": "date"},
+        "event_date": {"type": "string", "format": "date"},
+        "source_name": {"type": "string"},
+        "url": {"type": "string", "format": "uri"},
+        "satellite_agreement": {
+          "enum": ["agrees", "no_detections", "unavailable"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "fireNewsSatellite": {
+      "type": "object",
+      "required": ["available", "detections", "active_cells", "agrees_with_news"],
+      "properties": {
+        "available": {"type": "boolean"},
+        "detections": {"type": "integer", "minimum": 0},
+        "active_cells": {"type": "integer", "minimum": 0},
+        "agrees_with_news": {"type": ["boolean", "null"]}
+      },
+      "additionalProperties": false
     }
   }
 }

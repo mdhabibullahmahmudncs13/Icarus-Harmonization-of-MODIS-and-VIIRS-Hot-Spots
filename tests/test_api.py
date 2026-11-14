@@ -458,6 +458,27 @@ def test_the_aoi_narrows_the_answer(client: TestClient):
     assert sum(row["harm_total"] for row in npl["series"]) == 0
 
 
+def test_get_requests_scope_by_the_aoi_query_as_the_frontend_sends_it(client: TestClient):
+    """The UI uses GET with ``?aoi=``; every scoped route must honour it.
+
+    Before this was covered, the GET routes resolved the default region and
+    ignored the query, so changing the picker still reported Bangladesh.
+    """
+    bgd_series = client.get("/api/v1/series", params={"aoi": "BGD"}).json()
+    europe_series = client.get("/api/v1/series", params={"aoi": "EUROPE"}).json()
+    assert europe_series["meta"]["region"]["bbox"] == [-26.0, 34.0, 35.0, 82.0]
+    assert sum(row["harm_total"] for row in bgd_series["series"]) > 0
+    assert sum(row["harm_total"] for row in europe_series["series"]) == 0
+
+    bgd_cells = client.get("/api/v1/cells", params={"aoi": "BGD"}).json()
+    europe_cells = client.get("/api/v1/cells", params={"aoi": "EUROPE"}).json()
+    assert bgd_cells["cells"] and europe_cells["cells"] == []
+
+    europe_baseline = client.get("/api/v1/baseline", params={"aoi": "EUROPE"}).json()
+    assert europe_baseline["meta"]["region"]["bbox"] == [-26.0, 34.0, 35.0, 82.0]
+    assert all(row["p95"] == 0 for row in europe_baseline["baseline"])
+
+
 def test_the_density_divisor_follows_the_region(client: TestClient):
     """Density divides by the requested region's cells, not Bangladesh's.
 
@@ -582,17 +603,25 @@ def test_missing_cache_and_fixture_is_a_503(client: TestClient, tmp_path, monkey
 # --------------------------------------------------------------------------
 
 
-def test_endpoints_work_with_all_network_blocked(client: TestClient, monkeypatch):
-    """The API must answer with sockets unavailable — it has no network tier."""
+def test_endpoints_work_with_all_network_blocked(monkeypatch):
+    """The API must answer with sockets unavailable — it has no network tier.
 
-    def blocked(*_args, **_kwargs):
-        raise AssertionError("the API attempted a network connection")
+    The client is entered *before* the sockets are blocked: Starlette's test
+    client opens an event loop (and its self-pipe socketpair) on first use,
+    and blocking that would fail the harness rather than prove the API makes
+    no outbound connection.
+    """
 
-    monkeypatch.setattr(socket.socket, "connect", blocked)
-    monkeypatch.setattr(socket, "create_connection", blocked)
-    for endpoint in ENDPOINTS.values():
-        response = client.get(endpoint["path"], params=endpoint["params"])
-        assert response.status_code == 200, endpoint["path"]
+    with TestClient(app) as client:
+
+        def blocked(*_args, **_kwargs):
+            raise AssertionError("the API attempted a network connection")
+
+        monkeypatch.setattr(socket.socket, "connect", blocked)
+        monkeypatch.setattr(socket, "create_connection", blocked)
+        for endpoint in ENDPOINTS.values():
+            response = client.get(endpoint["path"], params=endpoint["params"])
+            assert response.status_code == 200, endpoint["path"]
 
 
 # --------------------------------------------------------------------------
@@ -600,8 +629,11 @@ def test_endpoints_work_with_all_network_blocked(client: TestClient, monkeypatch
 # --------------------------------------------------------------------------
 
 
-def test_an_aoi_over_the_cell_cap_is_refused(client: TestClient):
-    """A huge bbox is refused before any query runs."""
+def test_an_aoi_over_the_cell_cap_is_refused(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+    """A bbox over the configured bound is refused before any query runs."""
+    from src.api import main
+
+    monkeypatch.setattr(main, "MAX_AOI_CELLS", 1000)
     response = client.post("/api/v1/series", json={"bbox": [-80.0, -60.0, 80.0, 70.0]})
     assert response.status_code == 422, response.text
     body = response.json()
@@ -622,9 +654,22 @@ def test_the_cell_cap_applies_to_a_preset_too(client: TestClient, monkeypatch):
 
     monkeypatch.setattr(main, "PRESET_BBOX", {"HUGE": (-80.0, -60.0, 80.0, 70.0)})
     monkeypatch.setattr(main, "PRESET_IDS", frozenset({"HUGE"}))
+    monkeypatch.setattr(main, "MAX_AOI_CELLS", 1000)
     response = client.post("/api/v1/series", json={"aoi": "HUGE"})
     assert response.status_code == 422, response.text
     assert response.json()["code"] == "aoi_too_large"
+
+
+def test_every_configured_region_is_within_the_cell_cap(client: TestClient):
+    """The cap must admit every region the picker offers, including World."""
+    from src import regions
+    from src.api import main
+
+    for region in regions.all_regions():
+        assert harmonize.grid_cell_count(region.bbox) <= main.MAX_AOI_CELLS
+        response = client.get("/api/v1/meta", params={"aoi": region.id})
+        assert response.status_code == 200, f"{region.id}: {response.text}"
+        assert response.json()["meta"]["region"]["bbox"] == list(region.bbox)
 
 
 def test_a_slow_request_is_cut_off_with_a_timeout(client: TestClient, monkeypatch):

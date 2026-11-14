@@ -5,6 +5,7 @@ export type View =
   | 'calendar'
   | 'map'
   | 'anomalies'
+  | 'news'
   | 'critical'
   | 'validation'
   | 'methods'
@@ -15,6 +16,7 @@ export const VIEWS: View[] = [
   'calendar',
   'map',
   'anomalies',
+  'news',
   'critical',
   'validation',
   'methods',

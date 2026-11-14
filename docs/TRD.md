@@ -208,7 +208,7 @@ If mean density < `min_mean_density = 1e-5`, return "insufficient activity".
 | bootstrap_seed | 20260101 | Bootstrap seed |
 | sigma_floor | 0.1 | Min sigma for z-score |
 | z_elevated / z_extreme | 2.0 / 3.0 | Anomaly thresholds |
-| max_aoi_cells | 100000 | Max cells per AOI request |
+| max_aoi_cells | 25000000 | Max cells per AOI request |
 | request_timeout_s | 30 | API per-request timeout |
 
 All parameters live in `config/params.yaml`; the hash of that file is stored with every derived artifact.
@@ -241,7 +241,7 @@ Preset:  { "type": "preset",  "id": "BGD" }
 Polygon: { "type": "geojson", "geometry": { "type": "Polygon", "coordinates": [[[lon,lat], ...]] } }
 ```
 
-Validation: ring closed, ≥ 4 positions, within processing extent, no self-intersection, ≤ 100,000 cells. Invalid → HTTP 422 with `{ "code", "message", "field" }`.
+Validation: ring closed, ≥ 4 positions, within processing extent, no self-intersection, ≤ 25,000,000 cells. Invalid → HTTP 422 with `{ "code", "message", "field" }`.
 
 ### 6.2 Series Bins
 
@@ -328,7 +328,7 @@ A synthetic data generator produces `det.parquet` matching §3.1 with configurab
 ## 11. Security & Data Governance
 
 - The API reads the Parquet cache and never writes to it.
-- All inputs validated (AOI geometry, year ranges, cell count ≤ `api.max_aoi_cells` = 100,000).
+- All inputs validated (AOI geometry, year ranges, cell count ≤ `api.max_aoi_cells` = 25,000,000).
 - Request size limits and a 30 s per-request timeout (`api.request_timeout_s`).
 - `FIRMS_MAP_KEY` read from the environment only; never committed or logged.
 - Logs contain request path, duration, and status — not user AOI geometries.

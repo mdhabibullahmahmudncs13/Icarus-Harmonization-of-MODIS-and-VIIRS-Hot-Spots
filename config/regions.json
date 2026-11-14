@@ -1,0 +1,135 @@
+{
+  "_comment": "Single source of truth for every selectable region. Read by src/regions.py, which the API, the acquisition CLI and tools/gen_mock.py all use; the web picker receives it through /api/v1/aoi. 'kind': firms = a NASA FIRMS regional coordinate box, local = a project AOI inside the pilot extent. 'sensors' lists the FIRMS product ids the region can be queried with; every FIRMS region supports MODIS and all three VIIRS satellites. 'search_terms' are the English and local-language terms the fire-news agent uses for this region.",
+  "_bbox_order": "west, south, east, north (decimal degrees)",
+  "_source": "NASA FIRMS Regional Coordinates: https://firms.modaps.eosdis.nasa.gov/active_fire/coordinates.html (retrieved 2026-11-14). Do not edit these bboxes without re-reading that page.",
+  "regions": [
+    {
+      "id": "BGD",
+      "label": "Bangladesh",
+      "kind": "local",
+      "bbox": [88.0, 20.0, 93.0, 27.0],
+      "sensors": ["MODIS_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "VIIRS_NOAA21_NRT"],
+      "search_terms": ["wildfire", "forest fire", "দাবানল"]
+    },
+    {
+      "id": "IND-C",
+      "label": "Central India",
+      "kind": "local",
+      "bbox": [75.0, 18.0, 82.0, 25.0],
+      "sensors": ["MODIS_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "VIIRS_NOAA21_NRT"],
+      "search_terms": ["wildfire", "forest fire", "जंगल में आग"]
+    },
+    {
+      "id": "NPL",
+      "label": "Nepal Terai",
+      "kind": "local",
+      "bbox": [80.0, 26.0, 88.0, 31.0],
+      "sensors": ["MODIS_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "VIIRS_NOAA21_NRT"],
+      "search_terms": ["wildfire", "forest fire", "वन आग"]
+    },
+    {
+      "id": "WORLD",
+      "label": "World",
+      "kind": "firms",
+      "bbox": [-180.0, -90.0, 180.0, 90.0],
+      "sensors": ["MODIS_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "VIIRS_NOAA21_NRT"],
+      "search_terms": ["wildfire", "forest fire", "bushfire"]
+    },
+    {
+      "id": "CANADA",
+      "label": "Canada",
+      "kind": "firms",
+      "bbox": [-150.0, 40.0, -49.0, 79.0],
+      "sensors": ["MODIS_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "VIIRS_NOAA21_NRT"],
+      "search_terms": ["wildfire", "forest fire", "feu de forêt"]
+    },
+    {
+      "id": "ALASKA",
+      "label": "Alaska",
+      "kind": "firms",
+      "bbox": [-180.0, 50.0, -139.0, 72.0],
+      "sensors": ["MODIS_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "VIIRS_NOAA21_NRT"],
+      "search_terms": ["wildfire", "forest fire"]
+    },
+    {
+      "id": "USA_CONUS_HAWAII",
+      "label": "USA (Conterminous) and Hawaii",
+      "kind": "firms",
+      "bbox": [-160.5, 17.5, -63.8, 50.0],
+      "sensors": ["MODIS_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "VIIRS_NOAA21_NRT"],
+      "search_terms": ["wildfire", "brush fire", "incendio forestal"]
+    },
+    {
+      "id": "CENTRAL_AMERICA",
+      "label": "Central America",
+      "kind": "firms",
+      "bbox": [-119.5, 7.0, -58.5, 33.5],
+      "sensors": ["MODIS_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "VIIRS_NOAA21_NRT"],
+      "search_terms": ["incendio forestal", "incendio", "wildfire"]
+    },
+    {
+      "id": "SOUTH_AMERICA",
+      "label": "South America",
+      "kind": "firms",
+      "bbox": [-112.0, -60.0, -26.0, 13.0],
+      "sensors": ["MODIS_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "VIIRS_NOAA21_NRT"],
+      "search_terms": ["incendio forestal", "queimada", "fogo", "wildfire"]
+    },
+    {
+      "id": "EUROPE",
+      "label": "Europe",
+      "kind": "firms",
+      "bbox": [-26.0, 34.0, 35.0, 82.0],
+      "sensors": ["MODIS_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "VIIRS_NOAA21_NRT"],
+      "search_terms": ["incendie de forêt", "incendio forestal", "Waldbrand", "pożar lasu", "wildfire"]
+    },
+    {
+      "id": "NORTH_CENTRAL_AFRICA",
+      "label": "North and Central Africa",
+      "kind": "firms",
+      "bbox": [-27.0, -10.0, 52.0, 37.5],
+      "sensors": ["MODIS_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "VIIRS_NOAA21_NRT"],
+      "search_terms": ["incendie de forêt", "incêndio florestal", "moto wa msitu", "wildfire"]
+    },
+    {
+      "id": "SOUTHERN_AFRICA",
+      "label": "Southern Africa",
+      "kind": "firms",
+      "bbox": [10.0, -36.0, 58.5, -4.0],
+      "sensors": ["MODIS_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "VIIRS_NOAA21_NRT"],
+      "search_terms": ["incêndio florestal", "incendie de forêt", "moto wa msitu", "wildfire"]
+    },
+    {
+      "id": "RUSSIA_ASIA",
+      "label": "Russia and Asia",
+      "kind": "firms",
+      "bbox": [26.0, 9.0, 180.0, 83.5],
+      "sensors": ["MODIS_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "VIIRS_NOAA21_NRT"],
+      "search_terms": ["лесной пожар", "森林火灾", "森林火災", "산불", "wildfire"]
+    },
+    {
+      "id": "SOUTH_ASIA",
+      "label": "South Asia",
+      "kind": "firms",
+      "bbox": [54.0, 5.5, 102.0, 40.0],
+      "sensors": ["MODIS_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "VIIRS_NOAA21_NRT"],
+      "search_terms": ["जंगल में आग", "দাবানল", "جنگل میں آگ", "wildfire"]
+    },
+    {
+      "id": "SOUTHEAST_ASIA",
+      "label": "South East Asia",
+      "kind": "firms",
+      "bbox": [88.0, -12.0, 163.0, 31.0],
+      "sensors": ["MODIS_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "VIIRS_NOAA21_NRT"],
+      "search_terms": ["kebakaran hutan", "ไฟป่า", "cháy rừng", "wildfire"]
+    },
+    {
+      "id": "AUSTRALIA_NZ",
+      "label": "Australia and New Zealand",
+      "kind": "firms",
+      "bbox": [110.0, -55.0, 180.0, -10.0],
+      "sensors": ["MODIS_SP", "VIIRS_SNPP_SP", "VIIRS_NOAA20_SP", "VIIRS_NOAA21_NRT"],
+      "search_terms": ["bushfire", "wildfire", "scrub fire"]
+    }
+  ]
+}

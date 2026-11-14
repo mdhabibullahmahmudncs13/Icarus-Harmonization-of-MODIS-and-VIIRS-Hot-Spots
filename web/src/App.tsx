@@ -9,6 +9,7 @@ import { SeriesChart } from './components/SeriesChart';
 import { CalendarHeatmap } from './components/CalendarHeatmap';
 import { RegionMap } from './components/RegionMap';
 import { BaselineChart } from './components/BaselineChart';
+import { FireNewsPanel } from './components/FireNewsPanel';
 import {
   AnomalyBox,
   CriticalPeriodPanel,
@@ -25,6 +26,7 @@ const TITLES: Record<View, { title: string; sub: string }> = {
   calendar: { title: 'Calendar', sub: 'Years × 46 eight-day bins.' },
   map: { title: 'Map', sub: 'Grid cells by activity.' },
   anomalies: { title: 'Anomalies', sub: 'Is this period unusual for the season?' },
+  news: { title: 'Fire news', sub: 'Sourced reports for the selected day and region.' },
   critical: { title: 'Critical fire period', sub: 'Onset, peak, end, window mass.' },
   validation: { title: 'Validation', sub: 'Raw vs harmonized agreement over the overlap.' },
   methods: { title: 'Methods', sub: 'What was computed, and on which datasets.' },
@@ -109,6 +111,9 @@ export function App() {
         // The anomalies screen shows the score and the baseline it was ranked
         // against, so the drawer carries both.
         return { anomaly: data.anomaly, baseline: data.baseline };
+      case 'news':
+        // News is fetched by the panel itself and is not part of the dataset.
+        return null;
       case 'critical':
         return data.criticalPeriod;
       case 'validation':
@@ -138,8 +143,9 @@ export function App() {
       }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
-      if (k >= '1' && k <= '8') {
-        setView(VIEWS[Number(k) - 1]);
+      const index = Number(k);
+      if (k.length === 1 && index >= 1 && index <= VIEWS.length) {
+        setView(VIEWS[index - 1]);
       } else if (k === 'r') {
         setMode('raw');
       } else if (k === 'h') {
@@ -322,6 +328,17 @@ export function App() {
                   </div>
                 </div>
               </>
+            )}
+            {view === 'news' && (
+              <FireNewsPanel
+                date={state.date ?? data.meta.meta.date_range[1]}
+                regionId={state.aoi}
+                regionLabel={
+                  data.aoi.presets.find((preset) => preset.id === state.aoi)?.name ??
+                  state.aoi
+                }
+                onDate={setDate}
+              />
             )}
             {view === 'critical' && <CriticalPeriodPanel critical={data.criticalPeriod} />}
             {view === 'validation' && <ValidationCard validation={data.validation} />}

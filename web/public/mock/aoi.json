@@ -16,7 +16,7 @@
       "2010-01-01",
       "2016-12-31"
     ],
-    "params_hash": "5056f18fdf19"
+    "params_hash": "597249e71ed7"
   },
   "presets": [
     {
@@ -47,6 +47,136 @@
         26.0,
         88.0,
         31.0
+      ]
+    },
+    {
+      "id": "WORLD",
+      "name": "World",
+      "bbox": [
+        -180.0,
+        -90.0,
+        180.0,
+        90.0
+      ]
+    },
+    {
+      "id": "CANADA",
+      "name": "Canada",
+      "bbox": [
+        -150.0,
+        40.0,
+        -49.0,
+        79.0
+      ]
+    },
+    {
+      "id": "ALASKA",
+      "name": "Alaska",
+      "bbox": [
+        -180.0,
+        50.0,
+        -139.0,
+        72.0
+      ]
+    },
+    {
+      "id": "USA_CONUS_HAWAII",
+      "name": "USA (Conterminous) and Hawaii",
+      "bbox": [
+        -160.5,
+        17.5,
+        -63.8,
+        50.0
+      ]
+    },
+    {
+      "id": "CENTRAL_AMERICA",
+      "name": "Central America",
+      "bbox": [
+        -119.5,
+        7.0,
+        -58.5,
+        33.5
+      ]
+    },
+    {
+      "id": "SOUTH_AMERICA",
+      "name": "South America",
+      "bbox": [
+        -112.0,
+        -60.0,
+        -26.0,
+        13.0
+      ]
+    },
+    {
+      "id": "EUROPE",
+      "name": "Europe",
+      "bbox": [
+        -26.0,
+        34.0,
+        35.0,
+        82.0
+      ]
+    },
+    {
+      "id": "NORTH_CENTRAL_AFRICA",
+      "name": "North and Central Africa",
+      "bbox": [
+        -27.0,
+        -10.0,
+        52.0,
+        37.5
+      ]
+    },
+    {
+      "id": "SOUTHERN_AFRICA",
+      "name": "Southern Africa",
+      "bbox": [
+        10.0,
+        -36.0,
+        58.5,
+        -4.0
+      ]
+    },
+    {
+      "id": "RUSSIA_ASIA",
+      "name": "Russia and Asia",
+      "bbox": [
+        26.0,
+        9.0,
+        180.0,
+        83.5
+      ]
+    },
+    {
+      "id": "SOUTH_ASIA",
+      "name": "South Asia",
+      "bbox": [
+        54.0,
+        5.5,
+        102.0,
+        40.0
+      ]
+    },
+    {
+      "id": "SOUTHEAST_ASIA",
+      "name": "South East Asia",
+      "bbox": [
+        88.0,
+        -12.0,
+        163.0,
+        31.0
+      ]
+    },
+    {
+      "id": "AUSTRALIA_NZ",
+      "name": "Australia and New Zealand",
+      "bbox": [
+        110.0,
+        -55.0,
+        180.0,
+        -10.0
       ]
     }
   ]

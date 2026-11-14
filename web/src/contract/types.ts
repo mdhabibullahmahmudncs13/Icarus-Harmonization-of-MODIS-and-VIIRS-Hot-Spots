@@ -129,6 +129,34 @@ export interface AoiPayload {
   presets: { id: string; name: string; bbox: [number, number, number, number] }[];
 }
 
+export interface FireNewsItem {
+  headline: string;
+  summary: string;
+  published_date: string;
+  event_date: string;
+  source_name: string;
+  url: string;
+  satellite_agreement: 'agrees' | 'no_detections' | 'unavailable';
+}
+
+/** The agent's answer for one (date, region): sourced reports, never inferred. */
+export interface FireNewsPayload {
+  date: string;
+  region: { id: string; label: string; bbox: [number, number, number, number] };
+  generated_at: string;
+  cached: boolean;
+  partial: boolean;
+  count: number;
+  results: FireNewsItem[];
+  satellite: {
+    available: boolean;
+    detections: number;
+    active_cells: number;
+    agrees_with_news: boolean | null;
+  };
+  message: string | null;
+}
+
 /** Everything the app loads at startup. */
 export interface Dataset {
   meta: MetaPayload;

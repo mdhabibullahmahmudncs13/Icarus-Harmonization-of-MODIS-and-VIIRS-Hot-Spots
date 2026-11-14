@@ -30,6 +30,7 @@ import sys
 from datetime import date, timedelta
 from pathlib import Path
 
+from src import regions
 from src.compute import critical_period, params, pearson, percentile, spearman
 from src.compute.coverage import MODIS_SOURCE
 
@@ -66,13 +67,12 @@ BLOB_CENTERS = [
 ]
 BLOB_RADIUS_DEG = 0.30
 
-# AOI presets, inside the pilot extent. Read from the shared JSON that the
-# API's /api/v1/aoi payload also uses, so the mock and the API cannot drift
-# (docs/IMPLEMENTATION_PLAN.md §5).
-PRESETS_PATH = Path(__file__).resolve().parents[1] / "src" / "aoi_presets.json"
+# Regions, read from the shared registry the API's /api/v1/aoi payload also
+# uses, so the mock and the API cannot drift (docs/IMPLEMENTATION_PLAN.md §5).
+PRESETS_PATH = regions.REGIONS_PATH
 PRESETS = [
     (str(entry["id"]), str(entry["name"]), [float(v) for v in entry["bbox"]])
-    for entry in json.loads(PRESETS_PATH.read_text())["presets"]
+    for entry in regions.preset_entries()
 ]
 
 DATASETS = [

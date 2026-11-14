@@ -1,10 +1,12 @@
 """Icarus API — the seven contract endpoints, served offline-first.
 
-Every route returns a payload built by :mod:`src.compute.export`, so the API and
-the exported static files are the same shapes and both satisfy
+Every analysis route returns a payload built by :mod:`src.compute.export`, so
+the API and the exported static files are the same shapes and both satisfy
 ``docs/contract.schema.json``. The API reads local parquet only (see
 :mod:`src.api.dataset`); it never calls NASA, and ``OFFLINE=1`` makes it
-serve the committed fixture.
+serve the committed fixture. The one network-backed route is
+``POST /api/fire-news``, which asks the Hyperbrowser agent for sourced news
+(and returns a clear 503 under ``OFFLINE=1`` unless the answer is cached).
 
 Endpoints, all carrying the shared ``meta`` block. Every payload is served
 under the versioned ``/api/v1`` prefix the contract specifies (and the
@@ -21,6 +23,7 @@ alias so earlier callers keep working.
 * ``/api/v1/validation`` (alias ``/api/validation``)
 * ``/api/v1/methods`` (alias ``/api/methods``)
 * ``/api/v1/aoi``
+* ``POST /api/fire-news`` (alias ``/api/v1/fire-news``)
 
 Per ``docs/ARCHITECTURE.md`` §6 the analysis endpoints also accept ``POST``:
 ``aoi``, ``date`` and ``bbox`` in the body override the query parameters, and
@@ -44,8 +47,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from src import regions
 from src.api.dataset import Dataset, NoDataError, _continuous, get_dataset
 from src.compute import export, harmonize, params
+from src.news import agent as news_agent
+from src.news.hyperbrowser import HyperbrowserError, HyperbrowserNotConfigured
 
 #: Origins that may call the API during development: the Vite dev server and
 #: the preview server, both loopback-only. No wildcard, so an offline demo
@@ -58,10 +64,9 @@ ALLOWED_ORIGINS = [
     "http://localhost:4173",
 ]
 
-#: The AOI presets, from the one shared list: id -> the area it names.
+#: The regions, from the one shared registry: id -> the area it names.
 PRESET_BBOX: dict[str, tuple[float, float, float, float]] = {
-    str(preset["id"]): tuple(float(v) for v in preset["bbox"])  # type: ignore[misc]
-    for preset in export.load_presets()
+    region.id: region.bbox for region in regions.all_regions()
 }
 
 #: The AOI ids the picker offers.
@@ -71,7 +76,7 @@ PRESET_IDS: frozenset[str] = frozenset(PRESET_BBOX)
 #: may run. Both come from ``config/params.yaml`` (the ``api`` section), the
 #: file the project documents as the source of every tunable value; the
 #: constants are the fallback when the file cannot be read.
-MAX_AOI_CELLS = int(params.param(params.PARAMS_PATH, "api", "max_aoi_cells", 100_000))
+MAX_AOI_CELLS = int(params.param(params.PARAMS_PATH, "api", "max_aoi_cells", 25_000_000))
 REQUEST_TIMEOUT_S = float(params.param(params.PARAMS_PATH, "api", "request_timeout_s", 30))
 
 
@@ -223,6 +228,19 @@ class AoiBody(BaseModel):
     geometry: dict[str, Any] | None = None
 
 
+class FireNewsRequest(BaseModel):
+    """``POST /api/fire-news``: the day and the region to search for.
+
+    ``refresh`` bypasses the on-disk cache for this one call; without it a
+    repeated ``(date, region)`` is served from the cache, which is what keeps
+    the browsing cost bounded.
+    """
+
+    date: DateType
+    region: str
+    refresh: bool = False
+
+
 class AnalysisRequest(BaseModel):
     """The optional JSON body ``docs/ARCHITECTURE.md`` §6 describes.
 
@@ -247,7 +265,7 @@ class AnalysisRequest(BaseModel):
 def _resolve(
     body: AnalysisRequest | None,
     *,
-    aoi: str = "BGD",
+    aoi: str = regions.DEFAULT_REGION_ID,
     date: DateType | None = None,
     bbox: str | None = None,
     allow_density: bool = False,
@@ -369,7 +387,9 @@ def health() -> dict[str, str]:
 @app.get("/api/meta")
 @app.get("/api/v1/meta")
 def meta(
-    aoi: Annotated[str, Query(description="preset id the request is for")] = "BGD",
+    aoi: Annotated[
+        str, Query(description="region id the request is for")
+    ] = regions.DEFAULT_REGION_ID,
 ) -> Mapping[str, Any]:
     """Region, parameters and sensor epochs."""
     _, _, area = _resolve(None, aoi=aoi)
@@ -389,14 +409,20 @@ def meta(
 @app.get("/api/series")
 @app.get("/api/v1/series")
 @app.post("/api/v1/series")
-def series(body: AnalysisRequest | None = None) -> Mapping[str, Any]:
+def series(
+    aoi: Annotated[
+        str, Query(description="region id the request is for")
+    ] = regions.DEFAULT_REGION_ID,
+    bbox: Annotated[str | None, Query(description="west,south,east,north")] = None,
+    body: AnalysisRequest | None = None,
+) -> Mapping[str, Any]:
     """Daily raw and harmonized counts, one row per day.
 
     ``metric=density`` (the default the startup flow in
     ``docs/ARCHITECTURE.md`` §7 asks for) serves the same counts divided by
     the region's grid-cell count; anything else is ``cell_days``.
     """
-    _, _, area = _resolve(body, allow_density=True)
+    _, _, area = _resolve(body, aoi=aoi, bbox=bbox, allow_density=True)
     metric = body.metric if body is not None and body.metric is not None else "cell_days"
     dataset = _dataset()
     return export.build_series(
@@ -417,10 +443,14 @@ def series(body: AnalysisRequest | None = None) -> Mapping[str, Any]:
 def cells(
     start: Annotated[DateType | None, Query(description="ISO date, inclusive")] = None,
     end: Annotated[DateType | None, Query(description="ISO date, inclusive")] = None,
+    aoi: Annotated[
+        str, Query(description="region id the request is for")
+    ] = regions.DEFAULT_REGION_ID,
+    bbox: Annotated[str | None, Query(description="west,south,east,north")] = None,
     body: AnalysisRequest | None = None,
 ) -> Mapping[str, Any]:
     """Grid cells over a date window, with raw and harmonized counts."""
-    _, _, area = _resolve(body)
+    _, _, area = _resolve(body, aoi=aoi, bbox=bbox)
     if start is not None and end is not None and start > end:
         fail(422, "invalid_window", "start must not be after end", "start")
     dataset = _dataset()
@@ -438,9 +468,15 @@ def cells(
 @app.get("/api/baseline")
 @app.get("/api/v1/baseline")
 @app.post("/api/v1/baseline")
-def baseline(body: AnalysisRequest | None = None) -> Mapping[str, Any]:
+def baseline(
+    aoi: Annotated[
+        str, Query(description="region id the request is for")
+    ] = regions.DEFAULT_REGION_ID,
+    bbox: Annotated[str | None, Query(description="west,south,east,north")] = None,
+    body: AnalysisRequest | None = None,
+) -> Mapping[str, Any]:
     """Seasonal baseline: day-of-year percentiles of the harmonized series."""
-    _, _, area = _resolve(body)
+    _, _, area = _resolve(body, aoi=aoi, bbox=bbox)
     dataset = _dataset()
     return export.build_baseline(
         _area_series(dataset, area),
@@ -485,7 +521,9 @@ def _anomaly_payload(
 def anomaly(
     date: Annotated[DateType, Query(description="ISO date to judge")],
     bbox: Annotated[str | None, Query(description="west,south,east,north")] = None,
-    aoi: Annotated[str, Query(description="preset id the request is for")] = "BGD",
+    aoi: Annotated[
+        str, Query(description="region id the request is for")
+    ] = regions.DEFAULT_REGION_ID,
     body: AnalysisRequest | None = None,
 ) -> Mapping[str, Any]:
     """Rank one date against its day-of-year baseline."""
@@ -502,7 +540,9 @@ def anomalies(
         DateType | None, Query(description="ISO date to judge; defaults to the last day")
     ] = None,
     bbox: Annotated[str | None, Query(description="west,south,east,north")] = None,
-    aoi: Annotated[str, Query(description="preset id the request is for")] = "BGD",
+    aoi: Annotated[
+        str, Query(description="region id the request is for")
+    ] = regions.DEFAULT_REGION_ID,
     body: AnalysisRequest | None = None,
 ) -> Mapping[str, Any]:
     """The frontend's anomalies view: the requested date, or the latest day."""
@@ -512,11 +552,45 @@ def anomalies(
     )
 
 
+@app.post("/api/fire-news")
+@app.post("/api/v1/fire-news")
+def fire_news(body: FireNewsRequest) -> Mapping[str, Any]:
+    """Sourced fire news for one date and region (Hyperbrowser-backed).
+
+    ``region`` is a region id from ``config/regions.json``, not an arbitrary
+    bbox: the agent searches by name and verifies the page against the same
+    registry entry the rest of the app uses. The response carries only
+    articles that matched the date and region and have a source URL; an empty
+    search is a 200 with a clear message, never padding.
+    """
+    if body.region not in regions.region_ids():
+        fail(
+            422,
+            "unknown_region",
+            f"unknown region {body.region!r}; known: {sorted(regions.region_ids())}",
+            "region",
+        )
+    try:
+        return news_agent.search_fire_news(
+            body.date, body.region, force=body.refresh
+        )
+    except HyperbrowserNotConfigured as exc:
+        fail(503, "news_unconfigured", str(exc))
+    except news_agent.FireNewsUnavailable as exc:
+        fail(503, "news_unavailable", str(exc))
+    except news_agent.FireNewsTimeout as exc:
+        fail(504, "news_timeout", str(exc))
+    except HyperbrowserError as exc:
+        fail(502, "news_upstream_error", str(exc))
+
+
 @app.get("/api/critical-period")
 @app.get("/api/v1/critical-period")
 @app.post("/api/v1/critical-period")
 def critical_period(
-    aoi: Annotated[str, Query(description="preset id the request is for")] = "BGD",
+    aoi: Annotated[
+        str, Query(description="region id the request is for")
+    ] = regions.DEFAULT_REGION_ID,
     body: AnalysisRequest | None = None,
 ) -> Mapping[str, Any]:
     """Onset, peak, end and window mass of the burning season."""
@@ -538,7 +612,7 @@ def aoi() -> Mapping[str, Any]:
     """The preset AOIs the picker offers."""
     dataset = _dataset()
     return export.build_aoi(
-        bbox=PRESET_BBOX["BGD"],
+        bbox=PRESET_BBOX[regions.DEFAULT_REGION_ID],
         source=dataset.source,
         generated_at=dataset.generated_at,
         date_range=export.detections_date_range(dataset.detections),
@@ -548,9 +622,15 @@ def aoi() -> Mapping[str, Any]:
 @app.get("/api/validation")
 @app.get("/api/v1/validation")
 @app.post("/api/v1/validation")
-def validation(body: AnalysisRequest | None = None) -> Mapping[str, Any]:
+def validation(
+    aoi: Annotated[
+        str, Query(description="region id the request is for")
+    ] = regions.DEFAULT_REGION_ID,
+    bbox: Annotated[str | None, Query(description="west,south,east,north")] = None,
+    body: AnalysisRequest | None = None,
+) -> Mapping[str, Any]:
     """Overlap-period agreement, raw against harmonized."""
-    _, _, area = _resolve(body)
+    _, _, area = _resolve(body, aoi=aoi, bbox=bbox)
     dataset = _dataset()
     try:
         return export.build_validation(
@@ -574,7 +654,7 @@ def methods() -> Mapping[str, Any]:
     # across all nine payloads and two payloads can be matched against each
     # other (docs/ARCHITECTURE.md §13: same inputs + same hash => same output).
     return export.build_methods(
-        bbox=PRESET_BBOX["BGD"],
+        bbox=PRESET_BBOX[regions.DEFAULT_REGION_ID],
         source=dataset.source,
         generated_at=dataset.generated_at,
         date_range=export.detections_date_range(dataset.detections),
@@ -587,6 +667,7 @@ __all__ = [
     "PRESET_IDS",
     "REQUEST_TIMEOUT_S",
     "AnalysisRequest",
+    "FireNewsRequest",
     "TimeoutMiddleware",
     "app",
     "fail",

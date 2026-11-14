@@ -22,6 +22,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from src import regions
 from src.acquire import firms
 from src.compute import anomaly, calibrate, coverage, harmonize, params, schema, season, validate
 from src.compute.availability import availability_table
@@ -73,19 +74,14 @@ SENSOR_LABELS: dict[str, tuple[str, str]] = {
     "VIIRS_NOAA21_NRT": ("VIIRS 375 m, NOAA-21 (NRT)", "Raw + harmonized VIIRS series"),
 }
 
-#: AOI presets, read from ``src/aoi_presets.json`` so this module and
+#: The region registry (``config/regions.json``), so this module and
 #: ``tools/gen_mock.py`` cannot disagree about the picker list.
-AOI_PRESETS_PATH = REPO_ROOT / "src" / "aoi_presets.json"
-
+REGIONS_PATH = regions.REGIONS_PATH
 
 
 def load_presets() -> list[dict[str, Any]]:
-    """The AOI presets as contract ``presets`` entries."""
-    data = json.loads(AOI_PRESETS_PATH.read_text())
-    return [
-        {"id": str(p["id"]), "name": str(p["name"]), "bbox": [float(v) for v in p["bbox"]]}
-        for p in data["presets"]
-    ]
+    """The regions as contract ``presets`` entries."""
+    return regions.preset_entries()
 
 
 def _years_from_range(date_range: tuple[str, str]) -> dict[str, int]:
@@ -623,7 +619,7 @@ def build_methods(
 
 
 __all__: Iterable[str] = (
-    "AOI_PRESETS_PATH",
+    "REGIONS_PATH",
     "BANGLADESH_BBOX",
     "PRODUCT_STREAMS",
     "SENSOR_LABELS",

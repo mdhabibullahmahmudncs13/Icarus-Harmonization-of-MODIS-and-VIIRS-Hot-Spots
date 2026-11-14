@@ -41,6 +41,7 @@ from typing import Any
 
 import pandas as pd
 
+from src import regions
 from src.acquire import safe
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -576,10 +577,22 @@ def download_product(
     limiter: TransactionLimiter | None = None,
     offline: bool | None = None,
     merge: bool = True,
+    region: str | None = None,
 ) -> ProductReport:
-    """Download one FIRMS source product over a window, chunk by chunk."""
+    """Download one FIRMS source product over a window, chunk by chunk.
+
+    ``region`` resolves the bounding box from ``config/regions.json`` and
+    refuses a product that region does not support; ``bbox`` is used only
+    when no region is named. The registry is the authority, so a region and
+    sensor that do not exist cannot be paired here.
+    """
     if source not in PRODUCTS:
         raise ValueError(f"unknown FIRMS source {source!r}; known: {sorted(PRODUCTS)}")
+    if region is not None:
+        try:
+            bbox = regions.require_supported(region, source).bbox
+        except (KeyError, ValueError) as exc:
+            raise ValueError(str(exc)) from exc
     product = PRODUCTS[source]
     window = product_window(product, start, end)
     report = ProductReport(product=product, window=window)
@@ -620,6 +633,7 @@ def download(
     limiter: TransactionLimiter | None = None,
     offline: bool | None = None,
     merge: bool = True,
+    region: str | None = None,
 ) -> list[ProductReport]:
     """Download every requested product, in order (Suomi-NPP first)."""
     return [
@@ -634,6 +648,7 @@ def download(
             limiter=limiter,
             offline=offline,
             merge=merge,
+            region=region,
         )
         for source in products
     ]
@@ -669,10 +684,16 @@ def build_parser() -> argparse.ArgumentParser:
         "NOAA-20, NOAA-21)",
     )
     parser.add_argument(
+        "--region",
+        default=os.environ.get("FIRMS_REGION") or None,
+        help="region id from config/regions.json (e.g. SOUTH_ASIA, WORLD); "
+        "overrides --bbox and checks the region supports each product",
+    )
+    parser.add_argument(
         "--bbox",
         type=_parse_bbox,
         default=_parse_bbox(os.environ.get("FIRMS_BBOX", "88,20,93,27")),
-        help="west,south,east,north (default: Bangladesh 88,20,93,27)",
+        help="west,south,east,north (default: Bangladesh 88,20,93,27; ignored with --region)",
     )
     parser.add_argument(
         "--start",
@@ -697,6 +718,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"unknown products: {unknown}; known: {sorted(PRODUCTS)}", file=sys.stderr)
         return 2
 
+    if args.region is not None:
+        if args.region not in regions.region_ids():
+            print(
+                f"unknown region {args.region!r}; known: {sorted(regions.region_ids())}",
+                file=sys.stderr,
+            )
+            return 2
+        for product in products:
+            try:
+                regions.require_supported(args.region, product)
+            except ValueError as exc:
+                print(str(exc), file=sys.stderr)
+                return 2
+
     offline = is_offline()
     map_key = ""
     if not offline:
@@ -717,6 +752,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         limiter=limiter,
         offline=offline,
         merge=not args.no_merge,
+        region=args.region,
     )
     for report in reports:
         print(report.summary())

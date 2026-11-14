@@ -10,6 +10,7 @@ const VIEW_ITEMS: { id: View; label: string; icon: IconName }[] = [
   { id: 'calendar', label: 'Calendar', icon: 'calendar' },
   { id: 'map', label: 'Map', icon: 'map' },
   { id: 'anomalies', label: 'Anomalies', icon: 'anomalies' },
+  { id: 'news', label: 'Fire news', icon: 'news' },
   { id: 'critical', label: 'Critical period', icon: 'critical' },
   { id: 'validation', label: 'Validation', icon: 'validation' },
 ];

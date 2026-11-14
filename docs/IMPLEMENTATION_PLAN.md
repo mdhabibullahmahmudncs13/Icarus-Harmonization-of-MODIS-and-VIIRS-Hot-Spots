@@ -287,7 +287,7 @@ Artifacts:
 | Calibration | `src/compute/calibrate.py` | S8: multiplicative VIIRS-to-MODIS factor |
 | Payload builders | `src/compute/export.py` | The contract JSON, served by the API |
 | Static export | `tools/export_payloads.py` | Writes the same payloads to disk from the cache |
-| AOI presets | `src/aoi_presets.json` | One preset list for the API and the mock generator |
+| AOI presets | `config/regions.json` | One preset list for the API and the mock generator |
 | Contract tests | `tests/test_api.py`, `tests/test_export.py`, `tests/test_export_payloads.py` | Every payload against `$defs` |
 
 Run and verify:

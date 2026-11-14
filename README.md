@@ -41,7 +41,7 @@ Coverage and source labels to distinguish observed, calibrated, and unavailable 
 
 Climatology, anomaly scoring, and critical-period estimates.
 
-Preset or custom areas of interest (AOIs).
+Every NASA FIRMS region (including `World`), plus the pilot AOIs, from one registry.
 
 Read-only JSON API with a shared response contract.
 
@@ -108,7 +108,8 @@ Repository structure
 
 .
 ├── config/
-│   └── params.yaml          # Central registry of scientific parameters
+│   ├── params.yaml          # Central registry of scientific parameters
+│   └── regions.json         # One region registry for the UI, API and downloader
 ├── demo_fixtures/           # Committed offline demo detections
 ├── docs/                    # Architecture, methods, API, validation and deployment docs
 ├── src/
@@ -208,6 +209,8 @@ Run the cache command, optionally overriding its defaults:
 make cache
 # Example with explicit products and dates:
 make cache ARGS="--products VIIRS_SNPP_SP --start 2012-01-01"
+# Example with a named region from config/regions.json (overrides --bbox):
+make cache ARGS="--region SOUTH_ASIA"
 
 The default pilot region is approximately Bangladesh and nearby areas. Check the acquisition module and its command-line help before downloading a large date range. Raw and derived datasets are stored locally and are not bundled with this repository.
 
@@ -259,9 +262,19 @@ Method and provenance information
 
 /api/v1/aoi
 
-AOI-related information
+Every selectable region and its bounding box
+
+POST /api/fire-news
+
+Sourced fire news for one date and region (Hyperbrowser)
 
 Exact request parameters and payload shapes are defined by the API implementation and docs/contract.schema.json. Invalid AOIs return structured validation errors. Responses include parameter metadata so results can be traced to the configuration used.
+
+Regions come from `config/regions.json`. The FIRMS entries and bounding boxes are copied from the official [Regional Coordinates](https://firms.modaps.eosdis.nasa.gov/active_fire/coordinates.html) table; each region lists the MODIS and VIIRS products it supports, and the acquisition CLI refuses a region/sensor pair the registry does not define.
+
+### Fire news
+
+`POST /api/fire-news` with `{"date": "YYYY-MM-DD", "region": "SOUTH_ASIA"}` asks the agent to search the web through [Hyperbrowser](https://www.hyperbrowser.ai), read the candidate pages, and keep only articles that name a fire in that region and match the day. Set `HYPERBROWSER_API_KEY` in `.env`. Each result carries a headline, summary, publication date, source name and source URL; if nothing verifies, the endpoint returns an empty result with a clear message rather than inferred text. Results are cached per `(date, region)` under `cache/news/` for six hours (`FIRE_NEWS_CACHE_TTL_S`), and a request is bounded by `FIRE_NEWS_TIMEOUT_S` (25 s). The same panel is available as **Fire news** in the web app. `make demo` is strictly offline (`OFFLINE=1`), so it serves only cached news and otherwise returns a clear 503; run `python -m uvicorn src.api.main:app` without `OFFLINE` (the fixture still backs the data) to allow live searches.
 
 Configuration and reproducibility
 

@@ -284,12 +284,14 @@ def test_year_timing_deviation_is_zero_for_a_single_year(series):
     assert export.year_timing_deviation(series) == [{"year": 2015, "days": 0}]
 
 
-def test_aoi_payload_matches_the_contract_and_the_presets_file():
+def test_aoi_payload_matches_the_contract_and_the_regions_file():
     payload = export.build_aoi()
     assert_matches("aoi", payload)
-    on_disk = json.loads((REPO_ROOT / "src" / "aoi_presets.json").read_text())["presets"]
+    on_disk = json.loads(
+        (REPO_ROOT / "config" / "regions.json").read_text(encoding="utf-8")
+    )["regions"]
     assert payload["presets"] == [
-        {"id": p["id"], "name": p["name"], "bbox": p["bbox"]} for p in on_disk
+        {"id": p["id"], "name": p["label"], "bbox": p["bbox"]} for p in on_disk
     ]
 
 

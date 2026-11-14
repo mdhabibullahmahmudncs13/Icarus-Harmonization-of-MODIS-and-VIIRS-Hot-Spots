@@ -77,7 +77,16 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     plugins: [react(), serviceWorkerVersion()],
-    server: { port: 5174 },
+    // The news agent is a backend route, so a mock-tier dev session still
+    // needs it reachable. `make demo` serves the API on 8000; an absolute
+    // VITE_API_BASE bypasses this proxy in api-tier runs.
+    server: {
+      port: 5174,
+      proxy: { '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true } },
+    },
+    preview: {
+      proxy: { '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true } },
+    },
     build: {
       target: 'es2022',
       // Two entries, one build: the app at `/` and the landing page at

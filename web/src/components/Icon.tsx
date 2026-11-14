@@ -3,6 +3,7 @@ export type IconName =
   | 'calendar'
   | 'map'
   | 'anomalies'
+  | 'news'
   | 'critical'
   | 'validation'
   | 'methods'
@@ -23,6 +24,7 @@ const PATHS: Record<IconName, string> = {
     'M7 3v3M17 3v3M4 9h16M5 6h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z',
   map: 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Zm0 0v14m6-12v14',
   anomalies: 'M3 15h4l3-9 4 13 3-8h4',
+  news: 'M4 5h13v14H5a1 1 0 0 1-1-1V5Zm13 3h2a1 1 0 0 1 1 1v8a2 2 0 0 1-2 2M7 9h7M7 12h7M7 15h4',
   critical: 'M12 3s5 4.5 5 9a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 1.5.8 2.5 2 2.5 1.2 0 2-1 2-2.5 0-1.5-1-3.5-1-4.5Z',
   validation: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-3.5-9.2 2.4 2.4 4.6-5',
   methods: 'M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Zm0 0a2 2 0 0 0-2 2v11m14 1h2a2 2 0 0 0 2-2V6',

@@ -42,7 +42,7 @@ this document, and the sensitivity experiment it affects (see §4).
 | `onset` | `0.10` | Onset cumulative fraction | §7 |
 | `end` | `0.90` | End cumulative fraction | §7 |
 | `min_mean_density` | `1e-5` | Minimum mean density to detect a season | §7 |
-| `max_aoi_cells` | `100000` | Max cells per AOI request | §8 |
+| `max_aoi_cells` | `25000000` | Max cells per AOI request | §8 |
 | `request_timeout_s` | `30` | API request timeout (seconds) | §8 |
 
 ---
@@ -88,7 +88,7 @@ season:
   end: 0.90
   min_mean_density: 1.0e-5
 api:
-  max_aoi_cells: 100000
+  max_aoi_cells: 25000000
   request_timeout_s: 30
 ```
 

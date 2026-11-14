@@ -38,7 +38,7 @@ export function MockBanner({ source }: { source: SourceKind }) {
 export function KeyboardHint() {
   return (
     <p className="hint">
-      Press <kbd>R</kbd>/<kbd>H</kbd> to switch modes, <kbd>1</kbd>–<kbd>8</kbd> for views,{' '}
+      Press <kbd>R</kbd>/<kbd>H</kbd> to switch modes, <kbd>1</kbd>–<kbd>9</kbd> for views,{' '}
       <kbd>?</kbd> for all shortcuts.
     </p>
   );
@@ -121,7 +121,7 @@ export class RenderBoundary extends Component<
 }
 
 const SHORTCUTS: { keys: string[]; label: string }[] = [
-  { keys: ['1', '…', '8'], label: 'Jump to a view (Overview → Offline)' },
+  { keys: ['1', '…', '9'], label: 'Jump to a view (Overview → Offline)' },
   { keys: ['R'], label: 'Raw detections mode' },
   { keys: ['H'], label: 'Harmonized cell-days mode' },
   { keys: ['T'], label: 'Toggle dark / light theme' },

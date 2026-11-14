@@ -43,5 +43,5 @@ season:
   end: 0.90               # end cumulative fraction
   min_mean_density: 1.0e-5   # minimum mean density to detect a season
 api:
-  max_aoi_cells: 100000   # max cells per AOI request
+  max_aoi_cells: 25000000 # max cells per AOI request (world = 24,216,976)
   request_timeout_s: 30   # API request timeout (seconds)
